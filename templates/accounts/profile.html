@@ -1,0 +1,33 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Profile — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Profile</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Shown in the "Assessment team" section of any report exported for an engagement you have
+            access to — keep it up to date and every future export reflects it automatically.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            {% for error in form.non_field_errors %}<p class="field-error mb-4">{{ error }}</p>{% endfor %}
+            <div class="mb-4">
+                <label for="{{ form.qualifications.id_for_label }}" class="field-label">{{ form.qualifications.label }}</label>
+                {{ form.qualifications|add_class:"field-input" }}
+                <p class="field-help">{{ form.qualifications.help_text }}</p>
+                {% for error in form.qualifications.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mb-4">
+                <label for="{{ form.background.id_for_label }}" class="field-label">{{ form.background.label }}</label>
+                {{ form.background|add_class:"field-input" }}
+                <p class="field-help">{{ form.background.help_text }}</p>
+                {% for error in form.background.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'accounts:dashboard' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+</div>
+{% endblock %}

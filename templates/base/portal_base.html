@@ -1,0 +1,180 @@
+{% load static %}
+{% load redscribe_extras %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script nonce="{{ request.csp_nonce }}">
+        (function () {
+            var stored = localStorage.getItem("theme");
+            var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+            if (dark) document.documentElement.classList.add("dark");
+            if (localStorage.getItem("portalSidebarCollapsed") === "1") document.documentElement.classList.add("sidebar-collapsed");
+        })();
+    </script>
+    <title>{% block title %}RedScribe Client Portal{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <style>
+        @media (min-width: 1024px) {
+            #sidebar { transition: width 200ms ease; }
+            html.sidebar-collapsed #sidebar { width: 4.5rem; }
+            html.sidebar-collapsed #sidebar .sidebar-label,
+            html.sidebar-collapsed #sidebar .sidebar-logo-full { display: none; }
+            html.sidebar-collapsed #sidebar .sidebar-logo-mark { display: flex; }
+            html.sidebar-collapsed #sidebar .sidebar-logo-image { max-width: 2rem; }
+            html.sidebar-collapsed #sidebar .sidebar-header {
+                flex-direction: column; justify-content: center; padding-left: 0; padding-right: 0; gap: 0.5rem;
+            }
+            html.sidebar-collapsed #sidebar .sidebar-link,
+            html.sidebar-collapsed #sidebar .sidebar-link-active { justify-content: center; padding-left: 0; padding-right: 0; }
+            html.sidebar-collapsed #sidebar .sidebar-user-row { justify-content: center; }
+            #sidebar-desktop-toggle svg { transition: transform 200ms ease; }
+            html.sidebar-collapsed #sidebar-desktop-toggle svg { transform: rotate(180deg); }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full font-sans text-slate-900 antialiased twilight-surface">
+
+    <div class="lg:flex lg:min-h-full">
+        {% if user.is_authenticated %}
+        <div class="lg:hidden flex items-center justify-between h-14 px-4 twilight-surface shadow-md">
+            <a href="{% url 'clients_portal:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
+                {% if branding.has_logo %}
+                <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="h-7 max-w-[9rem] object-contain">
+                {% elif branding.firm_name %}
+                <span class="truncate">{{ branding.firm_name }}</span>
+                {% else %}
+                <span class="flex items-baseline gap-0.5">Red<span class="text-mist-300">Scribe</span></span>
+                {% endif %}
+            </a>
+            <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-white/80 hover:bg-white/10 hover:text-white" aria-expanded="false" aria-controls="sidebar">
+                <span class="sr-only">Open main menu</span>
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+        <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden"></div>
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full transition-transform duration-200
+                                    lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0 lg:w-64 lg:shrink-0
+                                    flex flex-col twilight-surface shadow-md">
+            <div class="sidebar-header hidden lg:flex items-center justify-between gap-1 px-4 py-3.5 border-b border-white/15">
+                <a href="{% url 'clients_portal:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
+                    {% if branding.has_logo %}
+                    <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="sidebar-logo-image h-7 max-w-[9rem] object-contain">
+                    {% elif branding.firm_name %}
+                    <span class="sidebar-logo-full truncate">{{ branding.firm_name }}</span>
+                    <span class="sidebar-logo-mark hidden h-7 w-7 items-center justify-center rounded-md bg-white/10 text-mist-300 text-base uppercase">{{ branding.firm_name|slice:":1" }}</span>
+                    {% else %}
+                    <span class="sidebar-logo-full flex items-baseline gap-0.5">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></span>
+                    <span class="sidebar-logo-mark hidden h-7 w-7 items-center justify-center rounded-md bg-white/10 text-mist-300 text-base">R</span>
+                    {% endif %}
+                </a>
+                <button type="button" id="sidebar-desktop-toggle"
+                        class="inline-flex items-center justify-center h-7 w-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                        aria-expanded="true" aria-controls="sidebar" title="Collapse sidebar">
+                    <span class="sr-only">Toggle sidebar</span>
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+            {% if user.client %}
+            <div class="sidebar-label px-4 py-2.5 border-b border-white/15 text-xs text-white/50 truncate">{{ user.client.name }}</div>
+            {% endif %}
+            <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+                <a href="{% url 'clients_portal:dashboard' %}" title="Engagements" class="{% if request.resolver_match.url_name == 'dashboard' %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+                    <span class="sidebar-label">Engagements</span>
+                </a>
+                {% if user.auth_type == "LOCAL" %}
+                <a href="{% url 'accounts:password_change' %}" title="Change password" class="{% if request.resolver_match.url_name == 'password_change' %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8.5" width="10" height="8" rx="1.5"/><path d="M7 8.5V6a3 3 0 0 1 6 0v2.5"/></svg>
+                    <span class="sidebar-label">Change password</span>
+                </a>
+                {% if user.mfa_enrolled_at %}
+                <a href="{% url 'accounts:mfa_verify' %}" title="Two-factor authentication" class="sidebar-link">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 4-2.6 6.6-6 7.5-3.4-.9-6-3.5-6-7.5V5l6-2.5Z"/><path d="M7.5 10 9 11.5l3.5-3.5"/></svg>
+                    <span class="sidebar-label">Two-factor authentication</span>
+                </a>
+                {% else %}
+                <a href="{% url 'accounts:mfa_enroll' %}" title="Enable two-factor authentication" class="sidebar-link">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 4-2.6 6.6-6 7.5-3.4-.9-6-3.5-6-7.5V5l6-2.5Z"/><path d="M7.5 10 9 11.5l3.5-3.5"/></svg>
+                    <span class="sidebar-label">Enable two-factor authentication</span>
+                </a>
+                {% endif %}
+                {% endif %}
+            </nav>
+            <div class="px-3 py-4 border-t border-white/15 space-y-2">
+                <div class="sidebar-user-row flex items-center gap-2.5 px-1 py-1">
+                    <span class="avatar" title="{{ user }}">{{ user|initials }}</span>
+                    <div class="sidebar-label min-w-0 flex-1">
+                        <p class="text-sm text-white truncate leading-tight">{{ user }}</p>
+                        <p class="text-xs text-white/50 truncate leading-tight">Client Portal</p>
+                    </div>
+                    <span class="sidebar-label text-white">{% include 'base/_theme_toggle.html' %}</span>
+                </div>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" title="Sign out" class="sidebar-link w-full text-left">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><path d="M12.5 13.5 16 10l-3.5-3.5"/><path d="M16 10H7.5"/></svg>
+                        <span class="sidebar-label">Sign out</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <script nonce="{{ request.csp_nonce }}">
+            (function () {
+                var toggle = document.getElementById("sidebar-toggle");
+                var sidebar = document.getElementById("sidebar");
+                var backdrop = document.getElementById("sidebar-backdrop");
+                if (toggle && sidebar && backdrop) {
+                    toggle.addEventListener("click", function () {
+                        var isOpen = !sidebar.classList.contains("-translate-x-full");
+                        sidebar.classList.toggle("-translate-x-full", isOpen);
+                        backdrop.classList.toggle("hidden", isOpen);
+                        toggle.setAttribute("aria-expanded", String(!isOpen));
+                    });
+                    backdrop.addEventListener("click", function () {
+                        sidebar.classList.add("-translate-x-full");
+                        backdrop.classList.add("hidden");
+                        toggle.setAttribute("aria-expanded", "false");
+                    });
+                }
+                var dtoggle = document.getElementById("sidebar-desktop-toggle");
+                if (dtoggle) {
+                    function applyState(collapsed) {
+                        document.documentElement.classList.toggle("sidebar-collapsed", collapsed);
+                        dtoggle.setAttribute("aria-expanded", String(!collapsed));
+                        dtoggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+                    }
+                    applyState(document.documentElement.classList.contains("sidebar-collapsed"));
+                    dtoggle.addEventListener("click", function () {
+                        var collapsed = !document.documentElement.classList.contains("sidebar-collapsed");
+                        localStorage.setItem("portalSidebarCollapsed", collapsed ? "1" : "0");
+                        applyState(collapsed);
+                    });
+                }
+            })();
+        </script>
+        {% else %}
+        {% include 'base/_theme_toggle_floating.html' %}
+        {% endif %}
+
+        <div class="flex-1 min-w-0">
+            {% include 'base/_toasts.html' %}
+            <div class="w-full max-w-5xl mx-auto px-4 sm:px-6 py-10">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/redscribe-validation.js' %}"></script>
+    {% include "base/_session_watch.html" %}
+    {% block extra_body %}{% endblock %}
+</body>
+</html>

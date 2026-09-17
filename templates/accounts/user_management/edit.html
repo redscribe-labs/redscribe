@@ -1,0 +1,58 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Edit {{ target.username }} — RedScribe{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ target.username }}</h1>
+        <p class="text-sm text-slate-500 mb-5">Username and account type can't be changed here.</p>
+        <form method="post">
+            {% csrf_token %}
+            <div>
+                <label for="{{ form.email.id_for_label }}" class="field-label">Email</label>
+                {{ form.email|add_class:"field-input" }}
+                {% for error in form.email.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mt-4">
+                <label for="{{ form.first_name.id_for_label }}" class="field-label">First name</label>
+                {{ form.first_name|add_class:"field-input" }}
+                {% for error in form.first_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mt-4">
+                <label for="{{ form.last_name.id_for_label }}" class="field-label">Last name</label>
+                {{ form.last_name|add_class:"field-input" }}
+                {% for error in form.last_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mt-4">
+                <label for="{{ form.role.id_for_label }}" class="field-label">Role</label>
+                {{ form.role|add_class:"field-input" }}
+                {% if is_self %}
+                <p class="field-help">You can't change your own role — ask another Superadmin to do it.</p>
+                {% endif %}
+                {% for error in form.role.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mt-4">
+                <label for="{{ form.qualifications.id_for_label }}" class="field-label">{{ form.qualifications.label }}</label>
+                {{ form.qualifications|add_class:"field-input" }}
+                <p class="field-help">{{ form.qualifications.help_text }}</p>
+                {% for error in form.qualifications.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mt-4 mb-5">
+                <label for="{{ form.background.id_for_label }}" class="field-label">{{ form.background.label }}</label>
+                {{ form.background|add_class:"field-input" }}
+                <p class="field-help">{{ form.background.help_text }}</p>
+                {% for error in form.background.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}
+                <p class="field-error">{{ error }}</p>
+                {% endfor %}
+            {% endif %}
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'user_management:detail' target.uuid as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back" %}
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ company.name }} — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3">
+            <span class="avatar !h-10 !w-10 !rounded-lg !bg-orange-50 !text-orange-700 dark:!bg-orange-950/50 dark:!text-orange-300">
+                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5V7l4.5-2.5V16.5"/><path d="M8.5 8.5 16 6v10.5"/></svg>
+            </span>
+            <div>
+                <h1 class="page-title">{{ company.name }}</h1>
+                <p class="text-sm text-slate-500">Added {{ company.created_at|date:"d/m/Y" }}{% if company.created_by %} by {{ company.created_by.username }}{% endif %}</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 mt-3">
+            {% if company.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Inactive</span>{% endif %}
+        </div>
+    </div>
+    <a href="{% url 'clients:edit' company.pk %}" class="btn-secondary">Edit</a>
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel space-y-3">
+    <h2 class="font-semibold text-slate-900 mb-1">Actions</h2>
+    <a href="{% url 'clients:user_create' company.pk %}" class="btn-primary w-full text-center">New client user</a>
+    {% if not company.is_active %}
+    <p class="field-help">This client is inactive — it won't appear when creating new client users or linking engagements.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Linked engagements</h2>
+        {% if engagements %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for engagement in engagements %}
+            <li class="flex items-center justify-between py-2 text-sm gap-3">
+                <a href="{% url 'engagements:detail' engagement.pk %}" class="text-slate-700 hover:text-brand-700 dark:hover:text-brand-300 truncate">{{ engagement.client_name }}</a>
+                <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-500">No engagements linked to this client yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Client portal users</h2>
+        {% if portal_users %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for target in portal_users %}
+            <li class="flex items-center justify-between py-2 text-sm gap-3">
+                <a href="{% url 'clients:user_detail' target.uuid %}" class="text-slate-700 hover:text-brand-700 dark:hover:text-brand-300 truncate">
+                    {{ target.get_full_name|default:target.username }} <span class="text-slate-400">({{ target.username }})</span>
+                </a>
+                {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-500">No portal user accounts yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% url 'clients:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to Manage Clients" %}
+{% endblock %}

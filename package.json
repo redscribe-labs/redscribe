@@ -1,0 +1,35 @@
+{
+  "name": "redscribe-editor-build",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build-time only: bundles Tiptap into a self-hosted static asset. Not required at runtime — the committed output in static/vendor/ is what actually ships.",
+  "scripts": {
+    "build:editor": "esbuild editor-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-editor.bundle.js --minify",
+    "build:strength": "esbuild strength-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-password-strength.bundle.js --minify",
+    "build:datepicker": "esbuild datepicker-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-datepicker.bundle.js --minify",
+    "build:css": "tailwindcss -i tailwind-src/input.css -o static/css/tailwind.css --minify",
+    "build": "npm run build:editor && npm run build:strength && npm run build:datepicker && npm run build:css"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "@tiptap/core": "^2.27.3",
+    "@tiptap/extension-code-block": "^2.27.3",
+    "@tiptap/extension-highlight": "^2.27.3",
+    "@tiptap/extension-image": "^2.27.3",
+    "@tiptap/extension-link": "^2.27.3",
+    "@tiptap/extension-paragraph": "^2.27.3",
+    "@tiptap/extension-table": "^2.27.3",
+    "@tiptap/extension-table-cell": "^2.27.3",
+    "@tiptap/extension-table-header": "^2.27.3",
+    "@tiptap/extension-table-row": "^2.27.3",
+    "@tiptap/extension-underline": "^2.27.3",
+    "@tiptap/pm": "^2.27.3",
+    "@tiptap/starter-kit": "^2.27.3",
+    "@zxcvbn-ts/core": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-en": "^3.0.2",
+    "esbuild": "^0.24.0",
+    "flatpickr": "^4.6.13",
+    "tailwindcss": "^4.3.3"
+  }
+}

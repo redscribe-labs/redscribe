@@ -1,0 +1,346 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ finding.title }} — {{ engagement.client_name }}{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="findings" %}
+{% endblock %}
+
+{% block main_class %}min-w-0 flex-1 max-w-5xl{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel xl:w-auto xl:flex-1 xl:max-w-md">
+    <div>
+        <h2 class="font-semibold text-slate-900 text-sm mb-4">Review / QA</h2>
+
+        <div class="mb-5">
+            <div class="flex items-start gap-3">
+                <div class="flex flex-col items-center">
+                    <span class="step-dot {% if finding.workflow_status == 'DRAFT' %}step-dot-current{% else %}step-dot-done{% endif %}">
+                        {% if finding.workflow_status == 'DRAFT' %}1{% else %}<svg class="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4 4 8-8"/></svg>{% endif %}
+                    </span>
+                    <span class="{% if finding.workflow_status == 'REVIEW_CHANGES_REQUESTED' or finding.workflow_status == 'DRAFT' %}step-line{% else %}step-line-done{% endif %}"></span>
+                </div>
+                <div class="pb-4 pt-0.5">
+                    <p class="text-sm font-medium text-slate-800">Draft</p>
+                    <p class="text-xs text-slate-400">Authored by {{ finding.created_by|default:"—" }}</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="flex flex-col items-center">
+                    <span class="step-dot
+                        {% if finding.workflow_status == 'DRAFT' %}step-dot-pending
+                        {% elif finding.workflow_status == 'REVIEW_CHANGES_REQUESTED' %}step-dot-current !bg-amber-500
+                        {% else %}step-dot-done{% endif %}">
+                        {% if finding.workflow_status == 'DRAFT' %}2
+                        {% elif finding.workflow_status == 'REVIEW_CHANGES_REQUESTED' %}!
+                        {% else %}<svg class="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4 4 8-8"/></svg>{% endif %}
+                    </span>
+                    <span class="{% if finding.workflow_status == 'REVIEWED' or finding.workflow_status == 'QA_APPROVED' or finding.workflow_status == 'QA_CHANGES_REQUESTED' %}step-line-done{% else %}step-line{% endif %}"></span>
+                </div>
+                <div class="pb-4 pt-0.5">
+                    <p class="text-sm font-medium text-slate-800">Review</p>
+                    {% if finding.assigned_reviewer %}
+                    <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>{{ finding.assigned_reviewer }}</p>
+                    {% else %}<p class="text-xs text-slate-400">Unassigned</p>{% endif %}
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="flex flex-col items-center">
+                    <span class="step-dot
+                        {% if finding.workflow_status == 'DRAFT' or finding.workflow_status == 'REVIEW_CHANGES_REQUESTED' %}step-dot-pending
+                        {% elif finding.workflow_status == 'QA_CHANGES_REQUESTED' %}step-dot-current !bg-amber-500
+                        {% elif finding.workflow_status == 'QA_APPROVED' %}step-dot-done
+                        {% else %}step-dot-current{% endif %}">
+                        {% if finding.workflow_status == 'QA_APPROVED' %}<svg class="h-3 w-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l4 4 8-8"/></svg>
+                        {% elif finding.workflow_status == 'QA_CHANGES_REQUESTED' %}!
+                        {% else %}3{% endif %}
+                    </span>
+                </div>
+                <div class="pt-0.5">
+                    <p class="text-sm font-medium text-slate-800">QA approval</p>
+                    {% if finding.assigned_qa %}
+                    <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>{{ finding.assigned_qa }}</p>
+                    {% else %}<p class="text-xs text-slate-400">Unassigned</p>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if finding.workflow_status == "QA_APPROVED" %}
+        <p class="text-sm text-green-700 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/50 rounded-md px-3 py-2 mb-1">QA Approved — ready to publish.</p>
+        {% endif %}
+
+        {% if can_assign_reviewer or can_submit_review or can_assign_qa or can_submit_qa or can_reopen %}
+        <div class="border-t border-slate-200 pt-4 space-y-2">
+            {% if can_assign_reviewer %}
+            <form method="post" action="{% url 'findings:assign_reviewer' engagement.pk finding.pk %}">
+                {% csrf_token %}
+                <select name="reviewer" class="field-input mb-2">
+                    {% for candidate in reviewer_candidates %}
+                    <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-primary w-full">Assign reviewer</button>
+            </form>
+            {% endif %}
+
+            {% if can_submit_review %}
+            <form method="post" action="{% url 'findings:submit_review' engagement.pk finding.pk %}" class="flex flex-col gap-2">
+                {% csrf_token %}
+                <button type="submit" name="outcome" value="REVIEWED" class="btn-primary w-full">Approve review</button>
+                <button type="submit" name="outcome" value="REVIEW_CHANGES_REQUESTED" class="btn-danger w-full">Request changes</button>
+            </form>
+            {% endif %}
+
+            {% if can_assign_qa %}
+            <form method="post" action="{% url 'findings:assign_qa' engagement.pk finding.pk %}">
+                {% csrf_token %}
+                <select name="qa_reviewer" class="field-input mb-2">
+                    {% for candidate in qa_candidates %}
+                    <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-primary w-full">Assign QA</button>
+            </form>
+            {% endif %}
+
+            {% if can_submit_qa %}
+            <form method="post" action="{% url 'findings:submit_qa' engagement.pk finding.pk %}" class="flex flex-col gap-2">
+                {% csrf_token %}
+                <button type="submit" name="outcome" value="QA_APPROVED" class="btn-primary w-full">QA Approve</button>
+                <button type="submit" name="outcome" value="QA_CHANGES_REQUESTED" class="btn-danger w-full">Request changes</button>
+            </form>
+            {% endif %}
+
+            {% if can_reopen %}
+            <form method="post" action="{% url 'findings:reopen_to_draft' engagement.pk finding.pk %}" class="pt-2">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger w-full">Revert to Draft</button>
+                <p class="field-help">Clears reviewer/QA assignment and reopens the finding for editing.</p>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="pt-6 border-t border-slate-200">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Linked checklist items</h2>
+        {% if linked_checklist_items %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for item in linked_checklist_items %}
+            <li class="py-2">
+                <a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">
+                    {% if item.code %}<span class="text-slate-400 font-mono text-xs mr-1">{{ item.code }}</span>{% endif %}{{ item.title }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-400">No checklist items link to this finding yet — link one from the checklist item's detail page.</p>
+        {% endif %}
+        <a href="{% url 'checklist:list' engagement.pk %}" class="block text-xs text-brand-600 dark:text-brand-300 hover:underline mt-3">View full checklist &rarr;</a>
+    </div>
+
+    {% if engagement.client %}
+    <div class="pt-6 border-t border-slate-200">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Client visibility</h2>
+        {% if client_views %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for view in client_views %}
+            <li class="py-2 text-sm text-slate-700">
+                {{ view.client_user }} ({{ view.client_user.client.name }})
+                <p class="text-xs text-slate-400">Last viewed {{ view.last_viewed_at|date:"d/m/Y H:i" }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% elif finding.workflow_status == "QA_APPROVED" %}
+        <p class="text-sm text-slate-400">Not yet viewed by the client.</p>
+        {% else %}
+        <p class="text-sm text-slate-400">Not visible to the client until QA approved.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if similar_catalogue_entries or repeat_findings_for_client %}
+    <div class="pt-6 border-t border-slate-200">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Possible recurrence</h2>
+
+        {% if repeat_findings_for_client %}
+        <p class="text-xs text-slate-400 mb-1.5">Similar findings for {{ engagement.client_name }}</p>
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200 mb-4">
+            {% for prior in repeat_findings_for_client %}
+            <li class="py-2">
+                <a href="{% url 'findings:detail' prior.engagement_id prior.pk %}" class="text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">{{ prior.title }}</a>
+                <p class="text-xs text-slate-400">{{ prior.engagement.client_name }} &middot; {{ prior.created_at|date:"d/m/Y" }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if similar_catalogue_entries %}
+        <p class="text-xs text-slate-400 mb-1.5">Similar catalogue entries</p>
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for template in similar_catalogue_entries %}
+            <li class="py-2">
+                <a href="{% url 'catalogue:detail' template.pk %}" class="text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">{{ template.title }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block page_header %}
+
+<div class="flex flex-wrap items-start justify-between gap-4 mb-3">
+    <div class="rail-severity pl-4 min-w-0" style="{{ finding|severity_rail_style }}">
+        <p class="page-eyebrow !text-slate-400 dark:!text-slate-400 !mb-0.5">{{ engagement.client_name }}</p>
+        <h1 class="text-3xl font-bold text-slate-900 leading-tight break-words">{{ finding.title }}</h1>
+    </div>
+    <div class="flex gap-2 shrink-0">
+        {% if can_edit_content %}
+        <a href="{% url 'findings:edit' engagement.pk finding.pk %}" class="btn-secondary">Edit</a>
+        {% endif %}
+        {% if not finding.archived and can_delete %}
+        <a href="{% url 'findings:archive' engagement.pk finding.pk %}" class="btn-danger">Archive</a>
+        {% elif finding.archived and can_archive %}
+        <form method="post" action="{% url 'findings:unarchive' engagement.pk finding.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary">Unarchive</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="flex flex-wrap items-center gap-x-6 gap-y-3 pb-6 mb-6 border-b border-slate-200">
+    <span class="badge-severity text-sm px-3 py-1" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+    {% if finding.archived %}<span class="badge-red">Archived {{ finding.archived_at|date:"d/m/Y" }}</span>{% endif %}
+    <div class="flex items-center gap-1.5 text-sm">
+        <span class="text-slate-400">Status</span>
+        <span class="{{ finding.status|badge_class }}">{{ finding.get_status_display }}</span>
+    </div>
+    <div class="flex items-center gap-1.5 text-sm">
+        <span class="text-slate-400">Workflow</span>
+        <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+    </div>
+    {% if finding.retest_status != "NOT_RETESTED" %}
+    <div class="flex items-center gap-1.5 text-sm">
+        <span class="text-slate-400">Retest</span>
+        <span class="{{ finding.retest_status|badge_class }}">{{ finding.get_retest_status_display }}</span>
+    </div>
+    {% endif %}
+    <div class="flex items-baseline gap-1.5 text-sm">
+        <span class="text-slate-400">CVSS</span>
+        <span class="font-mono font-semibold text-slate-800">{{ finding.cvss_score|default:"—" }}</span>
+    </div>
+    {% if finding.cve_id %}
+    <div class="flex items-baseline gap-1.5 text-sm">
+        <span class="text-slate-400">CVE</span>
+        <span class="font-mono text-slate-700">{{ finding.cve_id }}</span>
+    </div>
+    {% endif %}
+    {% if finding.cvss_vector %}
+    <code class="text-xs bg-slate-100 rounded px-2 py-1 text-slate-600 break-all">{{ finding.cvss_vector }}</code>
+    {% endif %}
+    {% for tag in finding.classifications.all %}
+    <span class="badge-slate" title="{{ tag.taxonomy }}">{{ tag.value }}</span>
+    {% endfor %}
+</div>
+
+{% if finding.affects_list %}
+<div class="flex flex-wrap items-center gap-2 mb-8 -mt-2">
+    <span class="text-xs uppercase tracking-wide text-slate-400">Affects</span>
+    {% for item in finding.affects_list %}
+    <code class="text-xs bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-300 border border-red-100 dark:border-red-900 rounded px-2 py-1 break-all">{{ item }}</code>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-5xl">
+{% if document_sections %}
+<div class="card">
+    {% for section in document_sections %}
+    <div class="{% if not forloop.first %}mt-11 pt-11 border-t border-slate-200 dark:border-slate-200{% endif %}">
+        {% include "base/_document_section.html" with field_name=section.field_name label=section.label encrypted=section.encrypted content_json=section.content_json readonly_partial="findings/_rte_readonly.html" engagement=engagement finding=finding %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card text-center text-sm text-slate-500">
+    No content sections have been filled in yet.
+    {% if can_edit_content %}
+    <a href="{% url 'findings:edit' engagement.pk finding.pk %}" class="text-brand-600 hover:underline">Add some</a>.
+    {% endif %}
+</div>
+{% endif %}
+
+{% if retest_records or can_log_retest or retest_workflow_enabled %}
+<div class="card mt-6">
+    <h2 class="font-semibold text-slate-900 mb-3">Retest history</h2>
+
+    {% if retest_workflow_enabled and not can_log_retest and not finding.archived %}
+    <p class="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 rounded-md px-3 py-2 mb-4">
+        Retest results can only be logged while the engagement is Awaiting Remediation Test or in
+        Remediation Test — this one is currently
+        <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>.
+        {% if is_manager %}<a href="{% url 'engagements:detail' engagement.pk %}" class="underline">Change the engagement's status</a> to unlock this.{% endif %}
+    </p>
+    {% endif %}
+
+    {% if retest_records %}
+    <div class="space-y-4 divide-y divide-slate-100 dark:divide-slate-200 [&>*:not(:first-child)]:pt-4">
+        {% for record in retest_records %}
+        <div>
+            <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                <span class="{{ record.status|badge_class }}">{{ record.status_display }}</span>
+                <span>{{ record.tested_by|default:"Unknown" }}</span>
+                <span>&middot; {{ record.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            {% if record.notes %}
+            <div class="rte-editor" data-rte-field="retest-record-{{ forloop.counter }}" data-rte-editable="false" data-rte-initial='{{ record.notes }}'></div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400 mb-4">Not retested yet.</p>
+    {% endif %}
+
+    {% if can_log_retest %}
+    <form method="post" action="{% url 'findings:retest_create' engagement.pk finding.pk %}" class="mt-5 pt-5 border-t border-slate-100 dark:border-slate-200">
+        {% csrf_token %}
+        <div class="mb-3 max-w-xs">
+            <label for="{{ retest_form.status.id_for_label }}" class="field-label">{{ retest_form.status.label }}</label>
+            {{ retest_form.status|add_class:"field-input" }}
+            {% for error in retest_form.status.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="mb-3">
+            <label class="field-label">{{ retest_form.notes.label }}</label>
+            <div class="rte-editor" data-rte-field="retest_notes" data-rte-editable="true" data-rte-initial='{{ retest_form.notes.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
+            <input type="hidden" name="notes" id="{{ retest_form.notes.id_for_label }}" data-rte-hidden="retest_notes">
+            {% for error in retest_form.notes.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <button type="submit" class="btn-primary">Log retest result</button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if can_archive or can_delete %}
+<p class="text-xs text-slate-400 mt-4">
+    RedScribe doesn't offer permanent deletion of findings — actions here are kept in an append-only audit
+    trail, so removal is archival (see the Archive button above) rather than deletion.
+</p>
+{% endif %}
+
+{% url 'findings:list' engagement.pk as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to findings" %}
+</div>
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

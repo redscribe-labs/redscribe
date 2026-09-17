@@ -1,0 +1,421 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/inter-400.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/inter-500.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/inter-600.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../fonts/inter-700.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Plex Mono";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Plex Mono";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Plex Mono";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-mono-600.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Plex Mono";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../fonts/ibm-plex-mono-700.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Source Code Pro";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/source-code-pro-400.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Source Code Pro";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/source-code-pro-500.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Source Code Pro";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/source-code-pro-600.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Source Code Pro";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../fonts/source-code-pro-700.woff2") format("woff2");
+}
+
+@layer base {
+    input[type="checkbox"], input[type="radio"] {
+        @apply accent-brand-600 rounded-sm;
+    }
+
+    #sidebar ~ .flex-1 {
+        @apply bg-slate-50 min-h-screen;
+    }
+}
+
+@theme {
+    /* Color tokens below are the project's actual palette, defined in
+       COLOR_SCHEME.md (source of truth — update that file, not just this
+       one, whenever the palette changes). Only brand/navy/twilight/mist/
+       bell + the .dark slate override are part of that system; red/orange/
+       amber/green/slate (light mode) are intentionally left at Tailwind's
+       own defaults — the documented palette never touches them. */
+    --color-brand-50: #f0f5f0;
+    --color-brand-100: #e0ebe0;
+    --color-brand-200: #c2d6c2;
+    --color-brand-300: #a3c2a3;
+    --color-brand-400: #85ad85;
+    --color-brand-500: #669966;
+    --color-brand-600: #527a52;
+    --color-brand-700: #3d5c3d;
+    --color-brand-800: #293d29;
+    --color-brand-900: #141f14;
+    --color-brand-950: #0e150e;
+
+    --color-navy-50: #f0eff5;
+    --color-navy-100: #e1dfec;
+    --color-navy-200: #c3bfd9;
+    --color-navy-300: #a49fc6;
+    --color-navy-400: #8680b3;
+    --color-navy-500: #68609f;
+    --color-navy-600: #534d80;
+    --color-navy-700: #3e3960;
+    --color-navy-800: #2a2640;
+    --color-navy-900: #151320;
+    --color-navy-950: #0f0d16;
+
+    --color-twilight-50: #f2f2f3;
+    --color-twilight-100: #e4e6e7;
+    --color-twilight-200: #cacdce;
+    --color-twilight-300: #afb3b6;
+    --color-twilight-400: #959a9d;
+    --color-twilight-500: #7a8185;
+    --color-twilight-600: #62676a;
+    --color-twilight-700: #494d50;
+    --color-twilight-800: #313435;
+    --color-twilight-900: #181a1b;
+    --color-twilight-950: #111213;
+
+    --color-mist-50: #f0f4f4;
+    --color-mist-100: #e2e9e9;
+    --color-mist-200: #c4d4d3;
+    --color-mist-300: #a7bebc;
+    --color-mist-400: #8aa8a6;
+    --color-mist-500: #6c9390;
+    --color-mist-600: #577573;
+    --color-mist-700: #415856;
+    --color-mist-800: #2b3b3a;
+    --color-mist-900: #161d1d;
+    --color-mist-950: #0f1514;
+
+    --color-bell-50: #ffe6e8;
+    --color-bell-100: #ffccd1;
+    --color-bell-200: #fe9aa4;
+    --color-bell-300: #fe6776;
+    --color-bell-400: #fe3448;
+    --color-bell-500: #fe011b;
+    --color-bell-600: #cb0115;
+    --color-bell-700: #980110;
+    --color-bell-800: #65010b;
+    --color-bell-900: #330005;
+    --color-bell-950: #240004;
+
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "Plex Mono", ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    --font-code: "Source Code Pro", ui-monospace, "SF Mono", "Cascadia Code", monospace;
+}
+
+.dark {
+    --color-slate-50: #111213;
+    --color-slate-100: #181a1b;
+    --color-slate-200: #313435;
+    --color-slate-300: #494d50;
+    --color-slate-400: #62676a;
+    --color-slate-500: #7a8185;
+    --color-slate-600: #959a9d;
+    --color-slate-700: #afb3b6;
+    --color-slate-800: #cacdce;
+    --color-slate-900: #f2f2f3;
+}
+
+@layer components {
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+               transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
+               bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-900/10;
+    }
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+               transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
+               bg-white dark:bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm;
+    }
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+               transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
+               bg-white dark:bg-slate-100 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50
+               hover:bg-red-50 dark:hover:bg-red-950/40 shadow-sm;
+    }
+    .btn-ghost {
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+               transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
+               text-slate-600 hover:bg-slate-100;
+    }
+
+    /* No shadow by default — a card earns visual weight from its border and
+       content, not a floating drop-shadow every panel on every page shares
+       regardless of what's in it. Interactive rows/cards add their own
+       hover:shadow where hovering is meaningful (see findings/list.html). */
+    .card {
+        @apply bg-white dark:bg-slate-100 rounded-lg border border-slate-200 p-6;
+    }
+
+    /* A card with a title bar reads as a distinct "panel" rather than one
+       more instance of the same rounded box — for content that has its own
+       clear heading (vs. .card used as a plain container). */
+    .panel {
+        @apply bg-white dark:bg-slate-100 rounded-lg border border-slate-200 overflow-hidden;
+    }
+    .panel-header {
+        @apply flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 bg-slate-50 dark:bg-slate-50;
+    }
+    .panel-body {
+        @apply p-6;
+    }
+
+    .rail-panel {
+        @apply w-full xl:w-72 xl:shrink-0 space-y-6
+               xl:sticky xl:top-32 xl:self-start xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto;
+    }
+
+    .rail-panel-wide {
+        @apply w-full xl:w-[28rem] xl:shrink-0 space-y-6
+               xl:sticky xl:top-32 xl:self-start xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto;
+    }
+
+    .field-input {
+        @apply block w-full rounded-md border border-slate-300 bg-white dark:bg-slate-50 text-slate-900 px-3 py-2 text-sm shadow-sm
+               placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none;
+    }
+    .field-input.is-invalid, .field-input-file.is-invalid {
+        @apply border-red-400 dark:border-red-700 focus:border-red-500 focus:ring-red-500;
+    }
+    /* <select> already gets .field-input in every template (see
+       add_class:"field-input" usages), but without this it still renders
+       with the browser's own native dropdown chrome — different radius,
+       different padding, its own arrow — sitting right next to a properly
+       styled text input. One custom chevron, appearance reset, and this is
+       the same control as everything else instead of an OS-default select
+       nobody styled. */
+    select.field-input {
+        @apply appearance-none bg-no-repeat pr-9;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 7.5 10 12l4.5-4.5'/%3E%3C/svg%3E");
+        background-position: right 0.65rem center;
+        background-size: 1rem;
+    }
+    .field-input-file {
+        @apply block w-full text-sm text-slate-600 dark:text-slate-500 rounded-md border border-slate-300 bg-white dark:bg-slate-50 shadow-sm
+               file:mr-3 file:my-1.5 file:rounded-md file:border file:border-slate-300 file:bg-white dark:file:bg-slate-100
+               file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 file:shadow-sm
+               file:cursor-pointer hover:file:bg-slate-50 file:transition-colors;
+    }
+    .field-label {
+        @apply block text-sm font-medium text-slate-700 mb-1;
+    }
+    .field-help {
+        @apply mt-1 text-xs text-slate-500;
+    }
+    .field-error {
+        @apply mt-1 text-xs text-red-600 dark:text-red-400;
+    }
+
+    .password-strength {
+        @apply mt-1.5;
+    }
+    .password-strength-track {
+        @apply h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-300 overflow-hidden;
+    }
+    .password-strength-fill {
+        @apply h-full w-0 rounded-full bg-red-500 transition-[width,background-color] duration-150;
+    }
+    .password-strength-fill.is-weak   { @apply bg-red-500; }
+    .password-strength-fill.is-fair   { @apply bg-amber-500; }
+    .password-strength-fill.is-good   { @apply bg-bell-500; }
+    .password-strength-fill.is-strong { @apply bg-green-500; }
+    .password-strength-label {
+        @apply mt-1 text-xs text-slate-500;
+    }
+
+    .badge-slate  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-slate-100 text-slate-700 ring-slate-500/20; }
+    .badge-red    { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-950/50 dark:text-red-300 dark:ring-red-400/30; }
+    .badge-orange { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-950/50 dark:text-orange-300 dark:ring-orange-400/30; }
+    .badge-amber  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-400/30; }
+    .badge-blue   { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-bell-50 text-bell-700 ring-bell-600/20 dark:bg-bell-950/50 dark:text-bell-300 dark:ring-bell-400/30; }
+    .badge-green  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-950/50 dark:text-green-300 dark:ring-green-400/30; }
+    .badge-purple { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-navy-50 text-navy-700 ring-navy-600/20 dark:bg-navy-950/50 dark:text-navy-300 dark:ring-navy-400/30; }
+
+    .badge-severity { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase; }
+
+    .sidebar-link {
+        @apply flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-lg text-sm font-medium border-l-2 border-transparent
+               text-white/60 hover:bg-white/10 hover:text-white transition-colors [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:opacity-70;
+    }
+    .sidebar-link-active {
+        @apply flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-lg text-sm font-medium border-l-2 border-mist-300
+               bg-white/10 text-white transition-colors [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0;
+    }
+    .sidebar-group-label {
+        @apply px-3 pt-4 pb-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-widest text-white/35;
+    }
+
+    .crumb-trail {
+        @apply font-mono text-xs uppercase tracking-wider text-slate-400;
+    }
+    .crumb-trail a {
+        @apply hover:text-brand-600 dark:hover:text-brand-300 transition-colors;
+    }
+
+    .page-eyebrow {
+        @apply font-mono text-xs font-medium uppercase tracking-widest text-brand-600 dark:text-brand-300 mb-1.5;
+    }
+    .page-title {
+        @apply text-2xl font-bold text-slate-900 tracking-tight;
+    }
+
+    .stat-tile {
+        @apply flex items-start gap-3.5 bg-white dark:bg-slate-100 rounded-lg border border-slate-200 p-5;
+    }
+    .stat-tile-icon {
+        @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
+               bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300 [&>svg]:h-5 [&>svg]:w-5;
+    }
+    /* Numbers are the tool talking in its own voice — a machine-generated
+       count, not prose — so they get the mono face, same as IDs/statuses. */
+    .stat-tile-value {
+        @apply font-mono text-2xl font-semibold text-slate-900 tabular-nums tracking-tight;
+    }
+
+    .rail-red    { @apply border-l-[3px] border-l-red-500; }
+    .rail-orange { @apply border-l-[3px] border-l-orange-500; }
+    .rail-amber  { @apply border-l-[3px] border-l-amber-500; }
+    .rail-blue   { @apply border-l-[3px] border-l-bell-500; }
+    .rail-slate  { @apply border-l-[3px] border-l-slate-300; }
+
+    .rail-severity { @apply border-l-[3px]; }
+
+    .step-dot {
+        @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.6rem] font-bold ring-4 ring-white dark:ring-slate-100;
+    }
+    .step-dot-done    { @apply bg-green-600 text-white; }
+    .step-dot-current { @apply bg-brand-600 text-white; }
+    .step-dot-pending { @apply bg-slate-200 text-slate-500 dark:bg-slate-300 dark:text-slate-600; }
+    .step-line {
+        @apply w-px flex-1 bg-slate-200 dark:bg-slate-300 my-0.5;
+    }
+    .step-line-done {
+        @apply w-px flex-1 bg-green-500 my-0.5;
+    }
+
+    .tab-link {
+        @apply flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 border-transparent
+               text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-colors whitespace-nowrap
+               [&>svg]:h-4 [&>svg]:w-4 [&>svg]:opacity-70;
+    }
+    .tab-link-active {
+        @apply flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 border-brand-600
+               text-brand-700 dark:text-brand-300 whitespace-nowrap [&>svg]:h-4 [&>svg]:w-4;
+    }
+
+    .avatar {
+        @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-white
+               font-mono text-xs font-semibold uppercase;
+    }
+
+    .twilight-surface {
+        @apply bg-twilight-950;
+    }
+
+    .toast {
+        @apply flex items-start gap-2.5 rounded-lg border px-4 py-3 text-sm shadow-lg
+               transition-all duration-200 ease-out;
+        animation: toast-in 0.2s ease-out;
+    }
+    .toast-hide {
+        @apply opacity-0 -translate-y-1;
+    }
+    .toast-icon {
+        @apply flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold;
+    }
+    .toast-dismiss {
+        @apply shrink-0 text-current/50 hover:text-current text-base leading-none cursor-pointer;
+    }
+    .toast-success {
+        @apply bg-green-50 border-green-200 text-green-900 dark:bg-green-950/80 dark:border-green-800 dark:text-green-200;
+        .toast-icon { @apply bg-green-600 text-white; }
+    }
+    .toast-error {
+        @apply bg-red-50 border-red-200 text-red-900 dark:bg-red-950/80 dark:border-red-800 dark:text-red-200;
+        .toast-icon { @apply bg-red-600 text-white; }
+    }
+    .toast-warning {
+        @apply bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/80 dark:border-amber-800 dark:text-amber-200;
+        .toast-icon { @apply bg-amber-500 text-white; }
+    }
+    .toast-info, .toast-debug {
+        @apply bg-mist-50 border-mist-200 text-mist-900 dark:bg-mist-950/80 dark:border-mist-800 dark:text-mist-200;
+        .toast-icon { @apply bg-mist-600 text-white; }
+    }
+
+    .theme-toggle {
+        @apply inline-flex items-center justify-center h-8 w-8 rounded-md text-current/70 hover:text-current hover:bg-current/10 transition-colors cursor-pointer;
+    }
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}

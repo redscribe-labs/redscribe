@@ -1,0 +1,18 @@
+{% extends "base/base.html" %}
+{% block title %}Delete {{ item.title }} — {{ template.name }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-2">Delete item?</h1>
+        <p class="text-sm text-slate-600 mb-5">
+            This permanently deletes "<strong>{{ item.title }}</strong>" from "{{ template.name }}".
+            Engagements whose checklist was already started from this template are unaffected.
+        </p>
+        <form method="post" class="flex gap-2">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Delete</button>
+            <a href="{% url 'checklist_templates:detail' template.pk %}" class="btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

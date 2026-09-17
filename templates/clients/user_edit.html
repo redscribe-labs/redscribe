@@ -1,0 +1,18 @@
+{% extends "base/base.html" %}
+{% block title %}Edit {{ target.username }} — RedScribe{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ target.username }}</h1>
+        <p class="text-sm text-slate-500 mb-5">Username can't be changed here.</p>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'clients:user_detail' target.uuid as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back" %}
+</div>
+{% endblock %}

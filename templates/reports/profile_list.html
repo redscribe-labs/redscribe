@@ -1,0 +1,79 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Report profiles — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Report profiles</h1>
+        <p class="text-sm text-slate-500">
+            A profile is the full document a report is built from, and how that report looks — write it
+            directly, using headings for chapters/subsections and {% templatetag openvariable %} tag_name {% templatetag closevariable %}
+            placeholders wherever computed or custom content should appear. The default profile is used
+            whenever a report doesn't explicitly choose one. Each profile manages its own independent set of
+            text-block tags from its own edit page.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for profile in profiles %}
+        <div class="card flex flex-col">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <a href="{% url 'report_profiles:edit' profile.pk %}" class="font-semibold text-slate-900 hover:text-brand-600">{{ profile.name }}</a>
+                {% if profile.is_default %}
+                <span class="badge-slate shrink-0">Default</span>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="h-4 w-4 rounded-full border border-slate-300 shrink-0" style="background-color: {{ profile.table_header_color|default:'rgba(248,250,252,1)' }};" title="Table/theme color"></span>
+                <p class="text-xs text-slate-500 truncate">{{ profile.body_font|default:"Open Sans" }} / {{ profile.monospace_font|default:"JetBrains Mono" }}</p>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">{{ profile.classification_label|default:"Strictly Confidential" }}</p>
+            <div class="mt-auto flex items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-200">
+                <a href="{% url 'report_profiles:edit' profile.pk %}" class="text-sm text-brand-600 hover:underline">Edit</a>
+                {% if profile.is_default %}
+                <span class="text-xs text-slate-400">Set as default to delete another</span>
+                {% else %}
+                <div class="flex items-center gap-3">
+                    <form method="post" action="{% url 'report_profiles:set_default' profile.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs text-slate-500 hover:underline">Set as default</button>
+                    </form>
+                    <a href="{% url 'report_profiles:delete' profile.pk %}" class="text-xs text-red-600 hover:underline">Delete</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <form method="post" class="card border-dashed border-2 border-slate-300 dark:border-slate-300 shadow-none flex flex-col items-center justify-center text-center gap-3 min-h-[9rem]">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div class="w-full">
+                <label for="{{ create_form.name.id_for_label }}" class="field-label">New profile name</label>
+                {{ create_form.name|add_class:"field-input" }}
+                {% for error in create_form.name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <button type="submit" class="btn-primary w-full">+ New profile</button>
+        </form>
+    </div>
+
+    <div class="card max-w-sm">
+        <h2 class="font-semibold text-slate-900 text-sm mb-1">Export limits</h2>
+        <p class="field-help mb-3">The one setting shared by every report, regardless of profile.</p>
+        <form method="post" class="space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="export_limits">
+            <div>
+                <label for="{{ limits_form.max_concurrent_report_jobs.id_for_label }}" class="field-label">{{ limits_form.max_concurrent_report_jobs.label }}</label>
+                {{ limits_form.max_concurrent_report_jobs|add_class:"field-input" }}
+                <p class="field-help">{{ limits_form.max_concurrent_report_jobs.help_text }}</p>
+                {% for error in limits_form.max_concurrent_report_jobs.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <button type="submit" class="btn-primary">Save</button>
+        </form>
+    </div>
+
+    {% url 'accounts:dashboard' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+</div>
+{% endblock %}

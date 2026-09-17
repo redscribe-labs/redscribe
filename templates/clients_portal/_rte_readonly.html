@@ -1,0 +1,8 @@
+<div>
+    {% include "base/_field_section_header.html" with field_name=field_name label=label %}
+    <div class="rte-editor"
+         data-rte-field="{{ field_name }}"
+         data-rte-editable="false"
+         data-rte-initial='{{ content_json|default:"" }}'
+    ></div>
+</div>

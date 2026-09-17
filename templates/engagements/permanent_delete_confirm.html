@@ -1,0 +1,41 @@
+{% extends "base/base.html" %}
+{% block title %}Permanently delete {{ engagement.client_name }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Permanently delete engagement?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This <strong>permanently and irreversibly</strong> destroys "<strong>{{ engagement.client_name }}</strong>"
+            and everything under it — findings, checklist runs, comments, scope-change history, and its
+            encryption key. This is not the same as archiving: there is no undo, and nothing can be
+            recovered afterward, including from a database backup taken before this point in time.
+        </p>
+        <p class="text-xs text-slate-500 mb-5">
+            Existing audit log entries referencing this engagement are kept — only the engagement's own data is
+            removed. Intended for satisfying a data-retention policy on engagements that are no longer needed,
+            not routine cleanup.
+        </p>
+        <form method="post" data-permanent-delete-form>
+            {% csrf_token %}
+            <label for="confirm-client-name" class="field-label">
+                Type the client name (<span class="font-mono">{{ engagement.client_name }}</span>) to confirm
+            </label>
+            <input type="text" id="confirm-client-name" name="confirm_client_name" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ engagement.client_name }}">
+            <div class="flex gap-2">
+                <button type="submit" class="btn-danger" data-confirm-submit disabled>Permanently delete</button>
+                <a href="{% url 'engagements:detail' engagement.pk %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var input = document.querySelector("[data-confirm-input]");
+    var submit = document.querySelector("[data-confirm-submit]");
+    var expected = input.getAttribute("data-expected");
+    input.addEventListener("input", function () {
+        submit.disabled = input.value !== expected;
+    });
+})();
+</script>
+{% endblock %}

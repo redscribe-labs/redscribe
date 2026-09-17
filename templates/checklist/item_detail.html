@@ -1,0 +1,109 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ item.title }} — {{ engagement.client_name }}{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="checklist" %}
+{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <div class="flex items-center justify-between gap-2 mb-1">
+        <p class="page-eyebrow !mb-0">{{ engagement.client_name }} &middot; {{ item.run.label }} &middot; {{ item.category }}</p>
+        <span class="text-xs text-slate-400 shrink-0">Item {{ position }} of {{ total }}</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 mt-1">
+        <h1 class="text-xl font-bold text-slate-900 break-words min-w-0">
+            {% if item.code %}<span class="text-slate-400 font-mono text-base mr-1">{{ item.code }}</span>{% endif %}
+            {{ item.title }}
+        </h1>
+        <span class="{{ item.status|badge_class }} shrink-0">{{ item.get_status_display }}</span>
+    </div>
+    <div class="flex items-center justify-between gap-2 mt-3 text-sm">
+        {% if prev_item %}
+        <a href="{% url 'checklist:item_detail' engagement.pk prev_item.pk %}" class="text-slate-500 hover:text-brand-700 dark:hover:text-brand-300 truncate">&larr; {% if prev_item.code %}{{ prev_item.code }} — {% endif %}{{ prev_item.title }}</a>
+        {% else %}
+        <span></span>
+        {% endif %}
+        {% if next_item %}
+        <a href="{% url 'checklist:item_detail' engagement.pk next_item.pk %}" class="text-slate-500 hover:text-brand-700 dark:hover:text-brand-300 truncate text-right">{% if next_item.code %}{{ next_item.code }} — {% endif %}{{ next_item.title }} &rarr;</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="card space-y-5">
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label for="{{ form.status.id_for_label }}" class="field-label">Status</label>
+                {{ form.status|add_class:"field-input max-w-xs" }}
+            </div>
+
+            <div class="mb-4">
+                <label class="field-label">Reference info</label>
+                <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
+                <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
+            </div>
+
+            <div class="mb-4">
+                <label class="field-label">Test results / test data</label>
+                <div class="rte-editor" data-rte-field="test_results" data-rte-editable="true" data-rte-initial='{{ form.test_results.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
+                <input type="hidden" name="test_results" id="{{ form.test_results.id_for_label }}" data-rte-hidden="test_results">
+            </div>
+
+            <div class="mb-4">
+                <label class="field-label">Linked findings</label>
+                <div class="max-h-40 overflow-y-auto border border-slate-300 rounded-md p-3 space-y-1 text-sm bg-white dark:bg-slate-50">
+                    {{ form.findings }}
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                {% if prev_item %}
+                <button type="submit" name="save_item" value="prev" class="btn-secondary">&larr; Save &amp; Previous</button>
+                {% endif %}
+                <button type="submit" name="save_item" value="stay" class="btn-secondary">Save</button>
+                <button type="submit" name="save_item" value="next" class="btn-primary flex-1">
+                    Save &amp; {% if next_item %}Next &rarr;{% else %}Finish{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% url 'checklist:list' engagement.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to checklist" %}
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel-wide">
+    <h2 class="font-semibold text-slate-900 mb-3">Comments</h2>
+    {% if comments %}
+    <ul class="divide-y divide-slate-100 mb-4">
+        {% for c in comments %}
+        <li class="py-3">
+            <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                <span class="font-medium text-slate-600">{{ c.author|default:"Unknown" }}</span>
+                <span>{{ c.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="rte-editor" data-rte-field="comment-{{ forloop.counter }}" data-rte-editable="false" data-rte-initial='{{ c.body }}'></div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400 mb-4">No comments yet.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'checklist:item_comment_create' engagement.pk item.pk %}">
+        {% csrf_token %}
+        <div class="rte-editor" data-rte-field="new_comment" data-rte-editable="true" data-rte-initial=""></div>
+        <input type="hidden" name="body" id="{{ comment_form.body.id_for_label }}" data-rte-hidden="new_comment">
+        <button type="submit" class="btn-secondary mt-2">Add comment</button>
+    </form>
+</div>
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

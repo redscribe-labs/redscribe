@@ -1,0 +1,19 @@
+{% extends "base/base.html" %}
+{% block title %}Delete {{ block.label }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto card">
+    <h1 class="text-lg font-semibold mb-2">Delete "{{ block.label }}"?</h1>
+    <p class="text-sm text-slate-500 mb-5">
+        This deletes it from "{{ block.profile.name }}" only — deleting it removes the
+        "{% templatetag openvariable %} {{ block.slug }} {% templatetag closevariable %}" placeholder's effect
+        wherever that profile's own template uses it. If its template still contains it, that placeholder will
+        simply be skipped when a report is built, not show an error. Text already saved against it in an
+        engagement's report config stays there but becomes unreachable. This cannot be undone.
+    </p>
+    <form method="post" class="flex gap-3">
+        {% csrf_token %}
+        <button type="submit" class="btn-primary bg-red-600 hover:bg-red-700">Delete permanently</button>
+        <a href="{% url 'report_profiles:edit' block.profile.pk %}" class="btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

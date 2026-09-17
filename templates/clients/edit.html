@@ -1,0 +1,21 @@
+{% extends "base/base.html" %}
+{% block title %}Edit {{ company.name }} — RedScribe{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ company.name }}</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Setting a client inactive hides it from the "New client user" and
+            engagement portal-company pickers — it doesn't remove existing links.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'clients:detail' company.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back" %}
+</div>
+{% endblock %}

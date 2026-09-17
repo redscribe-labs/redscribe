@@ -1,0 +1,111 @@
+{% load redscribe_extras %}
+<div class="card">
+    <h2 class="font-semibold text-slate-900 text-sm mb-1">Text blocks</h2>
+    <p class="field-help mb-4">
+        Named rich-text tags this profile's own template can place via a {% templatetag openvariable %} tag_name {% templatetag closevariable %} placeholder
+        (e.g. "Summary of testing", "Scope of testing") — independent of every other profile's own set, even
+        if they share a name. This profile keeps its own default text per tag, and each report built from it
+        has its own copy of that text, editable per engagement. Retiring a block (uncheck "Active") hides it
+        from new placeholders but doesn't delete any report's existing text.
+    </p>
+
+    <form method="post" action="{{ text_block_manage_url }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_text_blocks">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        {{ text_block_formset.management_form }}
+        <div class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for form in text_block_formset %}
+            <div class="py-3 first:pt-0 last:pb-0">
+                {{ form.id }}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                    <div class="flex-1 min-w-0">
+                        {{ form.label|add_class:"field-input" }}
+                        <p class="mt-1 font-mono text-xs text-slate-400 truncate">{% templatetag openvariable %} {{ form.instance.slug }} {% templatetag closevariable %}</p>
+                    </div>
+                    <div class="flex items-center gap-4 shrink-0 pl-0 sm:pl-2">
+                        <label class="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap">{{ form.is_active }} Active</label>
+                        <label class="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap">{{ form.include_in_remediation_report_only }} Remediation only</label>
+                        <a href="{% url 'report_profiles:profile_text_block_edit' profile.pk form.instance.pk %}" class="text-brand-600 hover:underline text-xs shrink-0">Edit content</a>
+                        <button type="button" class="text-red-600 hover:underline text-xs shrink-0" data-block-delete-trigger
+                                data-action="{% url 'report_profiles:text_block_delete' form.instance.pk %}"
+                                data-label="{{ form.instance.label }}" data-slug="{{ form.instance.slug }}">Delete</button>
+                    </div>
+                </div>
+                {% for error in form.label.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-500 py-3 italic">No text blocks yet — add one below.</p>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn-primary w-full mt-5">Save changes</button>
+    </form>
+
+    <div class="mt-5 pt-5 border-t border-slate-100 dark:border-slate-200">
+        <form method="post" action="{{ text_block_manage_url }}" class="flex flex-col sm:flex-row sm:items-end gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_text_block">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="flex-1 min-w-0">
+                <label for="{{ text_block_create_form.label.id_for_label }}" class="field-label">New text block</label>
+                {{ text_block_create_form.label|add_class:"field-input" }}
+                {% for error in text_block_create_form.label.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <label class="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap pb-2.5">
+                {{ text_block_create_form.include_in_remediation_report_only }} Remediation only
+            </label>
+            <button type="submit" class="btn-primary shrink-0">+ Add</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    #text-block-delete-modal[open] {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0;
+    }
+</style>
+<dialog id="text-block-delete-modal" class="p-0 border-0 bg-transparent w-full max-w-md backdrop:bg-black/40">
+    <div class="card !m-0">
+        <h2 class="text-lg font-bold text-slate-900 mb-2">Delete "<span id="text-block-delete-label"></span>"?</h2>
+        <p class="text-sm text-slate-600 mb-3">
+            This deletes it from this profile only — deleting it removes the
+            <code id="text-block-delete-slug" class="font-mono text-xs bg-slate-100 dark:bg-slate-200 rounded px-1 py-0.5"></code>
+            placeholder's effect wherever this profile's own template uses it. If this profile's template still
+            contains it, that placeholder will simply be skipped when a report is built, not show an error. Text
+            already saved against it in an engagement's report config stays there but becomes unreachable. This
+            cannot be undone.
+        </p>
+        <form method="post" id="text-block-delete-form" class="flex gap-2 mt-3">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn-primary bg-red-600 hover:bg-red-700">Delete permanently</button>
+            <button type="button" class="btn-secondary" data-block-delete-cancel>Cancel</button>
+        </form>
+    </div>
+</dialog>
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var modal = document.getElementById("text-block-delete-modal");
+        var form = document.getElementById("text-block-delete-form");
+        var labelEl = document.getElementById("text-block-delete-label");
+        var slugEl = document.getElementById("text-block-delete-slug");
+        if (!modal || !form) return;
+
+        document.querySelectorAll("[data-block-delete-trigger]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                form.action = btn.dataset.action;
+                labelEl.textContent = btn.dataset.label;
+                slugEl.textContent = "{% templatetag openvariable %} " + btn.dataset.slug + " {% templatetag closevariable %}";
+                modal.showModal();
+            });
+        });
+
+        modal.querySelectorAll("[data-block-delete-cancel]").forEach(function (btn) {
+            btn.addEventListener("click", function () { modal.close(); });
+        });
+
+        modal.addEventListener("click", function (e) {
+            if (e.target === modal) modal.close();
+        });
+    })();
+</script>

@@ -1,0 +1,58 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}User management — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <h1 class="page-title">User management</h1>
+        <p class="text-sm text-slate-500 mt-1">{{ page_obj.paginator.count }} account{{ page_obj.paginator.count|pluralize }} on this instance.</p>
+    </div>
+    <a href="{% url 'user_management:create' %}" class="btn-primary">New user</a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "base/_search_box.html" with query=query placeholder="Search by username, name, or email" %}
+
+{% if page_obj.object_list %}
+<ul class="space-y-2">
+    {% for target in page_obj.object_list %}
+    <li>
+        <a href="{% url 'user_management:detail' target.uuid %}"
+           class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all
+                  {% if not target.is_active %}opacity-60{% endif %}">
+            <span class="avatar !h-9 !w-9 !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ target|initials }}</span>
+            <div class="min-w-0 flex-1">
+                <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">
+                    {{ target.get_full_name|default:target.username }}
+                    {% if target.pk == user.pk %}<span class="text-xs text-slate-400 font-normal">(you)</span>{% endif %}
+                </p>
+                <p class="text-xs text-slate-400 truncate">{{ target.username }} &middot; {{ target.email }}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
+                    <span class="badge-slate">{{ target.get_auth_type_display }}</span>
+                    {% if not target.is_active %}<span class="badge-red">Deactivated</span>{% endif %}
+                </div>
+            </div>
+            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% include "base/_pagination.html" %}
+{% else %}
+<div class="card text-center py-12">
+    {% if query %}
+    <p class="text-slate-500">No users match "{{ query }}".</p>
+    {% else %}
+    <p class="text-slate-500">No users yet.</p>
+    <a href="{% url 'user_management:create' %}" class="btn-primary mt-4">New user</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

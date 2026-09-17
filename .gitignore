@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Django
+.env
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+
+# Frontend tooling (BUILD.md) — node_modules is rebuilt from package.json/
+# package-lock.json; the actual build OUTPUT (static/vendor/*.bundle.js,
+# static/css/tailwind.css) is committed on purpose and must stay tracked.
+node_modules/
+npm-debug.log*
+
+# TLS certificates (certs/README.md) — real key material, never committed;
+# certs/README.md itself stays tracked.
+certs/*.pem
+certs/*.crt
+certs/*.key
+
+# Root encryption key, mounted as a Docker secret (secrets/README.md) —
+# real key material, never committed; secrets/README.md itself stays tracked.
+secrets/*.txt
+
+# Server-side backups (apps.backup) land here — encrypted, but still
+# never meant for version control.
+/backups/
+
+# Editors / IDEs
+.vscode/
+.idea/
+
+# OS-generated
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local-only, never shared/committed — Claude Code's own project-local
+# state (permission history, session settings). Not part of the app.
+.claude/
+
+# Ad-hoc local artifact from a manual demo-seeding session — real TOTP
+# secrets + a shared password, never meant for version control regardless
+# of being "demo" data.
+/creds.txt

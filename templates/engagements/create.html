@@ -1,0 +1,18 @@
+{% extends "base/base.html" %}
+{% block title %}New engagement — RedScribe{% endblock %}
+{% block extra_head %}{% include "base/_datepicker_head.html" %}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">New engagement</h1>
+        <p class="text-sm text-slate-500 mb-5">Starts In Progress immediately</p>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Create engagement</button>
+        </form>
+    </div>
+    {% url 'engagements:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to engagements" %}
+</div>
+{% endblock %}

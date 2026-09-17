@@ -1,0 +1,46 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}My review queue — RedScribe{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-slate-900 mb-1">My review queue</h1>
+<p class="text-sm text-slate-500 mb-6">Only findings explicitly assigned to you — there's no open pool to browse.</p>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Awaiting your review</h2>
+        {% if to_review %}
+        <ul class="divide-y divide-slate-100">
+            {% for finding in to_review %}
+            <li class="py-2.5 flex items-center justify-between">
+                <div>
+                    <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
+                    <p class="text-xs text-slate-400">{{ finding.engagement.client_name }}</p>
+                </div>
+                <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}<p class="text-sm text-slate-400">Nothing to review right now.</p>{% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Awaiting your QA</h2>
+        {% if to_qa %}
+        <ul class="divide-y divide-slate-100">
+            {% for finding in to_qa %}
+            <li class="py-2.5 flex items-center justify-between">
+                <div>
+                    <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
+                    <p class="text-xs text-slate-400">{{ finding.engagement.client_name }}</p>
+                </div>
+                <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}<p class="text-sm text-slate-400">Nothing to QA right now.</p>{% endif %}
+    </div>
+</div>
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

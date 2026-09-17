@@ -1,0 +1,23 @@
+{% extends "base/base.html" %}
+{% block title %}Notification preferences — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Notification preferences</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            In-app notifications (the bell in the sidebar) are always on. This only controls whether you
+            also get an email when you're assigned as reviewer or QA approver on a finding.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4 flex items-center gap-2">
+                {{ form.email_notifications_enabled }}
+                <label for="{{ form.email_notifications_enabled.id_for_label }}" class="text-sm text-slate-700">Also send me an email</label>
+            </div>
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'accounts:dashboard' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+</div>
+{% endblock %}

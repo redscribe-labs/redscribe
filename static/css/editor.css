@@ -1,0 +1,220 @@
+.rte-toolbar-sticky {
+    position: sticky; top: var(--rte-sticky-top, 0); z-index: 15;
+    background: var(--color-slate-50, #fff); padding-top: 0.35rem; margin-top: -0.35rem;
+}
+.rte-toolbar {
+    display: flex; gap: 0.2rem; margin-bottom: 0.4rem; flex-wrap: wrap;
+    padding: 0.3rem; border-radius: 0.5rem;
+    background: var(--color-slate-100, #f1f5f9);
+    border: 1px solid var(--color-slate-200, #e2e8f0);
+}
+.rte-toolbar-btn {
+    background: transparent; color: var(--color-slate-600, #475569);
+    border: 1px solid transparent;
+    border-radius: 0.375rem; min-width: 1.75rem; height: 1.75rem; padding: 0 0.45rem;
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.75rem; font-weight: 600;
+    cursor: pointer; transition: background-color 120ms ease, color 120ms ease;
+}
+.rte-toolbar-btn:hover { background: var(--color-slate-200, #e2e8f0); color: var(--color-slate-900, #0f172a); }
+.rte-toolbar-btn:focus-visible {
+    outline: 2px solid var(--color-brand-500, #669966); outline-offset: 1px;
+}
+.rte-toolbar-btn-active { background: var(--color-brand-600, #527a52); color: #fff; }
+.rte-toolbar-btn-active:hover { background: var(--color-brand-700, #3d5c3d); color: #fff; }
+.rte-toolbar-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.rte-toolbar-btn:disabled:hover { background: transparent; color: var(--color-slate-600, #475569); }
+.rte-toolbar-divider { width: 1px; margin: 0.15rem 0.25rem; background: var(--color-slate-300, #cbd5e1); align-self: stretch; }
+
+.rte-link-popover {
+    display: flex; gap: 0.35rem; align-items: center; margin-bottom: 0.35rem;
+    background: var(--color-slate-50, #f8fafc); border: 1px solid var(--color-slate-300, #cbd5e1);
+    border-radius: 0.375rem; padding: 0.35rem;
+}
+
+.rte-selection-menu {
+    position: fixed; display: flex; align-items: center; gap: 0.15rem;
+    background: var(--color-slate-50, #fff); border: 1px solid var(--color-slate-300, #cbd5e1); border-radius: 0.5rem;
+    padding: 0.25rem; box-shadow: 0 8px 20px rgba(12, 10, 9, 0.18);
+    /* Above the toasts/theme-toggle corner widgets (both z-50) explicitly,
+       not just by accident of being the last element appended to <body> —
+       an active text-selection affordance should never end up covered. */
+    z-index: 55;
+}
+.rte-selection-menu .rte-link-popover {
+    position: absolute; top: 100%; left: 0; margin: 0.25rem 0 0;
+    white-space: nowrap;
+}
+.rte-link-input {
+    flex: 1; border: 1px solid var(--color-slate-300, #cbd5e1); border-radius: 0.25rem;
+    padding: 0.2rem 0.4rem; font-size: 0.85rem;
+    background: var(--color-slate-50, #fff); color: var(--color-slate-900, #0f172a);
+}
+.rte-link-input:focus-visible {
+    outline: 2px solid var(--color-brand-500, #669966); outline-offset: 1px;
+}
+
+.rte-editor {
+    border: 1px solid var(--color-slate-300, #cbd5e1); border-radius: 0.5rem; padding: 0.6rem 0.7rem;
+    min-height: 6rem; background: var(--color-slate-50, #fff); color: var(--color-slate-900, #0f172a);
+    font-size: 0.9rem; transition: border-color 120ms ease;
+}
+.rte-editor:focus-within {
+    border-color: var(--color-brand-400, #85ad85);
+}
+.rte-editor[data-rte-editable="false"] {
+    border: none; border-radius: 0; padding: 0; min-height: 0; background: transparent;
+}
+.rte-editor[data-rte-editable="false"] .ProseMirror { line-height: 1.65; font-size: 0.95rem; }
+.rte-editor .ProseMirror { outline: none; min-height: 5rem; }
+.rte-editor[data-rte-editable="false"] .ProseMirror { min-height: 0; }
+.rte-editor .ProseMirror p { margin: 0 0 0.5em; }
+.rte-editor .ProseMirror img { max-width: 100%; border-radius: 0.25rem; }
+.rte-editor .ProseMirror h1, .rte-editor .ProseMirror h2, .rte-editor .ProseMirror h3 {
+    font-weight: 700; color: var(--color-slate-900, #0f172a); margin: 0.75em 0 0.35em; line-height: 1.25;
+}
+.rte-editor .ProseMirror h1 { font-size: 1.5em; }
+.rte-editor .ProseMirror h2 { font-size: 1.25em; }
+.rte-editor .ProseMirror h3 { font-size: 1.1em; }
+.rte-editor .ProseMirror p.report-lead { font-size: 1.15em; font-weight: 700; color: var(--color-slate-900, #0f172a); }
+.rte-editor .ProseMirror blockquote {
+    border-left: 3px solid var(--color-slate-300, #cbd5e1); margin: 0.5em 0; padding: 0.1em 0 0.1em 0.75em; color: var(--color-slate-600, #475569);
+}
+.rte-editor .ProseMirror hr { border: none; border-top: 1px solid var(--color-slate-300, #cbd5e1); margin: 1em 0; }
+.rte-editor .ProseMirror .rte-page-break {
+    display: flex; align-items: center; gap: 0.5em; margin: 1em 0;
+    font-size: 0.75em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-slate-400, #94a3b8);
+    user-select: none;
+}
+.rte-editor .ProseMirror .rte-page-break::before,
+.rte-editor .ProseMirror .rte-page-break::after {
+    content: ""; flex: 1 1 0; border-top: 1px dashed var(--color-slate-300, #cbd5e1);
+}
+.rte-editor .ProseMirror a { color: var(--color-brand-600, #527a52); text-decoration: underline; }
+.rte-editor .ProseMirror ul { list-style: disc outside; padding-left: 1.25em; margin: 0 0 0.5em; }
+.rte-editor .ProseMirror ol { list-style: decimal outside; padding-left: 1.25em; margin: 0 0 0.5em; }
+.rte-editor .ProseMirror ul ul { list-style-type: circle; }
+.rte-editor .ProseMirror ul ul ul { list-style-type: square; }
+.rte-editor .ProseMirror pre {
+    background: var(--editor-code-bg, var(--color-slate-100, #f1f5f9)); color: var(--editor-code-text, var(--color-slate-800, #1e293b));
+    border: 1px solid var(--editor-code-border, var(--color-slate-300, #cbd5e1));
+    padding: 0.6rem; border-radius: 0.375rem;
+    overflow-x: auto; font-size: 0.9em; font-family: var(--font-code);
+}
+.rte-editor .ProseMirror pre code { background: none; padding: 0; }
+.rte-editor .ProseMirror code {
+    background: var(--color-slate-100, #f1f5f9); color: var(--color-slate-800, #1e293b); border-radius: 0.2rem; padding: 0.1rem 0.3rem; font-size: 0.9em;
+    font-family: var(--font-code);
+}
+.rte-editor .ProseMirror mark {
+    background: #fde047; color: #422006; padding: 0.05em 0.15em; border-radius: 0.15em;
+}
+.rte-editor .ProseMirror pre mark,
+.rte-editor .ProseMirror pre mark * {
+    color: #422006;
+}
+.rte-editor .ProseMirror table {
+    border-collapse: collapse; table-layout: fixed; width: 100%; margin: 0.5em 0; overflow: hidden;
+}
+.rte-editor .ProseMirror table td, .rte-editor .ProseMirror table th {
+    border: 1px solid var(--color-slate-300, #cbd5e1); padding: 0.3em 0.5em; vertical-align: top; position: relative;
+    overflow-wrap: break-word;
+}
+.rte-editor .ProseMirror table th {
+    background: var(--color-slate-50, #f8fafc); font-weight: 600; text-align: left;
+}
+.rte-editor .ProseMirror table .selectedCell {
+    background: var(--color-brand-100, #e0ebe0);
+}
+.rte-editor .ProseMirror table p { margin: 0; }
+.rte-editor .ProseMirror .tableWrapper { overflow-x: auto; }
+.rte-editor .ProseMirror .resize-cursor { cursor: ew-resize; cursor: col-resize; }
+.rte-editor .ProseMirror table .column-resize-handle {
+    position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px;
+    background: var(--color-brand-600, #527a52); pointer-events: none; z-index: 5;
+}
+
+.rte-comment-highlight {
+    background: #fef3c7; border-bottom: 2px solid #d97706; cursor: pointer;
+}
+.rte-comment-highlight.rte-comment-resolved {
+    background: var(--color-slate-100, #f1f5f9); border-bottom: 2px solid var(--color-slate-400, #94a3b8);
+}
+
+.rte-comments-panel { margin-top: 0.5rem; font-size: 0.85rem; }
+.rte-comments-empty { color: var(--color-slate-400, #94a3b8); font-size: 0.8rem; }
+.rte-thread-card {
+    border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.5rem;
+}
+.rte-thread-card.rte-thread-resolved { opacity: 0.6; }
+.rte-thread-card.rte-thread-focused { border-color: #d97706; }
+.rte-thread-quote {
+    margin: 0 0 0.35rem; padding-left: 0.5rem; border-left: 3px solid #d97706;
+    color: var(--color-slate-600, #475569); font-size: 0.8rem; font-style: italic;
+}
+.rte-thread-entry { margin-bottom: 0.35rem; }
+.rte-thread-entry p { margin: 0.1rem 0 0; }
+.rte-thread-author { font-weight: 600; font-size: 0.8rem; }
+.rte-thread-time { color: var(--color-slate-400, #94a3b8); font-size: 0.75rem; }
+.rte-reply-form { display: flex; gap: 0.35rem; align-items: flex-start; margin-top: 0.35rem; }
+.rte-reply-form textarea { flex: 1; }
+
+.rte-new-comment-box {
+    border: 1px solid #d97706; border-radius: 0.375rem; padding: 0.5rem; margin-top: 0.5rem; background: #fffbeb;
+}
+.rte-new-comment-box textarea { width: 100%; margin-bottom: 0.35rem; }
+
+.dark .rte-toolbar-sticky { background: #181a1b; }
+.dark .rte-toolbar-btn {
+    background: #181a1b; color: #cacdce; border-color: #494d50;
+}
+.dark .rte-toolbar-btn:hover { background: #313435; }
+.dark .rte-toolbar-btn:focus-visible { outline-color: #a3c2a3; }
+.dark .rte-toolbar-btn-active { background: #669966; color: #fff; border-color: #85ad85; }
+.dark .rte-toolbar-btn-active:hover { background: var(--color-brand-600, #527a52); }
+.dark .rte-toolbar-divider { background: #494d50; }
+
+.dark .rte-link-popover {
+    background: #181a1b; border-color: #494d50;
+}
+.dark .rte-selection-menu {
+    background: #181a1b; border-color: #494d50; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.dark .rte-link-input {
+    border-color: #494d50; background: #111213; color: #cacdce;
+}
+.dark .rte-link-input:focus-visible { outline-color: #a3c2a3; }
+
+.dark .rte-editor {
+    border-color: #494d50; background: #181a1b;
+}
+.dark .rte-editor[data-rte-editable="false"] {
+    border: none; background: transparent;
+}
+.dark .rte-editor .ProseMirror h1,
+.dark .rte-editor .ProseMirror h2,
+.dark .rte-editor .ProseMirror h3 { color: #f2f2f3; }
+.dark .rte-editor .ProseMirror blockquote { border-left-color: #494d50; color: #959a9d; }
+.dark .rte-editor .ProseMirror hr { border-top-color: #494d50; }
+.dark .rte-editor .ProseMirror .rte-page-break { color: #6b7280; }
+.dark .rte-editor .ProseMirror .rte-page-break::before,
+.dark .rte-editor .ProseMirror .rte-page-break::after { border-top-color: #494d50; }
+.dark .rte-editor .ProseMirror a { color: #a3c2a3; }
+.dark .rte-editor .ProseMirror { color: #f2f2f3; }
+.dark .rte-editor .ProseMirror table td, .dark .rte-editor .ProseMirror table th {
+    border-color: #494d50;
+}
+.dark .rte-editor .ProseMirror table th { background: #313435; }
+.dark .rte-editor .ProseMirror table .selectedCell { background: #293d29; }
+
+.dark .rte-toolbar-btn:disabled:hover { background: #181a1b; }
+
+.dark .rte-comment-highlight { background: rgba(69, 26, 3, 0.5); border-bottom-color: #fbbf24; }
+.dark .rte-comment-highlight.rte-comment-resolved { background: #313435; border-bottom-color: #62676a; }
+
+.dark .rte-comments-empty { color: #7a8185; }
+.dark .rte-thread-card { border-color: #494d50; }
+.dark .rte-thread-card.rte-thread-focused { border-color: #fbbf24; }
+.dark .rte-thread-quote { border-left-color: #fbbf24; color: #959a9d; }
+.dark .rte-thread-time { color: #7a8185; }
+
+.dark .rte-new-comment-box { border-color: #fbbf24; background: rgba(69, 26, 3, 0.5); }

@@ -1,0 +1,19 @@
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var POLL_INTERVAL_MS = 60000;
+    var pingUrl = "{% url 'accounts:session_ping' %}";
+
+    function checkSession() {
+        fetch(pingUrl, { method: "GET", credentials: "same-origin", redirect: "manual", cache: "no-store" })
+            .then(function (resp) {
+                if (resp.type === "opaqueredirect" || resp.status === 0) {
+                    window.location.reload();
+                }
+            })
+            .catch(function () {
+            });
+    }
+
+    setInterval(checkSession, POLL_INTERVAL_MS);
+})();
+</script>

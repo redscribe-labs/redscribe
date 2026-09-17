@@ -1,0 +1,338 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ engagement.client_name }} — RedScribe{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="overview" %}
+{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <h1 class="page-title">{{ engagement.client_name }}</h1>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+            <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+            {% if engagement.archived %}<span class="badge-red">Archived {{ engagement.archived_at|date:"d/m/Y" }}</span>{% endif %}
+            {% if engagement.client %}
+                {% if engagement.client_release_approved %}
+                <span class="badge-green">Released to client</span>
+                {% else %}
+                <span class="badge-slate">Not released to client</span>
+                {% endif %}
+            {% endif %}
+            {% if engagement.reference_number %}<span class="text-sm text-slate-500 font-mono">{{ engagement.reference_number }}</span>{% endif %}
+            <span class="text-sm text-slate-500">{{ engagement.start_date|default:"—" }} – {{ engagement.end_date|default:"—" }}</span>
+        </div>
+    </div>
+    {% if is_manager %}
+    <div class="flex gap-2 shrink-0">
+        {% if not engagement.archived %}
+        <a href="{% url 'engagements:archive' engagement.pk %}" class="btn-danger">Archive</a>
+        {% else %}
+        <form method="post" action="{% url 'engagements:unarchive' engagement.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary">Unarchive</button>
+        </form>
+        {% if user.is_superadmin_role %}
+        <a href="{% url 'engagements:permanent_delete' engagement.pk %}" class="btn-danger">Permanently delete&hellip;</a>
+        {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel">
+    <h2 class="font-semibold text-slate-900 mb-1">Who has access</h2>
+    <p class="text-xs text-slate-500 mb-3">
+        Superadmin always has access. Team Lead has blanket access while not archived.
+        Everyone else below has been explicitly granted membership.
+    </p>
+    <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+        {% for m in members %}
+        <li class="py-2 flex items-center justify-between text-sm gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="avatar !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ m.user|initials }}</span>
+                <div class="min-w-0">
+                    <p class="font-medium text-slate-800 truncate">{{ m.user }}</p>
+                    <p class="text-xs text-slate-400">{{ m.user.role.name }}</p>
+                </div>
+            </div>
+            {% if is_manager %}
+            <form method="post" action="{% url 'engagements:member_remove' engagement.pk m.pk %}">
+                {% csrf_token %}<button type="submit" class="text-xs text-red-600 dark:text-red-400 hover:underline shrink-0">Remove</button>
+            </form>
+            {% endif %}
+        </li>
+        {% empty %}
+        <li class="py-2 text-sm text-slate-400">No explicit members yet.</li>
+        {% endfor %}
+    </ul>
+
+    {% if is_manager %}
+    <form method="post" action="{% url 'engagements:member_add' engagement.pk %}" class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-200 flex gap-2 items-end">
+        {% csrf_token %}
+        <div class="flex-1">
+            <label for="{{ add_member_form.user.id_for_label }}" class="field-label">{{ add_member_form.user.label }}</label>
+            {{ add_member_form.user|add_class:"field-input" }}
+        </div>
+        <button type="submit" class="btn-secondary">Add</button>
+    </form>
+    {% endif %}
+
+    {% if engagement.default_reviewer or engagement.default_qa or engagement.default_approver %}
+    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-200">
+        <h2 class="font-semibold text-slate-900 mb-1">Review roles</h2>
+        <p class="text-xs text-slate-500 mb-3">
+            Auto-assigned to findings (or notified) as this engagement reaches each stage.
+            {% if is_manager %}<a href="{% url 'engagements:edit' engagement.pk %}" class="text-brand-600 dark:text-brand-300 hover:underline">Change</a>{% endif %}
+        </p>
+        <ul class="space-y-2 text-sm">
+            {% if engagement.default_reviewer %}
+            <li class="flex items-center gap-2">
+                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_reviewer|initials }}</span>
+                <span class="min-w-0 truncate"><span class="text-slate-400">Reviewer</span> · {{ engagement.default_reviewer }}</span>
+            </li>
+            {% endif %}
+            {% if engagement.default_qa %}
+            <li class="flex items-center gap-2">
+                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_qa|initials }}</span>
+                <span class="min-w-0 truncate"><span class="text-slate-400">QA</span> · {{ engagement.default_qa }}</span>
+            </li>
+            {% endif %}
+            {% if engagement.default_approver %}
+            <li class="flex items-center gap-2">
+                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_approver|initials }}</span>
+                <span class="min-w-0 truncate"><span class="text-slate-400">Approver</span> · {{ engagement.default_approver }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+    <a href="{% url 'findings:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6.5a3 3 0 0 1 3 3v3a3 3 0 1 1-6 0v-3a3 3 0 0 1 3-3Z"/><path d="M10 6.5V5M7.5 8H4M12.5 8H16M7.5 12H4M12.5 12H16M8 4 7 3M12 4l1-1"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ findings_summary.total }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Findings{% if findings_summary.open %} <span class="text-red-600 dark:text-red-400 font-medium">&middot; {{ findings_summary.open }} open</span>{% endif %}</p>
+        </div>
+    </a>
+    <a href="{% url 'checklist:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.5"/><path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h1A1.5 1.5 0 0 1 12 3.5V4"/><path d="M7.5 10.5 9 12l3.5-3.5"/></svg>
+        </span>
+        <div class="min-w-0 flex-1">
+            {% if checklist_summary.started %}
+            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ checklist_summary.tested }}<span class="text-sm font-medium text-slate-400">/{{ checklist_summary.total }}</span></span>
+            <p class="text-xs text-slate-500 mt-0.5">Checklist tested</p>
+            <div class="mt-1.5 bg-slate-100 dark:bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-brand-600 h-full rounded-full" style="width: {{ checklist_summary.pct }}%"></div>
+            </div>
+            {% else %}
+            <span class="text-2xl font-bold text-slate-300 tabular-nums">—</span>
+            <p class="text-xs text-slate-500 mt-0.5">Checklist not started</p>
+            {% endif %}
+        </div>
+    </a>
+    <a href="{% url 'reports:options' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ findings_summary.publishable|default:0 }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Ready to publish</p>
+        </div>
+    </a>
+</div>
+
+{% if transition_options %}
+{{ transition_options|json_script:"transition-options-data" }}
+<div class="card mb-8">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-900 mb-0.5">Status</h2>
+            <p class="text-xs text-slate-500">
+                Currently <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% for option in transition_options %}
+            <button type="button"
+                    class="{% if option.style == 'primary' %}btn-primary{% else %}btn-secondary{% endif %}"
+                    data-transition-trigger
+                    data-to-status="{{ option.to_status }}"
+                    data-action="{% url 'engagements:transition' engagement.pk option.to_status %}">
+                {{ option.label }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    #transition-modal[open] {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0;
+    }
+</style>
+<dialog id="transition-modal" class="p-0 border-0 bg-transparent w-full max-w-md backdrop:bg-black/40">
+    <div class="card !m-0">
+        <h2 class="text-lg font-bold text-slate-900 mb-2">Change status?</h2>
+        <p class="text-sm text-slate-600 mb-3">
+            Move "<strong>{{ engagement.client_name }}</strong>" from
+            <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+            to <strong id="transition-modal-to-label"></strong>.
+        </p>
+        <div id="transition-modal-warnings"></div>
+        <form method="post" id="transition-modal-form" class="flex gap-2 mt-3">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary">Confirm</button>
+            <button type="button" class="btn-secondary" data-transition-cancel>Cancel</button>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+
+<div class="card">
+    <h2 class="font-semibold text-slate-900 mb-2">Scope</h2>
+    <p class="whitespace-pre-wrap bg-slate-50 dark:bg-slate-50 border border-slate-100 dark:border-slate-200 rounded-md p-3 text-sm text-slate-700">{{ engagement.scope|default:"No scope recorded yet." }}</p>
+
+    <details class="mt-3 group">
+        <summary class="cursor-pointer text-sm text-brand-600 dark:text-brand-300 hover:underline select-none">Propose a scope change</summary>
+        <form method="post" action="{% url 'engagements:scope_change_create' engagement.pk %}" class="mt-2">
+            {% csrf_token %}
+            {{ scope_change_form.proposed_scope|add_class:"field-input" }}
+            <button type="submit" class="btn-secondary mt-2">Submit for Team Lead approval</button>
+        </form>
+    </details>
+
+    {% if scope_requests %}
+    <h3 class="font-medium text-slate-800 mt-5 mb-2 text-sm">Scope change requests</h3>
+    <div class="divide-y divide-slate-100 dark:divide-slate-200 border-t border-slate-100 dark:border-slate-200">
+        {% for sr in scope_requests %}
+        <div class="py-3">
+            <div class="flex items-center justify-between">
+                <div class="text-xs text-slate-500">
+                    {{ sr.requested_by|default:"—" }} &middot; {{ sr.created_at|date:"d/m/Y H:i" }}
+                </div>
+                <span class="{{ sr.status|badge_class }}">{{ sr.get_status_display }}</span>
+            </div>
+            <p class="text-sm text-slate-700 whitespace-pre-wrap mt-1">{{ sr.proposed_scope }}</p>
+            {% if sr.status != "PENDING" and sr.reviewed_by %}
+            <div class="text-xs text-slate-500 mt-1">
+                {{ sr.get_status_display }} by {{ sr.reviewed_by }} &middot; {{ sr.reviewed_at|date:"d/m/Y H:i" }}
+            </div>
+            {% endif %}
+            {% if is_manager and sr.status == "PENDING" %}
+            <div class="flex gap-2 mt-2">
+                <form method="post" action="{% url 'engagements:scope_change_approve' engagement.pk sr.pk %}">
+                    {% csrf_token %}<button type="submit" class="btn-primary">Approve</button>
+                </form>
+                <form method="post" action="{% url 'engagements:scope_change_reject' engagement.pk sr.pk %}">
+                    {% csrf_token %}<button type="submit" class="btn-danger">Reject</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+{% if is_manager %}
+<p class="text-xs text-slate-400 mt-4">
+    RedScribe doesn't offer permanent deletion of engagements — actions here are kept in an append-only audit
+    trail, so removal is archival (see the Archive button above) rather than deletion.
+</p>
+{% endif %}
+
+{% if engagement.client %}
+<div class="card mt-8 flex flex-wrap items-center justify-between gap-4">
+    <div class="min-w-0">
+        <h2 class="font-semibold text-slate-900 mb-1">Client portal</h2>
+        {% if engagement.client_release_approved %}
+        <p class="text-xs text-slate-500">
+            Released by {{ engagement.client_release_approved_by|default:"—" }} on {{ engagement.client_release_approved_at|date:"d/m/Y" }}.
+            QA Approved findings are visible to {{ engagement.client.name }}'s portal users.
+        </p>
+        {% else %}
+        <p class="text-xs text-slate-500">
+            Not yet released — {{ engagement.client.name }}'s portal users can't see this engagement or any
+            of its findings, no matter how many are QA Approved, until it's explicitly released.
+        </p>
+        {% endif %}
+    </div>
+    {% if can_release_to_client %}
+    <div class="shrink-0">
+        {% if engagement.client_release_approved %}
+        <form method="post" action="{% url 'engagements:revoke_client_release' engagement.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Revoke client release</button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'engagements:release_to_client' engagement.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary">Release to client portal</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% url 'engagements:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to engagements" %}
+{% endblock %}
+
+{% block extra_body %}
+{% if transition_options %}
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var modal = document.getElementById("transition-modal");
+        var form = document.getElementById("transition-modal-form");
+        var toLabel = document.getElementById("transition-modal-to-label");
+        var warningsBox = document.getElementById("transition-modal-warnings");
+        var dataEl = document.getElementById("transition-options-data");
+        if (!modal || !dataEl) return;
+
+        var byStatus = {};
+        JSON.parse(dataEl.textContent).forEach(function (option) {
+            byStatus[option.to_status] = option;
+        });
+
+        document.querySelectorAll("[data-transition-trigger]").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var option = byStatus[btn.dataset.toStatus];
+                form.action = btn.dataset.action;
+                toLabel.textContent = option ? option.to_status_label : "";
+
+                warningsBox.innerHTML = "";
+                (option ? option.warnings : []).forEach(function (warning) {
+                    var p = document.createElement("p");
+                    p.className = "text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 rounded-md px-3 py-2 mb-2";
+                    p.textContent = warning;
+                    warningsBox.appendChild(p);
+                });
+
+                modal.showModal();
+            });
+        });
+
+        modal.querySelectorAll("[data-transition-cancel]").forEach(function (btn) {
+            btn.addEventListener("click", function () { modal.close(); });
+        });
+
+        modal.addEventListener("click", function (e) {
+            if (e.target === modal) modal.close();
+        });
+    })();
+</script>
+{% endif %}
+{% endblock %}

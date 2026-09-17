@@ -1,0 +1,26 @@
+{% extends "base/base.html" %}
+{% block title %}Edit {{ engagement.client_name }} — RedScribe{% endblock %}
+{% block extra_head %}{% include "base/_datepicker_head.html" %}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="edit" %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit engagement</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Scope isn't edited here — propose a scope change from the engagement
+            page instead; it takes effect once a Team Lead approves it.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Save</button>
+        </form>
+    </div>
+    {% url 'engagements:detail' engagement.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back" %}
+</div>
+{% endblock %}

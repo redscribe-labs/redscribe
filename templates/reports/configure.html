@@ -1,0 +1,380 @@
+{% extends "base/base.html" %}
+{% block title %}Configure report — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="report" %}
+{% endblock %}
+
+{% block page_header %}
+{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Configure report" subtitle="Changes on the left update the preview on the right as you type." %}
+{% endblock %}
+
+{% block extra_head %}
+{% include "findings/_editor_head.html" %}
+<style>
+  {{ preview_css|safe }}
+  /* This previews a printed/exported document, which has no dark-mode
+     notion of its own — always render it as a light page, regardless of
+     the app's theme, rather than letting the surrounding .card's dark
+     background show through .report-document's hardcoded dark text. */
+  #report-preview-pane {
+      max-height: calc(100vh - 12rem); overflow-y: auto;
+      background: #fff; padding: 1.5rem; border-radius: .5rem; border: 1px solid #e2e8f0;
+  }
+  /* This form is long and stacks many rich-text editors, each with its own
+     toolbar sticking to the top of the viewport while scrolled (see
+     .rte-toolbar-sticky in editor.css, z-index 15). The shared action bar
+     (base/_form_action_bar.html) sticks to the BOTTOM of the viewport at
+     z-index 10 — fine on short forms, but here the two can occupy the
+     same screen space at once. Un-sticking the action bar (an earlier
+     attempt) traded that visual collision for a worse problem: Save
+     became unreachable without scrolling all the way to the end of a
+     long form. Keep it sticky, but make it win the collision instead —
+     raise it above the toolbar's z-index and give it a shadow, so it
+     reads as intentionally floating above content rather than clipping
+     it. The toolbar underneath is very briefly covered while scrolling
+     past that exact position, which costs far less than losing Save.
+  */
+  #config-form .sticky.bottom-0.z-10 { z-index: 20; box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="config-form" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    {% csrf_token %}
+    <input type="hidden" name="content_json" id="content_json">
+
+    <div class="space-y-6">
+        <div class="card">
+            <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                <input type="checkbox" id="is_remediation_report" name="is_remediation_report" {% if is_remediation_report %}checked{% endif %}>
+                Remediation report
+            </label>
+            <p class="field-help mt-1">When on, each included finding's Remediation testing subsection is shown (only where remediation data exists).</p>
+        </div>
+
+        <div class="card">
+            <label for="report_profile" class="field-label">Report profile</label>
+            <select class="field-input" id="report_profile" name="report_profile">
+                <option value="">(Default)</option>
+                {% for profile in report_profiles %}
+                <option value="{{ profile.pk }}" {% if profile.pk == selected_profile_id %}selected{% endif %}>{{ profile.name }}</option>
+                {% endfor %}
+            </select>
+            <p class="field-help mt-1">Which document structure this report is built from — see Report Profiles in the sidebar to build one.</p>
+            <p class="field-help mt-1">Where cover page, document control, disclaimers, and table of contents appear (or don't) is set once in the profile's own template, via the {% templatetag openvariable %} cover_page {% templatetag closevariable %}, {% templatetag openvariable %} document_control {% templatetag closevariable %}, {% templatetag openvariable %} disclaimers {% templatetag closevariable %}, and {% templatetag openvariable %} table_of_contents {% templatetag closevariable %} tags. Their actual content for this one report can be overridden below.</p>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Cover page</h2>
+            <p class="field-help mb-3">Leave blank to use the report profile's default. Only affects this report.</p>
+            <div class="space-y-3">
+                <div>
+                    <label for="cover_title" class="field-label">Cover title</label>
+                    <input type="text" class="field-input" id="cover_title"
+                           placeholder="{{ selected_profile_cover_title|default:'Penetration Test Report' }}"
+                           value="{{ content.cover.title|default:'' }}">
+                </div>
+                <div>
+                    <label for="cover_classification_label" class="field-label">Classification label</label>
+                    <input type="text" class="field-input" id="cover_classification_label"
+                           placeholder="{{ selected_profile_classification_label|default:'Strictly Confidential' }}"
+                           value="{{ content.cover.classification_label|default:'' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Document control</h2>
+            <p class="field-help mb-3">Optional commentary shown before the document control history table wherever {% templatetag openvariable %} document_control {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
+            <div class="rte-editor" data-rte-field="document_control_notes" data-rte-editable="true"
+                 data-rte-initial='{{ content.document_control.notes|default:"" }}'></div>
+            <input type="hidden" data-rte-hidden="document_control_notes" id="document_control_notes">
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Breakdown of findings</h2>
+            <p class="field-help mb-3">Controls the severity chart and vulnerabilities table wherever {% templatetag openvariable %} breakdown_of_findings {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
+            <label class="flex items-center gap-2 text-sm font-medium text-slate-800 mb-3">
+                <input type="checkbox" id="breakdown_enabled" {% if content.breakdown.enabled %}checked{% endif %}>
+                Include this block
+            </label>
+            <div id="breakdown_options" class="space-y-3" {% if not content.breakdown.enabled %}hidden{% endif %}>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="breakdown_show_chart" {% if content.breakdown.show_chart %}checked{% endif %}>
+                        Chart
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" id="breakdown_show_table" {% if content.breakdown.show_table %}checked{% endif %}>
+                        Vulnerabilities table
+                    </label>
+                </div>
+                <div>
+                    <label class="field-label mb-1">Intro <span class="text-slate-400 font-normal">(optional — rendered above the chart)</span></label>
+                    <div class="rte-editor" data-rte-field="breakdown_intro" data-rte-editable="true"
+                         data-rte-initial='{{ content.breakdown.intro|default:"" }}'></div>
+                    <input type="hidden" data-rte-hidden="breakdown_intro" id="breakdown_intro">
+                </div>
+                <div>
+                    <label class="field-label mb-1">Commentary <span class="text-slate-400 font-normal">(optional — rendered between the chart and the table)</span></label>
+                    <div class="rte-editor" data-rte-field="breakdown_notes" data-rte-editable="true"
+                         data-rte-initial='{{ content.breakdown.notes|default:"" }}'></div>
+                    <input type="hidden" data-rte-hidden="breakdown_notes" id="breakdown_notes">
+                </div>
+                <div>
+                    <p class="field-label mb-1">Severities included</p>
+                    <div class="flex flex-wrap gap-3">
+                        {% for value, label in severity_choices %}
+                        <label class="flex items-center gap-1.5 text-sm">
+                            <input type="checkbox" class="breakdown-severity" value="{{ value }}"
+                                   {% if not content.breakdown.severities or value in content.breakdown.severities %}checked{% endif %}>
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <p class="field-label mb-1">Statuses included</p>
+                    <div class="flex flex-wrap gap-3">
+                        {% for value, label in status_choices %}
+                        <label class="flex items-center gap-1.5 text-sm">
+                            <input type="checkbox" class="breakdown-status" value="{{ value }}"
+                                   {% if not content.breakdown.statuses or value in content.breakdown.statuses %}checked{% endif %}>
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Report content blocks</h2>
+            <p class="field-help mb-3">Pre-filled from the selected report profile's default text — edit freely, this copy only affects this report. Supports tables.</p>
+            <div class="space-y-4">
+                {% for key, label, initial in dynamic_section_fields %}
+                <div class="border border-slate-200 dark:border-slate-200 rounded-lg p-3">
+                    <label class="block text-sm font-semibold text-slate-900 mb-2">{{ label }}</label>
+                    <div class="rte-editor" data-rte-field="dyn_{{ key }}" data-rte-editable="true"
+                         data-rte-initial='{{ initial|default:"" }}'></div>
+                    <input type="hidden" data-rte-hidden="dyn_{{ key }}" data-dynamic-key="{{ key }}" id="dyn_{{ key }}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Observations</h2>
+            <p class="field-help mb-3">One heading per item. Supports tables.</p>
+            <div id="observations-list">
+                {% for item in content.observations %}
+                <div class="repeating-item border border-slate-200 rounded-md p-3 mb-3" data-repeating-item>
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <input type="text" class="field-input" placeholder="Title" value="{{ item.title }}" data-item-title>
+                        <button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>
+                    </div>
+                    <div class="rte-editor" data-rte-field="obs_{{ forloop.counter0 }}" data-rte-editable="true"
+                         data-rte-initial='{{ item.content|default:"" }}'></div>
+                    <input type="hidden" data-rte-hidden="obs_{{ forloop.counter0 }}" data-item-content id="obs_{{ forloop.counter0 }}">
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn-secondary text-sm" data-add-item="observations" data-item-prefix="obs">+ Add observation</button>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Testing phases</h2>
+            <p class="field-help mb-3">One heading per phase. Supports tables.</p>
+            <div id="testing_phases-list">
+                {% for item in content.testing_phases %}
+                <div class="repeating-item border border-slate-200 rounded-md p-3 mb-3" data-repeating-item>
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <input type="text" class="field-input" placeholder="Phase title" value="{{ item.title }}" data-item-title>
+                        <button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>
+                    </div>
+                    <div class="rte-editor" data-rte-field="phase_{{ forloop.counter0 }}" data-rte-editable="true"
+                         data-rte-initial='{{ item.content|default:"" }}'></div>
+                    <input type="hidden" data-rte-hidden="phase_{{ forloop.counter0 }}" data-item-content id="phase_{{ forloop.counter0 }}">
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn-secondary text-sm" data-add-item="testing_phases" data-item-prefix="phase">+ Add phase</button>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-slate-900 text-sm mb-3">Findings included (in report order)</h2>
+            <label class="flex items-center gap-2 text-sm mb-3">
+                <input type="checkbox" id="toggle_page_break_per_finding" checked> Start each finding on a new page
+            </label>
+            {% if not publishable_findings %}
+            <p class="text-sm text-slate-500">No QA Approved findings on this engagement yet.</p>
+            {% else %}
+            <div class="space-y-1.5" id="findings-list">
+                {% for f in publishable_findings %}
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" class="finding-checkbox" value="{{ f.id }}" {% if f.id|stringformat:"s" in content.findings.included_ids %}checked{% endif %}>
+                    <span class="badge-slate">{{ f.get_severity_display }}</span>
+                    {{ f.title }}
+                </label>
+                {% endfor %}
+            </div>
+            <p class="field-help mt-2">Uncheck to exclude. Order matches the list above (severity order) — drag-to-reorder is a follow-up improvement.</p>
+            {% endif %}
+        </div>
+
+        {% include "base/_form_action_bar.html" with submit_label="Save configuration" %}
+    </div>
+
+    <div class="card lg:sticky lg:top-6">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Live preview</h2>
+        <div id="report-preview-pane">{{ preview_html|safe }}</div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_body %}
+{% include "findings/_editor_scripts.html" %}
+{{ preview_url|json_script:"preview-url" }}
+{{ content|json_script:"content-seed" }}
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  var previewUrl = JSON.parse(document.getElementById("preview-url").textContent);
+  var seed = JSON.parse(document.getElementById("content-seed").textContent);
+  var form = document.getElementById("config-form");
+  var pane = document.getElementById("report-preview-pane");
+  var csrfToken = form.querySelector("[name=csrfmiddlewaretoken]").value;
+
+  function checked(id) { var el = document.getElementById(id); return el ? el.checked : false; }
+
+  var breakdownEnabled = document.getElementById("breakdown_enabled");
+  var breakdownOptions = document.getElementById("breakdown_options");
+  if (breakdownEnabled && breakdownOptions) {
+    breakdownEnabled.addEventListener("change", function () {
+      breakdownOptions.hidden = !breakdownEnabled.checked;
+    });
+  }
+
+  var itemCounters = {
+    observations: document.querySelectorAll("#observations-list [data-repeating-item]").length,
+    testing_phases: document.querySelectorAll("#testing_phases-list [data-repeating-item]").length,
+  };
+
+  function wireRemoveButton(item) {
+    item.querySelector("[data-item-remove]").addEventListener("click", function () {
+      item.remove();
+      schedulePreview();
+    });
+  }
+
+  function addItem(kind, prefix) {
+    var container = document.getElementById(kind + "-list");
+    var n = itemCounters[kind]++;
+    var fieldName = prefix + "_" + n;
+    var item = document.createElement("div");
+    item.className = "repeating-item border border-slate-200 rounded-md p-3 mb-3";
+    item.setAttribute("data-repeating-item", "");
+    item.innerHTML =
+      '<div class="flex items-center justify-between gap-2 mb-2">' +
+      '<input type="text" class="field-input" placeholder="Title" data-item-title>' +
+      '<button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>' +
+      "</div>" +
+      '<div class="rte-editor" data-rte-field="' + fieldName + '" data-rte-editable="true"></div>' +
+      '<input type="hidden" data-rte-hidden="' + fieldName + '" data-item-content id="' + fieldName + '">';
+    container.appendChild(item);
+    window.RedscribeEditorApp.initRichTextEditor(item.querySelector("[data-rte-field]"));
+    wireRemoveButton(item);
+    schedulePreview();
+  }
+
+  document.querySelectorAll("[data-repeating-item]").forEach(wireRemoveButton);
+  document.querySelectorAll("[data-add-item]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      addItem(btn.getAttribute("data-add-item"), btn.getAttribute("data-item-prefix"));
+    });
+  });
+
+  function collectItems(kind) {
+    var container = document.getElementById(kind + "-list");
+    var items = [];
+    container.querySelectorAll("[data-repeating-item]").forEach(function (item) {
+      items.push({
+        title: item.querySelector("[data-item-title]").value,
+        content: item.querySelector("[data-item-content]").value,
+      });
+    });
+    return items;
+  }
+
+  function collectContent() {
+    var dynamic = {};
+    document.querySelectorAll("[data-dynamic-key]").forEach(function (el) {
+      dynamic[el.getAttribute("data-dynamic-key")] = el.value;
+    });
+    var includedIds = [];
+    document.querySelectorAll(".finding-checkbox").forEach(function (el) {
+      if (el.checked) includedIds.push(el.value);
+    });
+    return {
+      toggles: {
+        page_break_per_finding: checked("toggle_page_break_per_finding"),
+      },
+      dynamic: dynamic,
+      cover: {
+        title: document.getElementById("cover_title").value,
+        classification_label: document.getElementById("cover_classification_label").value,
+      },
+      document_control: {
+        notes: document.getElementById("document_control_notes").value,
+      },
+      breakdown: {
+        enabled: checked("breakdown_enabled"),
+        show_chart: checked("breakdown_show_chart"),
+        show_table: checked("breakdown_show_table"),
+        intro: document.getElementById("breakdown_intro").value,
+        notes: document.getElementById("breakdown_notes").value,
+        severities: Array.prototype.map.call(
+          document.querySelectorAll(".breakdown-severity:checked"), function (el) { return el.value; }
+        ),
+        statuses: Array.prototype.map.call(
+          document.querySelectorAll(".breakdown-status:checked"), function (el) { return el.value; }
+        ),
+      },
+      observations: collectItems("observations"),
+      testing_phases: collectItems("testing_phases"),
+      findings: { included_ids: includedIds, severities: null, statuses: null },
+    };
+  }
+
+  function applySeed() {
+    var toggles = seed.toggles || {};
+    if (document.getElementById("toggle_page_break_per_finding")) document.getElementById("toggle_page_break_per_finding").checked = toggles.page_break_per_finding !== false;
+  }
+
+  var debounceTimer = null;
+  function schedulePreview() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function () {
+      fetch(previewUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        body: JSON.stringify({
+          content: collectContent(),
+          is_remediation_report: checked("is_remediation_report"),
+        }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) { pane.innerHTML = data.html; })
+        .catch(function () {});
+    }, 400);
+  }
+
+  applySeed();
+  form.addEventListener("input", schedulePreview);
+  form.addEventListener("change", schedulePreview);
+  form.addEventListener("submit", function () {
+    document.getElementById("content_json").value = JSON.stringify(collectContent());
+  });
+})();
+</script>
+{% endblock %}

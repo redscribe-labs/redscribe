@@ -1,0 +1,16 @@
+{% extends "base/base.html" %}
+{% block title %}Delete {{ profile.name }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto card">
+    <h1 class="text-lg font-semibold mb-2">Delete "{{ profile.name }}"?</h1>
+    <p class="text-sm text-slate-500 mb-5">
+        This permanently deletes this report profile. Any ReportConfig that had explicitly chosen it falls back
+        to the default profile. This cannot be undone.
+    </p>
+    <form method="post" class="flex gap-3">
+        {% csrf_token %}
+        <button type="submit" class="btn-primary bg-red-600 hover:bg-red-700">Delete permanently</button>
+        <a href="{% url 'report_profiles:list' %}" class="btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

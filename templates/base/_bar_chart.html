@@ -1,0 +1,19 @@
+{% if data %}
+<div class="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-200">
+    {% for row in data %}
+    <div class="{{ row.color }} h-full first:rounded-l-full last:rounded-r-full" style="width: {{ row.pct }}%;{{ row.style }}" title="{{ row.label }}: {{ row.count }}"></div>
+    {% endfor %}
+</div>
+<ul class="mt-3.5 space-y-1.5">
+    {% for row in data %}
+    <li class="flex items-center gap-2 text-sm">
+        <span class="h-2 w-2 rounded-full {{ row.color }} shrink-0" style="{{ row.style }}"></span>
+        <span class="text-slate-600 flex-1 truncate">{{ row.label }}</span>
+        <span class="text-slate-900 font-medium tabular-nums text-xs">{{ row.count }}</span>
+        <span class="text-slate-400 tabular-nums text-xs w-9 text-right">{{ row.pct }}%</span>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-slate-400">No data yet.</p>
+{% endif %}

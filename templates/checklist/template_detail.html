@@ -1,0 +1,82 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ template.name }} — Checklist templates{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <h1 class="page-title">{{ template.name }}</h1>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+            {% if template.is_default %}<span class="badge-green">Default</span>{% endif %}
+            <span class="text-sm text-slate-500">{{ items|length }} item{{ items|length|pluralize }} &middot; updated {{ template.updated_at|date:"d/m/Y H:i" }}</span>
+        </div>
+        {% if template.description %}<p class="text-sm text-slate-500 mt-2">{{ template.description }}</p>{% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2 sm:shrink-0">
+        <a href="{% url 'checklist_templates:item_add' template.pk %}" class="btn-secondary">+ Add item</a>
+        <a href="{% url 'checklist_templates:edit' template.pk %}" class="btn-secondary">Edit</a>
+        <a href="{% url 'checklist_templates:export' template.pk %}" class="btn-secondary">Export JSON</a>
+        <a href="{% url 'checklist_templates:upload' %}" class="btn-secondary">Upload / replace template</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if grouped %}
+<div class="space-y-2">
+    {% for group in grouped %}
+    <div class="card">
+        <div class="flex items-center justify-between gap-2 mb-2">
+            <h2 class="font-semibold text-slate-900">{{ group.category }}</h2>
+            <a href="{% url 'checklist_templates:item_add' template.pk %}?category={{ group.category|urlencode }}" class="text-xs text-brand-700 dark:text-brand-300 hover:underline shrink-0">+ Add to this category</a>
+        </div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for item in group.items %}
+            <div class="py-2">
+                <div class="flex items-start justify-between gap-3">
+                    <details class="group flex-1 min-w-0">
+                        <summary class="cursor-pointer select-none flex items-center gap-2 text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">
+                            {% if item.code %}<span class="text-slate-400 font-mono text-xs">{{ item.code }}</span>{% endif %}
+                            <span class="font-medium">{{ item.title }}</span>
+                        </summary>
+                        <div class="mt-2 pl-1">
+                            {% if item.reference_info %}
+                            <div class="rte-editor" data-rte-field="template-item-{{ item.pk }}" data-rte-editable="false" data-rte-initial='{{ item.reference_info }}'></div>
+                            {% else %}
+                            <p class="text-sm text-slate-400">No reference info.</p>
+                            {% endif %}
+                        </div>
+                    </details>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <form method="post" action="{% url 'checklist_templates:item_move' item.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="direction" value="up">
+                            <button type="submit" class="text-slate-400 hover:text-brand-700 dark:hover:text-brand-300 disabled:opacity-30 disabled:pointer-events-none px-1" {% if forloop.first %}disabled{% endif %} aria-label="Move up">&uarr;</button>
+                        </form>
+                        <form method="post" action="{% url 'checklist_templates:item_move' item.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="direction" value="down">
+                            <button type="submit" class="text-slate-400 hover:text-brand-700 dark:hover:text-brand-300 disabled:opacity-30 disabled:pointer-events-none px-1" {% if forloop.last %}disabled{% endif %} aria-label="Move down">&darr;</button>
+                        </form>
+                        <a href="{% url 'checklist_templates:item_edit' item.pk %}" class="text-xs text-slate-500 hover:text-brand-700 dark:hover:text-brand-300 px-1">Edit</a>
+                        <a href="{% url 'checklist_templates:item_delete' item.pk %}" class="text-xs text-slate-500 hover:text-red-600 dark:hover:text-red-400 px-1">Delete</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-12">
+    <p class="text-slate-500 mb-4">This template has no items yet.</p>
+    <a href="{% url 'checklist_templates:item_add' template.pk %}" class="btn-primary">+ Add item</a>
+</div>
+{% endif %}
+
+{% url 'checklist_templates:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to checklist templates" %}
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

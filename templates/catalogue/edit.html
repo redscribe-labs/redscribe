@@ -1,0 +1,35 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Edit {{ template.title }} — RedScribe{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <p class="page-eyebrow !mb-0.5">Catalogue</p>
+    <h1 class="page-title">Edit template</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+{% url 'catalogue:detail' template.pk as back_url %}
+<form method="post">
+    {% csrf_token %}
+    <div class="card mb-6 max-w-5xl">
+        <label for="{{ form.title.id_for_label }}" class="field-label">{{ form.title.label }}</label>
+        {{ form.title|add_class:"field-input" }}
+        {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="flex flex-col xl:flex-row-reverse xl:items-start gap-8">
+        <div class="rail-panel-wide">
+            {% include "catalogue/_form_fields_meta.html" %}
+        </div>
+        <div class="min-w-0 flex-1">
+            {% include "catalogue/_form_fields_content.html" %}
+        </div>
+    </div>
+
+    {% include "base/_form_action_bar.html" with cancel_url=back_url submit_label="Save" %}
+</form>
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% include "base/_classifications_scripts.html" %}{% if feature_flags.cvss_calculator %}{% include "base/_cvss_calculator_scripts.html" %}{% endif %}{% endblock %}

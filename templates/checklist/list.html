@@ -1,0 +1,116 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Checklist — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="checklist" %}
+{% endblock %}
+
+{% block page_header %}
+{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Checklist" %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-6">
+    <h2 class="font-semibold text-slate-900 mb-3">Start a checklist run</h2>
+    <p class="text-sm text-slate-500 mb-3">
+        An engagement can run several checklists at once — e.g. OWASP WSTG against the main web app and
+        OWASP API Top 10 against its REST API. Give this run a label so it's easy to tell apart.
+    </p>
+    <form method="post" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+        {% csrf_token %}
+        <div class="flex-1 min-w-0 w-full">
+            <label for="checklist-run-label" class="field-label">Label</label>
+            <input type="text" id="checklist-run-label" name="label" class="field-input" placeholder="e.g. app.example.com, REST API v2">
+        </div>
+        <div class="flex-1 min-w-0 w-full">
+            <label for="checklist-template-select" class="field-label">Template</label>
+            <select id="checklist-template-select" name="template_id" class="field-input">
+                {% for t in checklist_templates %}
+                <option value="{{ t.pk }}" {% if t.is_default %}selected{% endif %}>{{ t.name }}{% if t.is_default %} (default){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" name="start_checklist" value="1" class="btn-primary shrink-0">Start checklist</button>
+    </form>
+</div>
+
+{% if not runs %}
+<div class="card text-center py-10">
+    <p class="text-slate-600">No checklist runs started yet — use the form above.</p>
+</div>
+{% else %}
+<div class="flex justify-end mb-3">
+    <a href="{% url 'checklist:export' engagement.pk %}" class="btn-secondary text-sm">Export JSON</a>
+</div>
+<div class="space-y-6">
+    {% for rc in runs %}
+    <details class="card p-0! overflow-hidden" open>
+        <summary class="cursor-pointer select-none px-5 py-4 border-b border-slate-200 bg-slate-50 dark:bg-slate-50 flex items-center gap-4">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-slate-900">{{ rc.run.label }}</span>
+                    {% if rc.run.template %}<span class="text-xs text-slate-400">from {{ rc.run.template.name }}</span>{% endif %}
+                </div>
+                <div class="flex items-baseline justify-between gap-4 mt-1.5 max-w-sm">
+                    <p class="text-xs text-slate-500">{{ rc.tested_count }} of {{ rc.total_count }} tested</p>
+                    <p class="text-xs text-slate-400 tabular-nums">{{ rc.progress_pct }}%</p>
+                </div>
+                <div class="mt-1 bg-slate-100 dark:bg-slate-200 rounded-full h-1.5 overflow-hidden max-w-sm">
+                    <div class="bg-green-600 h-full rounded-full" style="width: {{ rc.progress_pct }}%"></div>
+                </div>
+            </div>
+        </summary>
+
+        <div class="p-5">
+            {% if rc.suggestions %}
+            <div class="rounded-lg border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-4 mb-5">
+                <p class="text-sm font-medium text-brand-900 dark:text-brand-200 mb-2">Suggested next checks <span class="font-normal text-brand-700 dark:text-brand-400">— just a nudge, test in whatever order makes sense</span></p>
+                <div class="flex flex-wrap gap-2">
+                    {% for s in rc.suggestions %}
+                    <a href="{% url 'checklist:item_detail' engagement.pk s.item.pk %}"
+                       class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-100 border border-brand-200 dark:border-brand-800 rounded-full pl-2 pr-3 py-1 text-xs text-brand-800 dark:text-brand-300 hover:border-brand-400 hover:shadow-sm transition-shadow">
+                        <span class="text-slate-400 font-mono">{{ s.item.code }}</span>
+                        <span>{{ s.item.title }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="space-y-5">
+                {% for group in rc.grouped %}
+                <div class="card p-0! overflow-hidden">
+                    <h3 class="font-semibold text-slate-900 px-5 py-3 border-b border-slate-200 bg-slate-50 dark:bg-slate-50 flex items-center justify-between">
+                        {{ group.category }}
+                        <span class="text-xs font-normal text-slate-400 tabular-nums">{{ group.items|length }} check{{ group.items|length|pluralize }}</span>
+                    </h3>
+                    <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+                        {% for item in group.items %}
+                        <li>
+                            <a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-100 transition-colors">
+                                <span class="text-sm text-slate-800 min-w-0 truncate">
+                                    {% if item.code %}<span class="text-slate-400 font-mono text-xs mr-2">{{ item.code }}</span>{% endif %}
+                                    {{ item.title }}
+                                </span>
+                                <span class="flex items-center gap-1.5 shrink-0">
+                                    {% if item.pk in rc.suggested_ids %}<span class="badge-amber">Suggested</span>{% endif %}
+                                    {% if item.findings.all %}<span class="badge-red">{{ item.findings.all|length }} finding{{ item.findings.all|length|pluralize }}</span>{% endif %}
+                                    <span class="{{ item.status|badge_class }}">{{ item.get_status_display }}</span>
+                                </span>
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </details>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% url 'engagements:detail' engagement.pk as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to engagement" %}
+{% endblock %}

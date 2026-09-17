@@ -1,0 +1,114 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Trends — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="mb-2">
+    <h1 class="page-title">Trend reporting</h1>
+    <p class="text-sm text-slate-500 mt-1">{{ scope_label }}.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-1">Severity over time</h2>
+        <p class="text-xs text-slate-500 mb-4">Findings reported per month, last 12 months.</p>
+
+        {% if severity_chart.columns %}
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-6">
+            {% for entry in severity_chart.legend %}
+            <span class="flex items-center gap-1.5 text-xs text-slate-600">
+                <span class="h-2.5 w-2.5 rounded-full shrink-0" style="{{ entry.style }}"></span>
+                {{ entry.label }}
+            </span>
+            {% endfor %}
+        </div>
+
+        <div class="overflow-x-auto -mx-1 px-1 pb-1">
+            <div class="flex items-end gap-3 min-w-max">
+                {% for col in severity_chart.columns %}
+                <div class="flex flex-col items-center gap-2 w-9 shrink-0">
+                    <span class="text-[0.7rem] font-medium text-slate-500 tabular-nums">{{ col.total }}</span>
+                    <div class="flex flex-col-reverse gap-[2px] w-6 h-40 rounded-sm overflow-hidden bg-slate-100 dark:bg-slate-200"
+                         title="{{ col.label }}: {{ col.total }} finding{{ col.total|pluralize }}">
+                        {% for seg in col.segments %}
+                        <div class="w-full shrink-0" style="height: {{ seg.height_pct }}%;{{ seg.style }}"
+                             title="{{ seg.label }}: {{ seg.count }}"></div>
+                        {% endfor %}
+                    </div>
+                    <span class="text-[0.65rem] text-slate-400 tabular-nums whitespace-nowrap">{{ col.label }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-400">No findings yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="stat-tile-icon !bg-brand-50 !text-brand-600 dark:!bg-brand-950 dark:!text-brand-300">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14M4 10h12"/></svg>
+                </span>
+                <h2 class="font-semibold text-slate-900">Mean time to remediate</h2>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Days from a finding being reported to its first "Fixed" retest result.</p>
+            {% if mttr.overall_days is not None %}
+            <div class="flex items-baseline gap-2 mb-5">
+                <span class="text-4xl font-bold text-brand-600 dark:text-brand-300 tabular-nums">{{ mttr.overall_days }}</span>
+                <span class="text-sm text-slate-500">days on average, across {{ mttr.sample_size }} fixed finding{{ mttr.sample_size|pluralize }}</span>
+            </div>
+            {% if mttr.by_severity %}
+            <ul class="space-y-2.5">
+                {% for row in mttr.by_severity %}
+                <li class="flex items-center gap-3 text-sm">
+                    <span class="badge-severity w-24 shrink-0 justify-center" style="{{ row.severity|severity_chip_style }}">{{ row.label }}</span>
+                    <div class="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-200 overflow-hidden">
+                        <div class="h-full rounded-full" style="width: {{ row.bar_pct }}%;{{ row.style }}"></div>
+                    </div>
+                    <span class="text-slate-600 tabular-nums w-20 text-right shrink-0">{{ row.mean_days }}d <span class="text-slate-400">({{ row.sample_size }})</span></span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% else %}
+            <p class="text-sm text-slate-400">No findings have been marked Fixed yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="stat-tile-icon !bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5a4 4 0 0 0-4 4v2.3l-1.3 2.6a1 1 0 0 0 .9 1.6h8.8a1 1 0 0 0 .9-1.6L14 9.8V7.5a4 4 0 0 0-4-4Z"/><path d="M8.3 15a1.7 1.7 0 0 0 3.4 0"/></svg>
+                </span>
+                <h2 class="font-semibold text-slate-900">Repeat findings by client</h2>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Classifications recurring across 2+ engagements for the same client.</p>
+            {% if repeat_findings %}
+            <ul class="divide-y divide-slate-100 dark:divide-slate-200 -mx-1">
+                {% for row in repeat_findings %}
+                <li class="flex items-center justify-between gap-4 px-1 py-2.5">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-800 truncate">{{ row.client_name }}</p>
+                        <p class="text-xs text-slate-400 truncate" title="{{ row.tag.taxonomy }}">{{ row.tag.value }}</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="text-sm text-slate-700 tabular-nums">{{ row.engagement_count }} engagements</p>
+                        <p class="text-xs text-slate-400 tabular-nums">{{ row.finding_count }} finding{{ row.finding_count|pluralize }}</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-slate-400">No repeat findings detected yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

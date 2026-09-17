@@ -1,0 +1,155 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ template.title }} — Catalogue{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <p class="page-eyebrow">Catalogue</p>
+        <h1 class="page-title">{{ template.title }}</h1>
+        <div class="flex items-center gap-2 mt-2">
+            <span class="{{ template.status|badge_class }}">{{ template.get_status_display }}</span>
+            <span class="badge-severity" style="{{ template.default_severity|severity_chip_style }}">{{ template.get_default_severity_display }}</span>
+            {% if template.default_cvss_score %}<span class="text-sm text-slate-500">CVSS <span class="font-mono font-semibold text-slate-800">{{ template.default_cvss_score }}</span></span>{% endif %}
+        </div>
+        {% if template.created_by %}<p class="text-xs text-slate-400 mt-1.5">Created by {{ template.created_by }}</p>{% endif %}
+    </div>
+    <div class="flex gap-2 shrink-0">
+        {% if can_submit_qa %}
+        <form method="post" action="{% url 'catalogue:submit_qa' template.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary">Submit for QA</button>
+        </form>
+        {% endif %}
+        {% if can_approve %}
+            {% if template.status == "APPROVED" %}
+            <form method="post" action="{% url 'catalogue:unapprove' template.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-secondary">Revert to Draft</button>
+            </form>
+            {% else %}
+                {% if template.status == "PENDING_QA" %}
+                <form method="post" action="{% url 'catalogue:unapprove' template.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-secondary">Send back to Draft</button>
+                </form>
+                {% endif %}
+            <form method="post" action="{% url 'catalogue:approve' template.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-primary">Approve</button>
+            </form>
+            {% endif %}
+        {% endif %}
+        {% if can_edit %}
+        <a href="{% url 'catalogue:edit' template.pk %}" class="btn-secondary">Edit</a>
+        {% endif %}
+        {% if can_delete %}
+        <a href="{% url 'catalogue:delete' template.pk %}" class="btn-danger">Delete</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block main_class %}min-w-0 flex-1 max-w-5xl{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel xl:w-auto xl:flex-1 xl:max-w-md">
+    <div class="rounded-lg border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-4">
+        <strong class="text-sm text-brand-900 dark:text-brand-200">Use this template</strong>
+        {% if is_importable %}
+        <p class="text-xs text-brand-800 dark:text-brand-300 mt-1 mb-3">
+            Copies these fields into a new Draft finding in the engagement you pick below.
+            The finding has no ongoing link back to this template — editing this template later won't change it.
+        </p>
+        {% if importing_stale_version %}
+        <p class="text-xs bg-amber-100 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 rounded-md px-3 py-2 mb-3">
+            This entry has unapproved edits pending QA. Importing will use the content as it was
+            last approved{% if approved_version.approved_at %} on {{ approved_version.approved_at|date:"d/m/Y" }}{% endif %},
+            not the pending changes below.
+        </p>
+        {% endif %}
+        {% if engagements %}
+        <div class="flex flex-col gap-2">
+            <select id="copy-target-engagement" class="field-input">
+                {% for engagement in engagements %}
+                <option value="{{ engagement.pk }}">{{ engagement.client_name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" id="use-template-btn" class="btn-primary whitespace-nowrap"
+                    data-template-pk="{{ template.pk }}">
+                Use template
+            </button>
+        </div>
+        {% else %}
+        <p class="text-sm text-brand-800 dark:text-brand-300">You don't have access to any engagement to copy this into.</p>
+        {% endif %}
+        {% else %}
+        <p class="text-xs text-brand-800 dark:text-brand-300 mt-1">
+            Only approved catalogue entries can be imported into an engagement. Submit this entry for QA and get it approved first.
+        </p>
+        {% endif %}
+    </div>
+
+    {% if template.classifications.all %}
+    <div>
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Classification</h2>
+        <div class="flex flex-wrap gap-1.5">
+            {% for tag in template.classifications.all %}
+            <span class="badge-slate" title="{{ tag.taxonomy }}">{{ tag.value }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="pt-6 border-t border-slate-200 dark:border-slate-200">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">About this entry</h2>
+        <dl class="space-y-2 text-sm">
+            {% if template.created_by %}
+            <div class="flex justify-between gap-3"><dt class="text-slate-400">Created by</dt><dd class="text-slate-700 text-right">{{ template.created_by }}</dd></div>
+            {% endif %}
+            <div class="flex justify-between gap-3"><dt class="text-slate-400">Created</dt><dd class="text-slate-700">{{ template.created_at|date:"d/m/Y" }}</dd></div>
+            {% if template.updated_at != template.created_at %}
+            <div class="flex justify-between gap-3"><dt class="text-slate-400">Updated</dt><dd class="text-slate-700">{{ template.updated_at|date:"d/m/Y" }}</dd></div>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl">
+{% if document_sections %}
+<div class="card">
+    {% for section in document_sections %}
+    <div class="{% if not forloop.first %}mt-11 pt-11 border-t border-slate-200 dark:border-slate-200{% endif %}">
+        {% include "base/_document_section.html" with field_name=section.field_name label=section.label encrypted=section.encrypted content_json=section.content_json readonly_partial="catalogue/_rte_readonly.html" %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card text-center text-sm text-slate-500">
+    No content sections have been filled in yet.
+    {% if can_edit %}
+    <a href="{% url 'catalogue:edit' template.pk %}" class="text-brand-600 hover:underline">Add some</a>.
+    {% endif %}
+</div>
+{% endif %}
+
+{% url 'catalogue:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to catalogue" %}
+</div>
+{% endblock %}
+{% block extra_body %}
+{% include "findings/_editor_scripts.html" %}
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var btn = document.getElementById("use-template-btn");
+        var select = document.getElementById("copy-target-engagement");
+        if (!btn || !select) return;
+        btn.addEventListener("click", function () {
+            location.href = "/engagements/" + select.value + "/findings/new/?from_template=" + btn.dataset.templatePk;
+        });
+    })();
+</script>
+{% endblock %}

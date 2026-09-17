@@ -1,0 +1,46 @@
+{% extends "base/base.html" %}
+{% block title %}Clear all audit logs — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Clear all audit logs?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This <strong>permanently and irreversibly</strong> deletes every audit log entry and login
+            attempt record — not just entries older than the retention window, all of them, regardless
+            of age. There is no undo, and nothing can be recovered afterward, including from a database
+            backup taken before this point in time.
+        </p>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 mb-1">⚠ This may violate regulatory requirements</p>
+            <p class="text-xs text-amber-800">
+                Regimes that commonly apply to a tool handling client security/health-related findings —
+                notably HIPAA's six-year documentation retention requirement — expect audit trails to be
+                kept for a fixed minimum period, not cleared on demand. This action exists purely as a
+                storage-management escape hatch. Confirm your organization's own retention obligations
+                before using it; RedScribe cannot determine what applies to your deployment.
+            </p>
+        </div>
+        <form method="post" data-permanent-delete-form>
+            {% csrf_token %}
+            <label for="confirm-phrase" class="field-label">
+                Type <span class="font-mono">{{ confirm_phrase }}</span> to confirm
+            </label>
+            <input type="text" id="confirm-phrase" name="confirm_phrase" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ confirm_phrase }}">
+            <div class="flex gap-2">
+                <button type="submit" formaction="{% url 'audit:purge_all' %}" class="btn-danger" data-confirm-submit disabled>Clear all logs</button>
+                <a href="{% url 'audit:list' %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var input = document.querySelector("[data-confirm-input]");
+    var submit = document.querySelector("[data-confirm-submit]");
+    var expected = input.getAttribute("data-expected");
+    input.addEventListener("input", function () {
+        submit.disabled = input.value !== expected;
+    });
+})();
+</script>
+{% endblock %}

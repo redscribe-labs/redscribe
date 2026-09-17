@@ -1,0 +1,7 @@
+{% extends "errors/_base.html" %}
+{% block title %}401 Unauthorized{% endblock %}
+{% block code %}401{% endblock %}
+{% block heading %}Unauthorized{% endblock %}
+{% block message %}Your credentials didn't survive the handshake. Unlike most of what you test, this one actually requires you to sign in — no SQL injection required.{% endblock %}
+{% block cta_url %}/login/{% endblock %}
+{% block cta_label %}Sign in{% endblock %}

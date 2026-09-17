@@ -1,0 +1,1499 @@
+import hashlib
+import os
+import re
+import time
+import urllib.error
+from unittest.mock import patch
+
+import django_otp
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
+from django.core import mail
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.accounts import security
+from apps.accounts.models import LoginAttempt, Permission, Role
+from apps.accounts.permissions_registry import PERMISSIONS
+from apps.accounts.password_validators import PwnedPasswordValidator
+
+User = get_user_model()
+TEST_PASSWORD = "a-very-long-test-password-123!"
+NEW_PASSWORD = "a-different-long-password-456!"
+
+
+def make_user(role=User.Role.CONSULTANT, **kwargs):
+    kwargs.setdefault("username", f"user-{role.lower()}-{os.urandom(4).hex()}")
+    kwargs.setdefault("email", f"{kwargs['username']}@example.com")
+    auth_type = kwargs.pop("auth_type", User.AuthType.LOCAL)
+    user = User.objects.create(role=Role.objects.get(slug=role.lower()), auth_type=auth_type, **kwargs)
+    user.set_password(TEST_PASSWORD)
+    user.save()
+    return user
+
+
+def login(client: Client, user) -> None:
+    from django_otp import login as otp_login
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+
+    from .models import UserSession
+
+    client.force_login(user)
+    device = TOTPDevice.objects.create(user=user, name="test", confirmed=True)
+    session = client.session
+    request = type("R", (), {"session": session, "user": user})()
+    otp_login(request, device)
+    session.save()
+    # force_login() bypasses the real login views, which are the only place
+    # UserSession rows normally get written (see security.invalidate_other_sessions) —
+    # record it here too so a test client set up this way is indistinguishable from one
+    # that went through a real login, for tests that exercise session revocation.
+    UserSession.objects.update_or_create(session_key=session.session_key, defaults={"user": user})
+
+
+class PasswordChangeTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        login(self.client, self.user)
+
+    def test_wrong_old_password_rejected(self):
+        resp = self.client.post(reverse("accounts:password_change"), {
+            "old_password": "not-the-real-password",
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(TEST_PASSWORD))
+
+    def test_weak_new_password_rejected(self):
+        resp = self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": "short",
+            "new_password2": "short",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(TEST_PASSWORD))
+
+    def test_successful_change_updates_password_and_keeps_current_session(self):
+        resp = self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        })
+        self.assertRedirects(resp, reverse("accounts:dashboard"))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
+        resp2 = self.client.get(reverse("accounts:dashboard"))
+        self.assertEqual(resp2.status_code, 200)
+
+    def test_successful_change_invalidates_other_sessions(self):
+        other_client = Client()
+        login(other_client, self.user)
+        other_session_key = other_client.session.session_key
+        self.assertTrue(Session.objects.filter(pk=other_session_key).exists())
+
+        self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        })
+
+        self.assertFalse(Session.objects.filter(pk=other_session_key).exists())
+        resp = other_client.get(reverse("accounts:dashboard"))
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_successful_change_sends_notification_email(self):
+        mail.outbox = []
+        self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        })
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+    def test_oauth_user_cannot_reach_local_password_change(self):
+        oauth_user = make_user(auth_type=User.AuthType.OAUTH)
+        client = Client()
+        login(client, oauth_user)
+        resp = client.get(reverse("accounts:password_change"))
+        self.assertRedirects(resp, reverse("accounts:dashboard"))
+
+
+class NotificationPreferencesTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        login(self.client, self.user)
+        self.url = reverse("accounts:notification_preferences")
+
+    def test_enabled_by_default(self):
+        self.assertTrue(self.user.email_notifications_enabled)
+
+    def test_user_can_opt_out(self):
+        resp = self.client.post(self.url, {})
+        self.assertEqual(resp.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.email_notifications_enabled)
+
+    def test_user_can_opt_back_in(self):
+        self.user.email_notifications_enabled = False
+        self.user.save(update_fields=["email_notifications_enabled"])
+        resp = self.client.post(self.url, {"email_notifications_enabled": "on"})
+        self.assertEqual(resp.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.email_notifications_enabled)
+
+    def test_any_authenticated_user_can_reach_it_regardless_of_role(self):
+        for role in [User.Role.SUPERADMIN, User.Role.TEAM_LEAD, User.Role.SENIOR, User.Role.CONSULTANT]:
+            client = Client()
+            login(client, make_user(role))
+            resp = client.get(self.url)
+            self.assertEqual(resp.status_code, 200)
+
+
+class MFAFeatureFlagTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def test_mfa_not_required_by_default(self):
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_sidebar_renders_for_unverified_local_user_when_mfa_not_required(self):
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertContains(resp, 'id="sidebar"')
+        self.assertContains(resp, "sidebar-link-active")
+
+    def test_enabling_flag_blocks_unenrolled_local_user(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = True
+        flags.save()
+
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertRedirects(resp, reverse("accounts:mfa_enroll"))
+
+    def test_disabling_flag_again_lets_the_user_back_through(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = True
+        flags.save()
+        self.client.get(reverse("accounts:dashboard"))
+
+        flags.mfa_required = False
+        flags.save()
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_sidebar_hidden_on_mfa_verify_for_role_required_user_even_when_global_flag_off(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from .models import Role
+
+        superadmin = make_user("superadmin")
+        TOTPDevice.objects.create(user=superadmin, name="default", confirmed=True)
+        self.assertTrue(Role.objects.get(slug="superadmin").requires_mfa)
+
+        client = Client()
+        client.force_login(superadmin)
+        resp = client.get(reverse("accounts:dashboard"))
+        self.assertRedirects(resp, reverse("accounts:mfa_verify"))
+
+        verify_resp = client.get(reverse("accounts:mfa_verify"))
+        self.assertNotContains(verify_resp, 'id="sidebar"')
+        self.assertNotContains(verify_resp, "User Management")
+        self.assertNotContains(verify_resp, "Superadmin")
+
+    def test_banner_shown_only_when_disabled(self):
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertContains(resp, "MFA is currently disabled instance-wide")
+
+        from apps.feature_flags.models import FeatureFlags
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = True
+        flags.save()
+        verified_client = Client()
+        login(verified_client, make_user())
+        resp = verified_client.get(reverse("accounts:dashboard"))
+        self.assertNotContains(resp, "MFA is currently disabled instance-wide")
+
+
+class ForgotPasswordTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        mail.outbox = []
+
+    def _request_reset(self, email):
+        return self.client.post(reverse("accounts:password_reset_request"), {"email": email})
+
+    def _extract_reset_url(self):
+        self.assertEqual(len(mail.outbox), 1)
+        match = re.search(r"https?://\S+/password/reset/\S+/\S+/", mail.outbox[0].body)
+        self.assertIsNotNone(match)
+        return match.group(0)
+
+    def test_known_local_email_sends_reset_link(self):
+        resp = self._request_reset(self.user.email)
+        self.assertRedirects(resp, reverse("accounts:login"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.user.username, mail.outbox[0].body)
+
+    def test_unknown_email_gives_same_response_and_sends_nothing(self):
+        resp = self._request_reset("nobody@example.com")
+        self.assertRedirects(resp, reverse("accounts:login"))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_oauth_email_sends_nothing(self):
+        oauth_user = make_user(auth_type=User.AuthType.OAUTH)
+        resp = self._request_reset(oauth_user.email)
+        self.assertRedirects(resp, reverse("accounts:login"))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_full_reset_flow_changes_password_and_logs_in_with_new_one(self):
+        self._request_reset(self.user.email)
+        reset_url = self._extract_reset_url()
+
+        get_resp = self.client.get(reset_url)
+        self.assertEqual(get_resp.status_code, 200)
+
+        confirm_resp = self.client.post(reset_url, {
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        })
+        self.assertRedirects(confirm_resp, reverse("accounts:login"))
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
+        self.assertFalse(self.user.check_password(TEST_PASSWORD))
+
+    def test_reset_link_is_single_use(self):
+        self._request_reset(self.user.email)
+        reset_url = self._extract_reset_url()
+
+        self.client.post(reset_url, {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD})
+
+        second_attempt = self.client.post(reset_url, {
+            "new_password1": "yet-another-long-password-789!",
+            "new_password2": "yet-another-long-password-789!",
+        })
+        self.assertEqual(second_attempt.status_code, 400)
+
+    def test_tampered_token_rejected(self):
+        self._request_reset(self.user.email)
+        reset_url = self._extract_reset_url()
+        bad_url = reset_url[:-2] + "xx/"
+        resp = self.client.get(bad_url)
+        self.assertEqual(resp.status_code, 400)
+
+    def test_reset_kills_active_sessions(self):
+        other_client = Client()
+        login(other_client, self.user)
+        other_session_key = other_client.session.session_key
+
+        self._request_reset(self.user.email)
+        reset_url = self._extract_reset_url()
+        self.client.post(reset_url, {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD})
+
+        self.assertFalse(Session.objects.filter(pk=other_session_key).exists())
+
+    def test_weak_new_password_rejected_on_reset(self):
+        self._request_reset(self.user.email)
+        reset_url = self._extract_reset_url()
+        resp = self.client.post(reset_url, {"new_password1": "short", "new_password2": "short"})
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(TEST_PASSWORD))
+
+
+class AccountSetupConfirmTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.user.set_unusable_password()
+        self.user.save()
+        self.client = Client()
+
+    def _setup_url(self):
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        token = security.account_setup_token_generator.make_token(self.user)
+        uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+        return reverse("accounts:account_setup_confirm", kwargs={"uidb64": uidb64, "token": token})
+
+    def test_full_setup_flow_sets_password_and_sends_confirmation(self):
+        mail.outbox = []
+        url = self._setup_url()
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        resp = self.client.post(url, {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD})
+        self.assertRedirects(resp, reverse("accounts:login"))
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(NEW_PASSWORD))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.user.username, mail.outbox[0].body)
+
+    def test_link_is_single_use(self):
+        url = self._setup_url()
+        self.client.post(url, {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD})
+
+        second_attempt = self.client.post(url, {
+            "new_password1": "yet-another-long-password-789!",
+            "new_password2": "yet-another-long-password-789!",
+        })
+        self.assertEqual(second_attempt.status_code, 400)
+
+    def test_tampered_token_rejected(self):
+        bad_url = self._setup_url()[:-2] + "xx/"
+        self.assertEqual(self.client.get(bad_url).status_code, 400)
+
+    def test_survives_past_the_shorter_password_reset_timeout(self):
+        from datetime import datetime, timedelta
+
+        url = self._setup_url()
+        future = datetime.now() + timedelta(hours=2)
+        with patch.object(security.AccountSetupTokenGenerator, "_now", return_value=future):
+            self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_expires_after_24_hours(self):
+        from datetime import datetime, timedelta
+
+        url = self._setup_url()
+        future = datetime.now() + timedelta(hours=25)
+        with patch.object(security.AccountSetupTokenGenerator, "_now", return_value=future):
+            self.assertEqual(self.client.get(url).status_code, 400)
+
+
+class PasswordPolicyTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        login(self.client, self.user)
+
+    def test_password_over_max_length_rejected(self):
+        too_long = "Aa1!" * 40
+        resp = self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": too_long,
+            "new_password2": too_long,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(TEST_PASSWORD))
+
+    @patch("apps.accounts.password_validators.urllib.request.urlopen")
+    def test_breached_password_rejected(self, mock_urlopen):
+        candidate = "correct-horse-battery-staple-1!"
+        sha1 = hashlib.sha1(candidate.encode()).hexdigest().upper()
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = (
+            f"{sha1[5:]}:12345\r\n".encode()
+        )
+
+        resp = self.client.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD,
+            "new_password1": candidate,
+            "new_password2": candidate,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(TEST_PASSWORD))
+
+
+class PwnedPasswordValidatorTests(TestCase):
+    def setUp(self):
+        self.validator = PwnedPasswordValidator()
+
+    @patch("apps.accounts.password_validators.urllib.request.urlopen")
+    def test_password_not_in_range_response_is_allowed(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = (
+            b"0000000000000000000000000000000000A:5\r\n"
+        )
+        self.validator.validate("a-genuinely-unique-passphrase!")
+
+    @patch("apps.accounts.password_validators.urllib.request.urlopen")
+    def test_zero_count_padding_entry_is_allowed(self, mock_urlopen):
+        candidate = "some-password-1!"
+        sha1 = hashlib.sha1(candidate.encode()).hexdigest().upper()
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = (
+            f"{sha1[5:]}:0\r\n".encode()
+        )
+        self.validator.validate(candidate)
+
+    @patch("apps.accounts.password_validators.urllib.request.urlopen")
+    def test_network_failure_fails_open(self, mock_urlopen):
+        mock_urlopen.side_effect = urllib.error.URLError("no network")
+        self.validator.validate("literally-anything-1!")
+
+    @override_settings(PWNED_PASSWORD_CHECK_ENABLED=False)
+    @patch("apps.accounts.password_validators.urllib.request.urlopen")
+    def test_disabled_via_setting_skips_network_call_entirely(self, mock_urlopen):
+        self.validator.validate("literally-anything-1!")
+        mock_urlopen.assert_not_called()
+
+
+class LoginFormWhitespaceTests(TestCase):
+    def test_password_with_trailing_whitespace_is_not_stripped(self):
+        password_with_space = TEST_PASSWORD + " "
+        user = make_user()
+        user.set_password(password_with_space)
+        user.save()
+
+        resp = Client().post(reverse("accounts:login"), {
+            "username": user.username,
+            "password": password_with_space,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse("accounts:dashboard"))
+
+
+class SuperadminSetupTests(TestCase):
+    def _form_data(self, **overrides):
+        data = {
+            "username": "first-admin",
+            "email": "first-admin@example.com",
+            "password1": "a-genuinely-strong-passphrase-1!",
+            "password2": "a-genuinely-strong-passphrase-1!",
+        }
+        data.update(overrides)
+        return data
+
+    def test_setup_page_reachable_when_no_superadmin_exists(self):
+        resp = Client().get(reverse("accounts:setup"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_setup_creates_superadmin_and_logs_them_in(self):
+        from apps.feature_flags.models import FeatureFlags
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": True})
+
+        client = Client()
+        resp = client.post(reverse("accounts:setup"), self._form_data())
+        self.assertRedirects(resp, reverse("accounts:dashboard"), target_status_code=302)
+
+        user = User.objects.get(username="first-admin")
+        self.assertTrue(user.is_superadmin_role)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.is_superuser)
+        self.assertEqual(user.auth_type, User.AuthType.LOCAL)
+
+        dashboard_resp = client.get(reverse("accounts:dashboard"))
+        self.assertRedirects(dashboard_resp, reverse("accounts:mfa_enroll"))
+
+    def test_setup_unreachable_once_a_superadmin_exists(self):
+        make_user(role=User.Role.SUPERADMIN)
+        client = Client()
+
+        get_resp = client.get(reverse("accounts:setup"))
+        self.assertRedirects(get_resp, reverse("accounts:login"))
+
+        post_resp = client.post(reverse("accounts:setup"), self._form_data())
+        self.assertRedirects(post_resp, reverse("accounts:login"))
+        self.assertFalse(User.objects.filter(username="first-admin").exists())
+
+    def test_mismatched_passwords_rejected(self):
+        client = Client()
+        resp = client.post(
+            reverse("accounts:setup"),
+            self._form_data(password2="a-completely-different-passphrase-2!"),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username="first-admin").exists())
+
+    def test_weak_password_rejected(self):
+        client = Client()
+        resp = client.post(reverse("accounts:setup"), self._form_data(password1="password", password2="password"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username="first-admin").exists())
+
+    def test_login_page_links_to_setup_only_when_no_superadmin_exists(self):
+        resp = Client().get(reverse("accounts:login"))
+        self.assertContains(resp, reverse("accounts:setup"))
+
+        make_user(role=User.Role.SUPERADMIN)
+        resp = Client().get(reverse("accounts:login"))
+        self.assertNotContains(resp, reverse("accounts:setup"))
+
+
+class UserManagementRBACTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.target = make_user(role=User.Role.CONSULTANT)
+
+    def _urls(self):
+        return [
+            reverse("user_management:list"),
+            reverse("user_management:create"),
+            reverse("user_management:detail", args=[self.target.uuid]),
+            reverse("user_management:edit", args=[self.target.uuid]),
+        ]
+
+    def test_non_superadmin_roles_get_403(self):
+        for role in (User.Role.TEAM_LEAD, User.Role.SENIOR, User.Role.CONSULTANT):
+            with self.subTest(role=role):
+                user = make_user(role=role)
+                client = Client()
+                login(client, user)
+                for url in self._urls():
+                    resp = client.get(url)
+                    self.assertEqual(resp.status_code, 403, f"{role} should not reach {url}")
+
+    def test_anonymous_user_redirected_to_login(self):
+        for url in self._urls():
+            resp = Client().get(url)
+            self.assertEqual(resp.status_code, 302)
+            self.assertIn(reverse("accounts:login"), resp.url)
+
+    def test_superadmin_can_reach_every_view(self):
+        client = Client()
+        login(client, self.superadmin)
+        for url in self._urls():
+            resp = client.get(url)
+            self.assertEqual(resp.status_code, 200)
+
+    def test_mutating_endpoints_blocked_for_non_superadmin(self):
+        user = make_user(role=User.Role.TEAM_LEAD)
+        client = Client()
+        login(client, user)
+        mutating_urls = [
+            reverse("user_management:deactivate", args=[self.target.uuid]),
+            reverse("user_management:reactivate", args=[self.target.uuid]),
+            reverse("user_management:send_password_reset", args=[self.target.uuid]),
+            reverse("user_management:clear_mfa", args=[self.target.uuid]),
+        ]
+        for url in mutating_urls:
+            resp = client.post(url)
+            self.assertEqual(resp.status_code, 403)
+
+
+class UserManagementListSearchPaginationTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN, username="zz-searcher")
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    def test_search_filters_by_username_email_or_name(self):
+        make_user(role=User.Role.CONSULTANT, username="findme-user", email="other@example.com")
+        make_user(role=User.Role.CONSULTANT, username="other-user", email="findme@example.com")
+        make_user(role=User.Role.CONSULTANT, username="unrelated", first_name="Findme")
+        make_user(role=User.Role.CONSULTANT, username="no-match-at-all")
+
+        resp = self.client.get(reverse("user_management:list"), {"q": "findme"})
+        usernames = {u.username for u in resp.context["page_obj"].object_list}
+        self.assertEqual(usernames, {"findme-user", "other-user", "unrelated"})
+
+    def test_pagination_caps_at_ten_per_page(self):
+        for i in range(15):
+            make_user(role=User.Role.CONSULTANT, username=f"bulk-user-{i}")
+
+        resp = self.client.get(reverse("user_management:list"))
+        page_obj = resp.context["page_obj"]
+        self.assertEqual(len(page_obj.object_list), 10)
+        self.assertEqual(page_obj.paginator.num_pages, 2)
+
+        resp_page2 = self.client.get(reverse("user_management:list"), {"page": 2})
+        self.assertEqual(len(resp_page2.context["page_obj"].object_list), 6)
+
+
+class UserManagementCRUDTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    def test_create_local_user(self):
+        mail.outbox = []
+        resp = self.client.post(reverse("user_management:create"), {
+            "username": "new-consultant",
+            "email": "new-consultant@example.com",
+            "first_name": "New",
+            "last_name": "Consultant",
+            "role": Role.objects.get(slug="consultant").pk,
+        })
+        user = User.objects.get(username="new-consultant")
+        self.assertRedirects(resp, reverse("user_management:detail", args=[user.uuid]))
+        self.assertEqual(user.auth_type, User.AuthType.LOCAL)
+        self.assertTrue(user.is_consultant_role)
+        self.assertFalse(user.has_usable_password())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+        self.assertIn(user.username, mail.outbox[0].body)
+        self.assertIn("/invite/", mail.outbox[0].body)
+
+    def test_edit_updates_role_and_profile(self):
+        target = make_user(role=User.Role.CONSULTANT, first_name="Old")
+        resp = self.client.post(reverse("user_management:edit", args=[target.uuid]), {
+            "email": target.email,
+            "first_name": "Updated",
+            "last_name": "Name",
+            "role": Role.objects.get(slug="senior").pk,
+        })
+        self.assertRedirects(resp, reverse("user_management:detail", args=[target.uuid]))
+        target.refresh_from_db()
+        self.assertTrue(target.is_senior_role)
+        self.assertEqual(target.first_name, "Updated")
+
+    def test_deactivate_and_reactivate(self):
+        target = make_user(role=User.Role.CONSULTANT)
+        self.client.post(reverse("user_management:deactivate", args=[target.uuid]))
+        target.refresh_from_db()
+        self.assertFalse(target.is_active)
+        self.assertIsNotNone(target.deactivated_at)
+
+        self.client.post(reverse("user_management:reactivate", args=[target.uuid]))
+        target.refresh_from_db()
+        self.assertTrue(target.is_active)
+        self.assertIsNone(target.deactivated_at)
+
+    def test_deactivate_kills_target_sessions_immediately(self):
+        target = make_user(role=User.Role.CONSULTANT)
+        target_client = Client()
+        login(target_client, target)
+        self.assertEqual(target_client.get(reverse("accounts:dashboard")).status_code, 200)
+
+        self.client.post(reverse("user_management:deactivate", args=[target.uuid]))
+
+        self.assertEqual(Session.objects.filter(expire_date__gte=timezone.now()).count(), 1)
+
+    def test_send_password_reset_sends_email_for_local_user_only(self):
+        local_target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL)
+        self.client.post(reverse("user_management:send_password_reset", args=[local_target.uuid]))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(local_target.email, mail.outbox[0].to)
+
+        oauth_target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH)
+        resp = self.client.post(reverse("user_management:send_password_reset", args=[oauth_target.uuid]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_deactivate_warns_about_orphaned_review_qa_assignments(self):
+        from apps.crypto.services import generate_project_key
+        from apps.engagements.models import Engagement
+        from apps.findings import review
+        from apps.findings.models import Finding
+
+        engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(engagement)
+        author = make_user(role=User.Role.CONSULTANT)
+        target = make_user(role=User.Role.SENIOR)
+        finding = Finding.objects.create(
+            engagement=engagement, title="Orphan-prone finding", severity=Finding.Severity.HIGH,
+            created_by=author,
+        )
+        review.assign_reviewer(finding, target, assigned_by=self.superadmin)
+
+        resp = self.client.post(
+            reverse("user_management:deactivate", args=[target.uuid]), follow=True
+        )
+        self.assertContains(resp, "still had 1 finding")
+        self.assertContains(resp, "Orphan-prone finding")
+
+        finding.refresh_from_db()
+        self.assertEqual(finding.assigned_reviewer, target)
+
+    def test_clear_mfa_deletes_confirmed_device(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        target = make_user(role=User.Role.CONSULTANT)
+        TOTPDevice.objects.create(user=target, name="default", confirmed=True)
+
+        self.client.post(reverse("user_management:clear_mfa", args=[target.uuid]))
+        self.assertFalse(TOTPDevice.objects.filter(user=target).exists())
+
+
+class UserManagementUsersManageOnlyCannotEscalateTests(TestCase):
+    def setUp(self):
+        role = Role.objects.create(name=f"Custom {os.urandom(4).hex()}")
+        role.slug = Role.unique_slug_from_name(role.name)
+        role.save()
+        role.permissions.add(Permission.objects.get(codename="users.manage"))
+        username = f"holder-{os.urandom(4).hex()}"
+        self.holder = User.objects.create(
+            username=username, email=f"{username}@example.com", role=role, auth_type=User.AuthType.LOCAL,
+        )
+        self.client = Client()
+        login(self.client, self.holder)
+
+    def test_cannot_create_a_superadmin(self):
+        resp = self.client.post(reverse("user_management:create"), {
+            "username": "sneaky-superadmin",
+            "email": "sneaky@example.com",
+            "role": Role.objects.get(slug="superadmin").pk,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username="sneaky-superadmin").exists())
+
+    def test_cannot_edit_someone_into_a_superadmin(self):
+        target = make_user(role=User.Role.CONSULTANT)
+        resp = self.client.post(reverse("user_management:edit", args=[target.uuid]), {
+            "email": target.email,
+            "first_name": "", "last_name": "",
+            "role": Role.objects.get(slug="superadmin").pk,
+        })
+        self.assertEqual(resp.status_code, 200)
+        target.refresh_from_db()
+        self.assertFalse(target.is_superadmin_role)
+
+    def test_cannot_reach_a_client_portal_account(self):
+        from apps.clients.models import Client as ClientCompany
+
+        company = ClientCompany.objects.create(name="Acme Corp")
+        client_role = Role.objects.get(slug="client")
+        username = f"client-{os.urandom(4).hex()}"
+        target = User.objects.create(
+            username=username, email=f"{username}@example.com", role=client_role,
+            auth_type=User.AuthType.LOCAL, client=company,
+        )
+        for url in (
+            reverse("user_management:detail", args=[target.uuid]),
+            reverse("user_management:edit", args=[target.uuid]),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+        for url in (
+            reverse("user_management:deactivate", args=[target.uuid]),
+            reverse("user_management:reactivate", args=[target.uuid]),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 404)
+
+
+class UserManagementSafetyGuardTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    def test_cannot_deactivate_own_account(self):
+        resp = self.client.post(
+            reverse("user_management:deactivate", args=[self.superadmin.uuid]), follow=True
+        )
+        self.superadmin.refresh_from_db()
+        self.assertTrue(self.superadmin.is_active)
+        self.assertContains(resp, "can&#x27;t deactivate your own account")
+
+    def test_cannot_deactivate_last_active_superadmin(self):
+        other_superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client.post(reverse("user_management:deactivate", args=[other_superadmin.uuid]))
+        other_superadmin.refresh_from_db()
+        self.assertFalse(other_superadmin.is_active)
+
+        resp = self.client.post(
+            reverse("user_management:deactivate", args=[self.superadmin.uuid]), follow=True
+        )
+        self.superadmin.refresh_from_db()
+        self.assertTrue(self.superadmin.is_active)
+
+    def test_cannot_change_own_role(self):
+        resp = self.client.post(reverse("user_management:edit", args=[self.superadmin.uuid]), {
+            "email": self.superadmin.email,
+            "first_name": "",
+            "last_name": "",
+            "role": Role.objects.get(slug="consultant").pk,
+        })
+        self.assertRedirects(resp, reverse("user_management:detail", args=[self.superadmin.uuid]))
+        self.superadmin.refresh_from_db()
+        self.assertTrue(self.superadmin.is_superadmin_role)
+
+    def test_last_active_superadmin_guard_blocks_direct_demotion(self):
+        self.assertTrue(security.is_last_active_superadmin(self.superadmin))
+        other_superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.assertFalse(security.is_last_active_superadmin(self.superadmin))
+        self.assertFalse(security.is_last_active_superadmin(other_superadmin))
+
+    def test_can_demote_superadmin_when_another_exists(self):
+        other_superadmin = make_user(role=User.Role.SUPERADMIN)
+        resp = self.client.post(reverse("user_management:edit", args=[other_superadmin.uuid]), {
+            "email": other_superadmin.email,
+            "first_name": "",
+            "last_name": "",
+            "role": Role.objects.get(slug="team_lead").pk,
+        })
+        self.assertRedirects(resp, reverse("user_management:detail", args=[other_superadmin.uuid]))
+        other_superadmin.refresh_from_db()
+        self.assertTrue(other_superadmin.is_team_lead_role)
+
+
+class RoleModelTests(TestCase):
+    def test_superadmin_role_bypasses_every_permission(self):
+        superadmin_role = Role.objects.get(slug="superadmin")
+        self.assertTrue(superadmin_role.has_permission("engagements.create"))
+        self.assertTrue(superadmin_role.has_permission("this-codename-does-not-exist"))
+
+    def test_role_without_permission_returns_false(self):
+        senior_role = Role.objects.get(slug="senior")
+        self.assertFalse(senior_role.has_permission("engagements.create"))
+
+    def test_role_with_permission_returns_true(self):
+        team_lead_role = Role.objects.get(slug="team_lead")
+        self.assertTrue(team_lead_role.has_permission("engagements.create"))
+
+    def test_unique_slug_from_name_dedupes_on_collision(self):
+        first = Role.unique_slug_from_name("Pentest Lead")
+        Role.objects.create(name="Pentest Lead", slug=first)
+        second = Role.unique_slug_from_name("Pentest Lead")
+        self.assertNotEqual(first, second)
+
+
+class DefaultRolePermissionRegressionTests(TestCase):
+    def test_team_lead_defaults(self):
+        team_lead = make_user(role=User.Role.TEAM_LEAD)
+        self.assertTrue(team_lead.has_permission("engagements.create"))
+        self.assertTrue(team_lead.has_permission("engagements.manage"))
+        self.assertTrue(team_lead.has_permission("engagements.view_all"))
+        self.assertTrue(team_lead.has_permission("catalogue.manage"))
+        self.assertTrue(team_lead.has_permission("findings.review"))
+        self.assertTrue(team_lead.has_permission("findings.review_own"))
+        self.assertTrue(team_lead.has_permission("findings.qa"))
+        self.assertTrue(team_lead.has_permission("findings.qa_own"))
+        self.assertTrue(team_lead.has_permission("checklist_templates.manage"))
+        self.assertFalse(team_lead.has_permission("report_settings.manage"))
+
+    def test_senior_defaults(self):
+        senior = make_user(role=User.Role.SENIOR)
+        self.assertFalse(senior.has_permission("engagements.create"))
+        self.assertFalse(senior.has_permission("engagements.manage"))
+        self.assertFalse(senior.has_permission("catalogue.manage"))
+        self.assertTrue(senior.has_permission("findings.review"))
+        self.assertFalse(senior.has_permission("findings.review_own"))
+        self.assertTrue(senior.has_permission("findings.qa"))
+        self.assertFalse(senior.has_permission("findings.qa_own"))
+
+    def test_consultant_defaults(self):
+        consultant = make_user(role=User.Role.CONSULTANT)
+        self.assertFalse(consultant.has_permission("engagements.create"))
+        self.assertFalse(consultant.has_permission("engagements.manage"))
+        self.assertFalse(consultant.has_permission("catalogue.manage"))
+        self.assertFalse(consultant.has_permission("findings.review"))
+        self.assertFalse(consultant.has_permission("findings.qa"))
+
+    def test_superadmin_bypasses_all(self):
+        superadmin = make_user(role=User.Role.SUPERADMIN)
+        for codename, _label, _category in PERMISSIONS:
+            with self.subTest(codename=codename):
+                self.assertTrue(superadmin.has_permission(codename))
+
+
+class RoleManagementRBACTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.custom_role = Role.objects.create(name="Custom Reviewer")
+
+    def _urls(self):
+        return [
+            reverse("role_management:list"),
+            reverse("role_management:create"),
+            reverse("role_management:detail", args=[self.custom_role.pk]),
+            reverse("role_management:edit", args=[self.custom_role.pk]),
+        ]
+
+    def test_non_superadmin_roles_get_403(self):
+        for role in (User.Role.TEAM_LEAD, User.Role.SENIOR, User.Role.CONSULTANT):
+            with self.subTest(role=role):
+                user = make_user(role=role)
+                client = Client()
+                login(client, user)
+                for url in self._urls():
+                    resp = client.get(url)
+                    self.assertEqual(resp.status_code, 403, f"{role} should not reach {url}")
+
+    def test_anonymous_user_redirected_to_login(self):
+        for url in self._urls():
+            resp = Client().get(url)
+            self.assertEqual(resp.status_code, 302)
+            self.assertIn(reverse("accounts:login"), resp.url)
+
+    def test_superadmin_can_reach_every_view(self):
+        client = Client()
+        login(client, self.superadmin)
+        for url in self._urls():
+            resp = client.get(url)
+            self.assertEqual(resp.status_code, 200)
+
+    def test_delete_blocked_for_non_superadmin(self):
+        user = make_user(role=User.Role.TEAM_LEAD)
+        client = Client()
+        login(client, user)
+        resp = client.post(reverse("role_management:delete", args=[self.custom_role.pk]))
+        self.assertEqual(resp.status_code, 403)
+
+
+class RoleManagementCRUDTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    def test_create_role_with_permissions(self):
+        resp = self.client.post(reverse("role_management:create"), {
+            "name": "Reviewer Only",
+            "permissions": ["findings.review", "findings.qa"],
+        })
+        role = Role.objects.get(name="Reviewer Only")
+        self.assertRedirects(resp, reverse("role_management:detail", args=[role.pk]))
+        self.assertEqual(role.slug, "reviewer-only")
+        self.assertFalse(role.is_builtin)
+        self.assertFalse(role.is_superadmin)
+        self.assertEqual(
+            set(role.permissions.values_list("codename", flat=True)),
+            {"findings.review", "findings.qa"},
+        )
+
+    def test_create_role_duplicate_name_rejected(self):
+        Role.objects.create(name="Auditor")
+        resp = self.client.post(reverse("role_management:create"), {"name": "Auditor", "permissions": []})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Role.objects.filter(name="Auditor").count(), 1)
+
+    def test_edit_role_updates_name_and_permissions(self):
+        role = Role.objects.create(name="Old Name")
+        role.permissions.set(Permission.objects.filter(codename="catalogue.manage"))
+        resp = self.client.post(reverse("role_management:edit", args=[role.pk]), {
+            "name": "New Name",
+            "permissions": ["engagements.create"],
+        })
+        self.assertRedirects(resp, reverse("role_management:detail", args=[role.pk]))
+        role.refresh_from_db()
+        self.assertEqual(role.name, "New Name")
+        self.assertEqual(set(role.permissions.values_list("codename", flat=True)), {"engagements.create"})
+
+    def test_cannot_edit_superadmin_role(self):
+        superadmin_role = Role.objects.get(slug="superadmin")
+        resp = self.client.get(reverse("role_management:edit", args=[superadmin_role.pk]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_cannot_delete_builtin_role(self):
+        team_lead_role = Role.objects.get(slug="team_lead")
+        resp = self.client.post(reverse("role_management:delete", args=[team_lead_role.pk]), follow=True)
+        team_lead_role.refresh_from_db()
+        self.assertContains(resp, "built-in role")
+
+    def test_cannot_delete_role_still_in_use(self):
+        role = Role.objects.create(name="In Use Role")
+        user = make_user(role=User.Role.CONSULTANT)
+        user.role = role
+        user.save(update_fields=["role"])
+
+        resp = self.client.post(reverse("role_management:delete", args=[role.pk]), follow=True)
+        self.assertTrue(Role.objects.filter(pk=role.pk).exists())
+        self.assertContains(resp, "still have it")
+
+    def test_delete_unused_custom_role(self):
+        role = Role.objects.create(name="Unused Role")
+        resp = self.client.post(reverse("role_management:delete", args=[role.pk]))
+        self.assertRedirects(resp, reverse("role_management:list"))
+        self.assertFalse(Role.objects.filter(pk=role.pk).exists())
+
+
+class RequireSuperadminHelperTests(TestCase):
+    def test_raises_for_non_superadmin(self):
+        from django.core.exceptions import PermissionDenied
+
+        from .permissions import require_superadmin
+
+        team_lead = make_user(role=User.Role.TEAM_LEAD)
+        with self.assertRaises(PermissionDenied) as ctx:
+            require_superadmin(team_lead, "do the thing")
+        self.assertIn("do the thing", str(ctx.exception))
+
+    def test_raises_for_anonymous(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.core.exceptions import PermissionDenied
+
+        from .permissions import require_superadmin
+
+        with self.assertRaises(PermissionDenied):
+            require_superadmin(AnonymousUser(), "do the thing")
+
+    def test_passes_for_superadmin(self):
+        from .permissions import require_superadmin
+
+        superadmin = make_user(role=User.Role.SUPERADMIN)
+        require_superadmin(superadmin, "do the thing")
+
+
+class AppVersionFooterTests(TestCase):
+    def test_authenticated_user_sees_version_in_footer(self):
+        from django.conf import settings
+
+        client = Client()
+        login(client, make_user(User.Role.SUPERADMIN))
+        resp = client.get(reverse("accounts:dashboard"))
+        self.assertContains(resp, f"RedScribe v{settings.APP_VERSION}")
+
+    def test_anonymous_visitor_does_not_see_version(self):
+        resp = Client().get(reverse("accounts:login"))
+        self.assertNotContains(resp, "RedScribe v")
+
+
+class OAuthLoginSignalTests(TestCase):
+    def _login_via(self, user, backend_path):
+        from django.contrib.auth import login
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/")
+        request.session = self.client.session
+        user.backend = backend_path
+        login(request, user, backend=backend_path)
+
+    def test_social_backend_login_records_an_oauth_attempt(self):
+        user = make_user(auth_type=User.AuthType.OAUTH)
+        self._login_via(user, "allauth.account.auth_backends.AuthenticationBackend")
+
+        attempt = LoginAttempt.objects.get(user=user)
+        self.assertEqual(attempt.auth_method, LoginAttempt.AuthMethod.OAUTH)
+        self.assertTrue(attempt.successful)
+
+    def test_local_backend_login_is_not_double_recorded(self):
+        user = make_user()
+        self._login_via(user, "apps.accounts.backends.LockoutAwareModelBackend")
+
+        self.assertFalse(LoginAttempt.objects.filter(user=user).exists())
+
+    def test_oauth_login_revokes_other_sessions(self):
+        user = make_user(auth_type=User.AuthType.OAUTH)
+        other_client = Client()
+        login(other_client, user)
+        other_key = other_client.session.session_key
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+
+        self._login_via(user, "allauth.account.auth_backends.AuthenticationBackend")
+
+        self.assertFalse(Session.objects.filter(pk=other_key).exists())
+
+    def test_oauth_login_revokes_other_sessions_on_a_shared_browser(self):
+        # Reproduces Django's login() session.flush() branch: it takes flush() (which
+        # clears session_key back to None) instead of cycle_key() whenever the browser's
+        # existing session already belongs to a DIFFERENT authenticated user — session_key
+        # is genuinely None at the exact point the user_logged_in signal fires in that
+        # case. A prior version of the signal handler's guard silently skipped
+        # invalidation whenever session_key was falsy, defeating enforcement for this
+        # exact shared/kiosk-browser scenario.
+        user = make_user(auth_type=User.AuthType.OAUTH)
+        other_client = Client()
+        login(other_client, user)
+        other_key = other_client.session.session_key
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+
+        someone_else = make_user()
+        self.client.force_login(someone_else)  # self.client.session now holds a DIFFERENT user's SESSION_KEY
+
+        self._login_via(user, "allauth.account.auth_backends.AuthenticationBackend")
+
+        self.assertFalse(Session.objects.filter(pk=other_key).exists())
+
+
+class SingleSessionEnforcementTests(TestCase):
+    """A user should only ever have one active session — a fresh successful login must
+    revoke whatever session(s) they were already logged in with elsewhere."""
+
+    def setUp(self):
+        self.user = make_user()
+
+    def _other_active_session_key(self):
+        # Plain force_login (no OTP device involved) — keeps this decoupled from whatever
+        # TOTPDevice state an individual test sets up for the *new* login it's exercising.
+        from .models import UserSession
+
+        other_client = Client()
+        other_client.force_login(self.user)
+        other_key = other_client.session.session_key
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+        # force_login() bypasses the real login views that normally record this — see
+        # the module-level login() helper's comment above for why this is needed.
+        UserSession.objects.update_or_create(session_key=other_key, defaults={"user": self.user})
+        return other_key
+
+    def _valid_totp(self, device):
+        from django_otp.oath import totp as totp_token
+
+        return str(totp_token(device.bin_key, device.step, device.t0, device.digits, device.drift)).zfill(
+            device.digits
+        )
+
+    def test_plain_login_revokes_other_sessions(self):
+        other_key = self._other_active_session_key()
+
+        resp = Client().post(reverse("accounts:login"), {
+            "username": self.user.username, "password": TEST_PASSWORD,
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        self.assertFalse(Session.objects.filter(pk=other_key).exists())
+
+    def test_password_step_alone_does_not_revoke_when_mfa_still_pending(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": True})
+        TOTPDevice.objects.create(user=self.user, name="default", confirmed=True)
+
+        other_key = self._other_active_session_key()
+
+        client = Client()
+        resp = client.post(reverse("accounts:login"), {
+            "username": self.user.username, "password": TEST_PASSWORD,
+        })
+        self.assertRedirects(resp, reverse("accounts:dashboard"), target_status_code=302)
+
+        # Knowing the password isn't enough on its own to kick out the real session —
+        # otherwise anyone with a leaked password (but no MFA code) could disrupt it
+        # without ever completing login themselves.
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+
+    def test_mfa_verify_step_revokes_other_sessions(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": True})
+        device = TOTPDevice.objects.create(user=self.user, name="default", confirmed=True)
+
+        other_key = self._other_active_session_key()
+
+        client = Client()
+        client.post(reverse("accounts:login"), {"username": self.user.username, "password": TEST_PASSWORD})
+        resp = client.post(reverse("accounts:mfa_verify"), {"token": self._valid_totp(device)})
+        self.assertRedirects(resp, reverse("accounts:dashboard"))
+
+        self.assertFalse(Session.objects.filter(pk=other_key).exists())
+
+    def test_forced_first_time_enrollment_revokes_other_sessions(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": True})
+
+        other_key = self._other_active_session_key()
+
+        client = Client()
+        client.post(reverse("accounts:login"), {"username": self.user.username, "password": TEST_PASSWORD})
+        enroll_resp = client.get(reverse("accounts:mfa_enroll"))
+        self.assertEqual(enroll_resp.status_code, 200)
+        device = self.user.totpdevice_set.get(confirmed=False)
+
+        resp = client.post(reverse("accounts:mfa_enroll"), {"token": self._valid_totp(device)})
+        self.assertRedirects(resp, reverse("accounts:dashboard"))
+
+        self.assertFalse(Session.objects.filter(pk=other_key).exists())
+
+    def test_voluntary_mfa_enrollment_mid_session_does_not_revoke_other_sessions(self):
+        # MFA isn't required for this user (no feature flag, no role requirement), so a
+        # plain non-OTP session can already use the whole app — this simulates them
+        # opting into MFA later via the "Enable 2FA" sidebar link, not completing a login.
+        other_key = self._other_active_session_key()
+
+        client = Client()
+        client.force_login(self.user)
+        current_key = client.session.session_key
+
+        # Two legitimate sessions coexist until one of them actually re-logs in.
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+
+        enroll_resp = client.get(reverse("accounts:mfa_enroll"))
+        self.assertEqual(enroll_resp.status_code, 200)
+        device = self.user.totpdevice_set.get(confirmed=False)
+
+        resp = client.post(reverse("accounts:mfa_enroll"), {"token": self._valid_totp(device)})
+        self.assertRedirects(resp, reverse("accounts:dashboard"))
+
+        self.assertTrue(Session.objects.filter(pk=other_key).exists())
+        self.assertTrue(Session.objects.filter(pk=current_key).exists())
+
+
+class IdleTimeoutMiddlewareTests(TestCase):
+    def setUp(self):
+        self.user = make_user(User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.user)
+        self.dashboard_url = reverse("accounts:dashboard")
+
+    def _set_last_activity(self, seconds_ago):
+        from apps.accounts.middleware import _IDLE_SESSION_KEY
+
+        session = self.client.session
+        session[_IDLE_SESSION_KEY] = time.time() - seconds_ago
+        session.save()
+
+    def test_recent_activity_stays_logged_in(self):
+        self._set_last_activity(5)
+        resp = self.client.get(self.dashboard_url)
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(SESSION_IDLE_TIMEOUT_SECONDS=60)
+    def test_idle_beyond_timeout_logs_out_and_redirects(self):
+        self._set_last_activity(120)
+        resp = self.client.get(self.dashboard_url)
+        self.assertRedirects(resp, reverse("accounts:login"))
+
+        resp2 = self.client.get(self.dashboard_url)
+        self.assertEqual(resp2.status_code, 302)
+
+    def test_first_request_after_login_has_no_prior_activity_to_compare(self):
+        resp = self.client.get(self.dashboard_url)
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(SESSION_IDLE_TIMEOUT_SECONDS=60)
+    def test_stale_session_visiting_a_real_page_ends_up_at_login(self):
+        self._set_last_activity(120)
+        resp = self.client.get(self.dashboard_url, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "accounts/login.html")
+
+    def test_anonymous_request_is_unaffected(self):
+        resp = Client().get(self.dashboard_url)
+        self.assertEqual(resp.status_code, 302)
+
+    @override_settings(SESSION_IDLE_TIMEOUT_SECONDS=60)
+    def test_last_activity_in_the_future_forces_logout(self):
+        self._set_last_activity(-3600)
+        resp = self.client.get(self.dashboard_url)
+        self.assertRedirects(resp, reverse("accounts:login"))
+
+
+@override_settings(LOCKOUT_THRESHOLD=3, LOCKOUT_DURATION_SECONDS=86400)
+class LockoutAlertTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(User.Role.SUPERADMIN, email="admin@example.com")
+
+    def test_alert_fires_exactly_at_threshold(self):
+        for _ in range(2):
+            security.record_attempt(username="nosuchuser", user=None, successful=False, ip_address="1.2.3.4")
+            security.maybe_alert_lockout(username="nosuchuser", is_superadmin=False, ip_address="1.2.3.4")
+        self.assertEqual(len(mail.outbox), 0)
+
+        security.record_attempt(username="nosuchuser", user=None, successful=False, ip_address="1.2.3.4")
+        security.maybe_alert_lockout(username="nosuchuser", is_superadmin=False, ip_address="1.2.3.4")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("nosuchuser", mail.outbox[0].subject)
+        self.assertIn(self.superadmin.email, mail.outbox[0].to)
+
+    def test_alert_does_not_refire_past_the_threshold(self):
+        for _ in range(3):
+            security.record_attempt(username="nosuchuser", user=None, successful=False, ip_address="1.2.3.4")
+            security.maybe_alert_lockout(username="nosuchuser", is_superadmin=False, ip_address="1.2.3.4")
+        self.assertEqual(len(mail.outbox), 1)
+
+        security.record_attempt(username="nosuchuser", user=None, successful=False, ip_address="1.2.3.4")
+        security.maybe_alert_lockout(username="nosuchuser", is_superadmin=False, ip_address="1.2.3.4")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_no_active_superadmin_recipients_does_not_crash(self):
+        self.superadmin.is_active = False
+        self.superadmin.save()
+
+        for _ in range(3):
+            security.record_attempt(username="nosuchuser", user=None, successful=False, ip_address="1.2.3.4")
+            security.maybe_alert_lockout(username="nosuchuser", is_superadmin=False, ip_address="1.2.3.4")
+
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_end_to_end_via_authenticate_backend(self):
+        from django.contrib.auth import authenticate
+
+        target = make_user(User.Role.CONSULTANT, username="target-user")
+        for _ in range(3):
+            authenticate(username="target-user", password="definitely-wrong")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("target-user", mail.outbox[0].subject)
+
+
+@override_settings(LOCKOUT_THRESHOLD=3, LOCKOUT_DURATION_SECONDS=86400)
+class LoginLockoutStatusCodeTests(TestCase):
+    def setUp(self):
+        self.url = reverse("accounts:login")
+        make_user(User.Role.CONSULTANT, username="lockout-target")
+
+    def test_ordinary_invalid_login_is_200(self):
+        resp = Client().post(self.url, {"username": "lockout-target", "password": "wrong-once"})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_crossing_the_threshold_returns_429_with_retry_after(self):
+        client = Client()
+        for _ in range(3):
+            resp = client.post(self.url, {"username": "lockout-target", "password": "wrong"})
+            self.assertEqual(resp.status_code, 200)
+
+        resp = client.post(self.url, {"username": "lockout-target", "password": "wrong"})
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(resp["Retry-After"], "86400")
+        self.assertContains(resp, "temporarily locked", status_code=429)
+
+
+@override_settings(MFA_THROTTLE_MAX_ATTEMPTS=5, MFA_THROTTLE_WINDOW_SECONDS=30)
+class MFAVerifyThrottleTests(TestCase):
+    def setUp(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        self.user = make_user()
+        TOTPDevice.objects.create(user=self.user, name="default", confirmed=True)
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse("accounts:mfa_verify")
+
+    def test_ordinary_wrong_code_is_200(self):
+        resp = self.client.post(self.url, {"token": "000000"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "didn&#x27;t match")
+
+    def test_sixth_attempt_within_window_is_throttled(self):
+        for _ in range(5):
+            resp = self.client.post(self.url, {"token": "000000"})
+            self.assertEqual(resp.status_code, 200)
+
+        resp = self.client.post(self.url, {"token": "000000"})
+        self.assertEqual(resp.status_code, 429)
+        self.assertContains(resp, "Too many attempts", status_code=429)
+
+    def test_throttle_blocks_even_a_correct_code(self):
+        from django_otp.oath import totp as totp_token
+
+        device = self.user.totpdevice_set.get()
+        valid_token = str(totp_token(device.bin_key, device.step, device.t0, device.digits, device.drift)).zfill(
+            device.digits
+        )
+
+        for _ in range(5):
+            self.client.post(self.url, {"token": "000000"})
+
+        resp = self.client.post(self.url, {"token": valid_token})
+        self.assertEqual(resp.status_code, 429)
+        self.assertNotIn(django_otp.DEVICE_ID_SESSION_KEY, self.client.session)
+
+    def test_throttle_is_per_account(self):
+        other = make_user()
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        TOTPDevice.objects.create(user=other, name="default", confirmed=True)
+        other_client = Client()
+        other_client.force_login(other)
+
+        for _ in range(5):
+            self.client.post(self.url, {"token": "000000"})
+        self.client.post(self.url, {"token": "000000"})
+
+        resp = other_client.post(reverse("accounts:mfa_verify"), {"token": "000000"})
+        self.assertEqual(resp.status_code, 200)
+
+
+class UserManagementFormRoleChoicesTests(TestCase):
+    def test_create_form_excludes_client_role(self):
+        from .forms import LocalUserCreateForm
+
+        form = LocalUserCreateForm(requesting_user=make_user(role=User.Role.SUPERADMIN))
+        slugs = set(form.fields["role"].queryset.values_list("slug", flat=True))
+        self.assertNotIn("client", slugs)
+        self.assertIn("superadmin", slugs)
+
+    def test_edit_form_excludes_client_role(self):
+        from .forms import LocalUserEditForm
+
+        form = LocalUserEditForm(requesting_user=make_user(role=User.Role.SUPERADMIN))
+        slugs = set(form.fields["role"].queryset.values_list("slug", flat=True))
+        self.assertNotIn("client", slugs)
+        self.assertIn("superadmin", slugs)
+
+    def test_non_superadmin_requester_cannot_choose_superadmin_role(self):
+        from .forms import LocalUserCreateForm, LocalUserEditForm
+
+        for role in (User.Role.TEAM_LEAD, User.Role.SENIOR, User.Role.CONSULTANT):
+            with self.subTest(role=role):
+                requester = make_user(role=role)
+                create_slugs = set(
+                    LocalUserCreateForm(requesting_user=requester).fields["role"].queryset.values_list("slug", flat=True)
+                )
+                edit_slugs = set(
+                    LocalUserEditForm(requesting_user=requester).fields["role"].queryset.values_list("slug", flat=True)
+                )
+                self.assertNotIn("superadmin", create_slugs)
+                self.assertNotIn("superadmin", edit_slugs)
+
+    def test_no_requesting_user_defaults_to_excluding_superadmin(self):
+        from .forms import LocalUserCreateForm
+
+        form = LocalUserCreateForm()
+        slugs = set(form.fields["role"].queryset.values_list("slug", flat=True))
+        self.assertNotIn("superadmin", slugs)
+
+
+def _make_role_with_permissions(*codenames):
+    name = f"Custom {os.urandom(4).hex()}"
+    role = Role.objects.create(name=name, slug=Role.unique_slug_from_name(name))
+    role.permissions.set(Permission.objects.filter(codename__in=codenames))
+    return role
+
+
+class GranularAdminPermissionDelegationTests(TestCase):
+    def _user_with(self, *codenames):
+        role = _make_role_with_permissions(*codenames)
+        return make_user(role=role.slug)
+
+    def test_users_manage_reaches_user_management_only(self):
+        user = self._user_with("users.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("user_management:list")).status_code, 200)
+        self.assertEqual(client.get(reverse("role_management:list")).status_code, 403)
+
+    def test_roles_manage_reaches_role_management_only(self):
+        user = self._user_with("roles.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("role_management:list")).status_code, 200)
+        self.assertEqual(client.get(reverse("user_management:list")).status_code, 403)
+
+    def test_feature_flags_manage_reaches_feature_flags_only(self):
+        user = self._user_with("feature_flags.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("feature_flags:edit")).status_code, 200)
+        self.assertEqual(client.get(reverse("licensing:edit")).status_code, 403)
+
+    def test_licensing_manage_reaches_licensing_only(self):
+        user = self._user_with("licensing.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("licensing:edit")).status_code, 200)
+        self.assertEqual(client.get(reverse("feature_flags:edit")).status_code, 403)
+
+    def test_audit_log_manage_reaches_audit_log_only(self):
+        user = self._user_with("audit_log.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("audit:list")).status_code, 200)
+        self.assertEqual(client.get(reverse("licensing:edit")).status_code, 403)
+
+    def test_field_visibility_manage_reaches_field_visibility_only(self):
+        user = self._user_with("field_visibility.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("field_visibility:edit")).status_code, 200)
+        self.assertEqual(client.get(reverse("audit:list")).status_code, 403)
+
+    def test_branding_manage_reaches_branding_only(self):
+        user = self._user_with("branding.manage")
+        client = Client()
+        login(client, user)
+        self.assertEqual(client.get(reverse("branding:edit")).status_code, 200)
+        self.assertEqual(client.get(reverse("field_visibility:edit")).status_code, 403)
+
+    def test_no_permission_reaches_none_of_them(self):
+        user = self._user_with()
+        client = Client()
+        login(client, user)
+        for url_name in (
+            "user_management:list", "role_management:list", "feature_flags:edit",
+            "licensing:edit", "audit:list", "field_visibility:edit", "branding:edit",
+        ):
+            with self.subTest(url_name=url_name):
+                self.assertEqual(client.get(reverse(url_name)).status_code, 403)

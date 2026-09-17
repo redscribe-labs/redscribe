@@ -1,0 +1,191 @@
+{% extends "base/base.html" %}
+{% block title %}Audit log — RedScribe{% endblock %}
+{% block extra_head %}{% include "base/_datepicker_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+    <h1 class="page-title">Audit log</h1>
+    <div class="flex flex-wrap gap-2">
+        <form method="post" action="{% url 'audit:purge' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Purge entries older than {{ retention_days }} days</button>
+        </form>
+        <a href="{% url 'audit:purge_all_confirm' %}" class="btn-danger" title="May violate regulatory retention requirements (e.g. HIPAA) — storage-management only">
+            Clear all logs&nbsp;⚠
+        </a>
+    </div>
+</div>
+<form method="get" class="flex flex-wrap items-end gap-2 mb-2">
+    <div class="relative flex-1 min-w-[14rem]">
+        <label class="field-label">Search</label>
+        <svg class="absolute left-3 bottom-2.5 h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+        <input type="search" name="q" value="{{ query|default:'' }}" placeholder="Search actor, action, path, IP..."
+               class="field-input pl-9 w-full">
+    </div>
+    <div>
+        <label class="field-label">Method</label>
+        <select name="method" class="field-input w-auto">
+            <option value="">All methods</option>
+            {% for m in method_choices %}
+            <option value="{{ m }}" {% if m == method %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="field-label">Actor</label>
+        <select name="actor" class="field-input w-auto">
+            <option value="">All actors</option>
+            {% for a in actor_choices %}
+            <option value="{{ a }}" {% if a == actor %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="field-label">Status</label>
+        <select name="status" class="field-input w-auto">
+            <option value="">All statuses</option>
+            {% for s in status_buckets %}
+            <option value="{{ s }}" {% if s == status_bucket %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="field-label">From</label>
+        <input type="text" name="from" value="{{ date_from }}" data-redscribe-datepicker="true"
+               autocomplete="off" class="field-input w-auto">
+    </div>
+    <div>
+        <label class="field-label">To</label>
+        <input type="text" name="to" value="{{ date_to }}" data-redscribe-datepicker="true"
+               autocomplete="off" class="field-input w-auto">
+    </div>
+    <div>
+        <label class="field-label">Per page</label>
+        <select name="page_size" class="field-input w-auto">
+            {% for size in page_size_choices %}
+            <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn-secondary">Filter</button>
+    {% if query or method or actor or status_bucket or date_from or date_to %}
+    <a href="{% url 'audit:list' %}" class="btn-secondary">Clear filters</a>
+    {% endif %}
+</form>
+{% endblock %}
+
+{% block content %}
+{% if page_obj.object_list %}
+<div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-200 shadow-sm">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="bg-slate-50 dark:bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">Time</th>
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">Actor</th>
+                <th class="px-4 py-2.5 font-medium">Action</th>
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">Method</th>
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">Status</th>
+                <th class="px-4 py-2.5 font-medium">Object</th>
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">IP</th>
+                <th class="px-4 py-2.5 font-medium whitespace-nowrap">Details</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-200 bg-white dark:bg-slate-50">
+            {% for entry in page_obj.object_list %}
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-100">
+                <td class="px-4 py-2.5 whitespace-nowrap text-slate-500 tabular-nums">{{ entry.created_at|date:"d/m/Y H:i:s" }}</td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                    <span class="text-slate-800 font-medium">{{ entry.actor_username|default:"anonymous" }}</span>
+                    {% if entry.actor_role %}<span class="text-xs text-slate-400 ml-1">({{ entry.actor_role }})</span>{% endif %}
+                </td>
+                <td class="px-4 py-2.5 font-mono text-xs text-slate-700">{{ entry.action|default:"—" }}</td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                    <span class="badge-slate">{{ entry.method }}</span>
+                </td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                    {% if entry.status_code >= 500 %}<span class="badge-red">{{ entry.status_code }}</span>
+                    {% elif entry.status_code >= 400 %}<span class="badge-amber">{{ entry.status_code }}</span>
+                    {% elif entry.status_code >= 300 %}<span class="badge-blue">{{ entry.status_code }}</span>
+                    {% else %}<span class="badge-green">{{ entry.status_code }}</span>{% endif %}
+                </td>
+                <td class="px-4 py-2.5 font-mono text-xs text-slate-500 max-w-xs truncate" title="{{ entry.path }} {{ entry.object_ref }}">
+                    {{ entry.path }}{% if entry.object_ref %} <span class="text-slate-400">{{ entry.object_ref }}</span>{% endif %}
+                </td>
+                <td class="px-4 py-2.5 whitespace-nowrap text-slate-500 font-mono text-xs">{{ entry.ip_address|default:"—" }}</td>
+                <td class="px-4 py-2.5 align-top">
+                    {% if entry.query_string or entry.referer or entry.user_agent or entry.duration_ms is not None %}
+                    <details class="text-xs">
+                        <summary class="cursor-pointer text-slate-400 hover:text-brand-700 dark:hover:text-brand-300 select-none whitespace-nowrap">Details</summary>
+                        <div class="mt-1.5 space-y-1 font-mono text-slate-500 whitespace-normal w-64 max-w-[70vw]">
+                            {% if entry.query_string %}<p class="break-all"><span class="text-slate-400">Query:</span> {{ entry.query_string }}</p>{% endif %}
+                            {% if entry.referer %}<p class="break-all"><span class="text-slate-400">Referer:</span> {{ entry.referer }}</p>{% endif %}
+                            {% if entry.user_agent %}<p class="break-all"><span class="text-slate-400">Agent:</span> {{ entry.user_agent }}</p>{% endif %}
+                            {% if entry.duration_ms is not None %}<p class="whitespace-nowrap"><span class="text-slate-400">Took:</span> {{ entry.duration_ms }}ms</p>{% endif %}
+                        </div>
+                    </details>
+                    {% else %}
+                    <span class="text-slate-300">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Pagination" class="flex flex-wrap items-center justify-between gap-3 mt-6">
+    <p class="text-sm text-slate-500 whitespace-nowrap">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        &middot; {{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}
+    </p>
+    <div class="flex flex-wrap items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page=1" class="btn-secondary" title="First page">&laquo;</a>
+        <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn-secondary">Previous</a>
+        {% else %}
+        <span class="btn-secondary opacity-50 pointer-events-none">&laquo;</span>
+        <span class="btn-secondary opacity-50 pointer-events-none">Previous</span>
+        {% endif %}
+
+        {% for p in page_range %}
+        {% if p == None %}
+        <span class="px-2 text-slate-400 select-none">&hellip;</span>
+        {% elif p == page_obj.number %}
+        <span class="btn-primary px-3" aria-current="page">{{ p }}</span>
+        {% else %}
+        <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ p }}" class="btn-secondary">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.next_page_number }}" class="btn-secondary">Next</a>
+        <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="btn-secondary" title="Last page">&raquo;</a>
+        {% else %}
+        <span class="btn-secondary opacity-50 pointer-events-none">Next</span>
+        <span class="btn-secondary opacity-50 pointer-events-none">&raquo;</span>
+        {% endif %}
+    </div>
+    <form method="get" class="flex items-center gap-1.5">
+        {% for key, value in request.GET.items %}
+        {% if key != "page" %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
+        {% endfor %}
+        <label for="jump-to-page" class="text-sm text-slate-500 whitespace-nowrap">Go to</label>
+        <input id="jump-to-page" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}"
+               value="{{ page_obj.number }}" class="field-input w-16">
+        <button type="submit" class="btn-secondary">Go</button>
+    </form>
+</nav>
+{% endif %}
+{% else %}
+<div class="card text-center py-12">
+    {% if query or method %}
+    <p class="text-slate-500">No audit log entries match your filters.</p>
+    {% else %}
+    <p class="text-slate-500">No audit log entries yet — this fills in as soon as anyone takes a state-changing action.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

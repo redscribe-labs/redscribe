@@ -1,0 +1,122 @@
+{% extends "base/base.html" %}
+{% block title %}Export report — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="report" %}
+{% endblock %}
+
+{% block page_header %}
+{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Export report" %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="card mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M7 10l2 2 4-4"/></svg>
+            </span>
+            <h2 class="font-semibold text-slate-900 text-sm">What's included</h2>
+        </div>
+        <p class="text-sm text-slate-700 mb-2">
+            <span class="font-medium">{{ included_count }}</span> finding{{ included_count|pluralize }}
+            {% if included_count %}(QA Approved){% endif %} will be included in the report.
+        </p>
+        {% if excluded_count %}
+        <p class="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-md px-3 py-2 mt-3">
+            {{ excluded_count }} other finding{{ excluded_count|pluralize }} — still Draft or awaiting
+            review/QA changes — {{ excluded_count|pluralize:"is,are" }} <strong>not</strong> included.
+            Only signed-off findings go into a client-facing report.
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="card mb-6">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 class="font-semibold text-slate-900 text-sm">Configure & preview</h2>
+                <p class="text-sm text-slate-600 mt-1">Choose sections, edit dynamic content, and pick which findings go in — with a live preview.</p>
+            </div>
+            <a href="{% url 'reports:configure' engagement.pk %}" class="btn-primary shrink-0">Configure report</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Format</h2>
+        <form method="post" action="{% url 'reports:download' engagement.pk 'pdf' %}" id="export-form">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <button type="submit" formaction="{% url 'reports:download' engagement.pk 'pdf' %}" class="flex flex-col items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-200 p-4 text-center hover:border-brand-300 hover:shadow-sm transition-all w-full">
+                    <span class="stat-tile-icon !bg-red-50 !text-red-600 dark:!bg-red-950 dark:!text-red-300"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg></span>
+                    <span class="text-sm font-medium text-slate-800">PDF</span>
+                </button>
+                <button type="submit" formaction="{% url 'reports:download' engagement.pk 'md' %}" class="flex flex-col items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-200 p-4 text-center hover:border-brand-300 hover:shadow-sm transition-all w-full">
+                    <span class="stat-tile-icon !bg-navy-50 !text-navy-600 dark:!bg-navy-950 dark:!text-navy-300"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg></span>
+                    <span class="text-sm font-medium text-slate-800">Markdown (.zip)</span>
+                </button>
+                <button type="submit" formaction="{% url 'reports:download' engagement.pk 'html' %}" class="flex flex-col items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-200 p-4 text-center hover:border-brand-300 hover:shadow-sm transition-all w-full">
+                    <span class="stat-tile-icon !bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5 3 10l4 5"/><path d="M13 5l4 5-4 5"/></svg></span>
+                    <span class="text-sm font-medium text-slate-800">HTML</span>
+                </button>
+                {% if docx_available %}
+                <button type="submit" formaction="{% url 'reports:download' engagement.pk 'docx' %}" class="flex flex-col items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-200 p-4 text-center hover:border-brand-300 hover:shadow-sm transition-all w-full">
+                    <span class="stat-tile-icon !bg-blue-50 !text-blue-600 dark:!bg-blue-950 dark:!text-blue-300"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg></span>
+                    <span class="text-sm font-medium text-slate-800">Word (.docx)</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-200">
+                <label for="pdf_password" class="field-label">PDF password (optional)</label>
+                <div class="flex items-center gap-2 mt-1">
+                    <input type="password" id="pdf_password" name="pdf_password"
+                           class="field-input" placeholder="Leave blank for no password" autocomplete="new-password">
+                </div>
+                <p class="field-help mt-1.5">
+                    If set, the exported PDF is encrypted (AES-256) and can't be opened without this password.
+                    Applies to PDF only — sent along whenever the PDF button above is clicked. Not stored anywhere;
+                    share it with the recipient through a separate channel.
+                </p>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-200">
+                <label for="export_comment" class="field-label">Export note (optional)</label>
+                <textarea id="export_comment" name="comment" rows="2" class="field-input"
+                          placeholder="e.g. Final delivery to client, internal review copy, re-export after finding correction..."></textarea>
+                <p class="field-help mt-1.5">Recorded against this export below, for audit purposes — who exported what, when, and why.</p>
+            </div>
+        </form>
+    </div>
+
+    {% if export_logs %}
+    <div class="card mt-6">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Export history</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-slate-400 uppercase tracking-wide">
+                        <th class="pb-2 pr-4">When</th>
+                        <th class="pb-2 pr-4">Format</th>
+                        <th class="pb-2 pr-4">By</th>
+                        <th class="pb-2">Note</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-200">
+                    {% for log in export_logs %}
+                    <tr>
+                        <td class="py-2 pr-4 text-slate-600 whitespace-nowrap">{{ log.exported_at|date:"d/m/Y H:i" }}</td>
+                        <td class="py-2 pr-4"><span class="badge-slate">{{ log.fmt|upper }}</span></td>
+                        <td class="py-2 pr-4 text-slate-600">{{ log.exported_by|default:"—" }}</td>
+                        <td class="py-2 text-slate-600">{{ log.comment|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% url 'engagements:detail' engagement.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to engagement" %}
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "errors/_base.html" %}
+{% block title %}403 Forbidden{% endblock %}
+{% block code %}403{% endblock %}
+{% block heading %}Forbidden{% endblock %}
+{% block message %}You're authenticated, just not authorized — the access level of a Guest badge at a Black Hat afterparty. Solid recon attempt, though.{% endblock %}
+{% block cta_url %}{% if user.is_authenticated and user.is_client_role %}{% url 'clients_portal:dashboard' %}{% else %}/{% endif %}{% endblock %}
+{% block cta_label %}Back to dashboard{% endblock %}

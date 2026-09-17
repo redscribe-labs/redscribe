@@ -1,0 +1,54 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras static %}
+{% block title %}Set up RedScribe{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+            <h1 class="font-mono font-semibold text-3xl tracking-tight text-white">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></h1>
+            <p class="text-sm text-mist-100/70 mt-1">First-run setup</p>
+        </div>
+        <div class="card">
+            <h2 class="text-lg font-semibold mb-1">Create the Superadmin account</h2>
+            <p class="text-sm text-slate-500 mb-4">
+                No Superadmin exists on this instance yet. This form only works once —
+                afterward, further accounts are created from the admin UI by an existing
+                Superadmin. You'll set up two-factor authentication right after this.
+            </p>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label for="{{ form.username.id_for_label }}" class="field-label">Username</label>
+                    {{ form.username|add_class:"field-input" }}
+                    {% for error in form.username.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                <div>
+                    <label for="{{ form.email.id_for_label }}" class="field-label">Email</label>
+                    {{ form.email|add_class:"field-input" }}
+                    {% for error in form.email.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                <div>
+                    <label for="{{ form.password1.id_for_label }}" class="field-label">Password</label>
+                    {{ form.password1|add_class:"field-input" }}
+                    {% if form.password1.help_text %}<div class="field-help">{{ form.password1.help_text|safe }}</div>{% endif %}
+                    {% for error in form.password1.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                <div>
+                    <label for="{{ form.password2.id_for_label }}" class="field-label">Confirm password</label>
+                    {{ form.password2|add_class:"field-input" }}
+                    {% for error in form.password2.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                    <p class="field-error">{{ error }}</p>
+                    {% endfor %}
+                {% endif %}
+                <button type="submit" class="btn-primary w-full">Create Superadmin account</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_body %}
+<script src="{% static 'vendor/redscribe-password-strength.bundle.js' %}" defer></script>
+{% endblock %}

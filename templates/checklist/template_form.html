@@ -1,0 +1,21 @@
+{% extends "base/base.html" %}
+{% block title %}{{ heading }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-5">{{ heading }}</h1>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">{% if template %}Save changes{% else %}Create template{% endif %}</button>
+        </form>
+    </div>
+    {% if template %}
+    {% url 'checklist_templates:detail' template.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to template" %}
+    {% else %}
+    {% url 'checklist_templates:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to templates" %}
+    {% endif %}
+</div>
+{% endblock %}
