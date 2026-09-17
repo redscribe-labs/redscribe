@@ -28,19 +28,25 @@ exists to cover the *right to use it commercially*, not to unlock anything.
 
 ## Pricing
 
-**Price:** `[PRICE TBD]` per year, flat rate — no per-seat, per-user, or
-per-engagement charges. One organization, one price, regardless of team
-size.
+**Free for the first year.** As a kickstart for the community, a commercial
+license key costs nothing right now, valid for up to twelve months from
+issue. Request one the same way described below.
+
+Priced tiers begin once RedScribe has been proven at the scale real
+enterprise engagements demand — flat rate, no per-seat, per-user, or
+per-engagement charges, one organization, one price, regardless of team
+size. Nothing about a key already issued during the free period changes
+retroactively once pricing starts.
 
 ## Support
 
-Paid commercial licensees may request support on a best-effort basis.
-This is **not** a guaranteed-response-time (SLA) support contract — it's
-priority attention when we're available, not a service-desk commitment.
+Commercial licensees may request support on a best-effort basis. This is
+**not** a guaranteed-response-time (SLA) support contract — it's priority
+attention when we're available, not a service-desk commitment.
 
 ## How to get a commercial license
 
-Contact `[CONTACT TBD]` to purchase a commercial license.
+Email `redscribe.maintainer@proton.me` for a commercial license key.
 
 ## Why not just use AGPL, or make it fully permissive?
 

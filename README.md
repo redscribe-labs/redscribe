@@ -28,8 +28,13 @@ License.
 - **Free** for personal and community/noncommercial use, under the
   [PolyForm Noncommercial License 1.0.0](LICENSE).
 - **Commercial use** (including running it at a for-profit consultancy)
-  requires a paid [commercial license](COMMERCIAL-LICENSE.md) — flat
-  price, no per-seat charges, no feature differences from the free tier.
+  requires a [commercial license](COMMERCIAL-LICENSE.md), no feature
+  differences from the free tier.
+
+**Commercial use is free right now.** As a kickstart for the community, a
+commercial license key costs nothing for the first year: email
+`redscribe.maintainer@proton.me` for one. Priced tiers begin once RedScribe
+has been proven at the scale real enterprise engagements demand.
 
 Nothing in RedScribe is feature-gated either way. See
 [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for full terms and
