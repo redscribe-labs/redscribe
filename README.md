@@ -5,7 +5,6 @@ management for a small penetration testing team.
 
 ![version](https://img.shields.io/badge/version-0.1.0--alpha.1-blue)
 ![license](https://img.shields.io/badge/license-source--available-orange)
-![CI](https://img.shields.io/badge/CI-test.yml-lightgrey)
 
 [Documentation](https://redscribe-labs.github.io/redscribe-docs/) ·
 [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) ·

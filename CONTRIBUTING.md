@@ -36,9 +36,8 @@ following the existing style in the relevant app's `tests.py`.
 
 ## Before opening a PR
 
-- Run the full test suite locally; CI (`.github/workflows/test.yml`) runs
-  it again on every PR, but catching failures locally first is faster for
-  everyone.
+- Run the full test suite locally before opening a PR — there's no CI
+  running it automatically, so this is the only check.
 - Add a `CHANGELOG.md` entry under `[Unreleased]` describing the change,
   following the existing Keep a Changelog format already used there.
 - Keep the change scoped — this codebase favors small, well-reasoned
