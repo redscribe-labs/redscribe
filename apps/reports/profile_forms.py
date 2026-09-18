@@ -36,11 +36,14 @@ class ReportProfileTemplateForm(forms.Form):
                    "(e.g. \"Roboto Slab\") — it's fetched once on save and self-hosted from then on, so nothing "
                    "external is contacted again. A non-Google font name (e.g. \"Helvetica\") just uses whatever's "
                    "installed wherever the report is viewed, same as before. Letters, digits, spaces, and "
-                   "hyphens only.",
+                   "hyphens only. If this is the instance's default Report Profile, this also becomes the font "
+                   "used across the RedScribe web app itself (both the internal app and the client portal), "
+                   "not just this report.",
     )
     monospace_font = forms.CharField(
         max_length=100, required=False, validators=[validate_font_name], label="Monospace font",
-        help_text="Used for code blocks and inline code. Same Google Fonts support as Body font above.",
+        help_text="Used for code blocks and inline code. Same Google Fonts support as Body font above — and, "
+                   "for the default profile, same effect on the live web app UI.",
     )
     bullet_character = forms.CharField(
         max_length=8, required=False, validators=[validate_no_markup_chars], label="Bullet character",

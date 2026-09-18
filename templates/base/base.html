@@ -16,6 +16,7 @@
     <title>{% block title %}RedScribe{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    {% include "base/_font_theme_head.html" %}
     <style>
         @media (min-width: 1024px) {
             #sidebar { transition: width 200ms ease; }

@@ -17,7 +17,7 @@ from apps.findings.models import ClassificationTag, ContentSectionDefinition, Fi
 
 from . import trends
 from .assembly import _select_findings
-from .models import ReportProfile, ReportSettings, ReportTextBlockDefinition
+from .models import CachedGoogleFont, ReportProfile, ReportSettings, ReportTextBlockDefinition
 from .placeholders import build_placeholder_context, render_placeholders
 from .tiptap_render import tiptap_to_html
 
@@ -520,6 +520,60 @@ class CssStyleTagEscapeTests(TestCase):
         escaped = _css_content_escape('</style><script>alert(1)</script>')
         self.assertNotIn("</style>", escaped)
         self.assertNotIn("<script>", escaped)
+
+
+class ReportFontDefaultFallbackTests(TestCase):
+    def test_build_preview_css_defaults_to_plus_jakarta_sans_and_jetbrains_mono(self):
+        from . import ir_render
+
+        css = ir_render.build_preview_css(None)
+        self.assertIn('font-family: "Plus Jakarta Sans"', css)
+        self.assertIn('font-family: "JetBrains Mono"', css)
+
+    def test_cached_google_font_rows_seeded_by_migration(self):
+        self.assertTrue(CachedGoogleFont.objects.filter(family="Plus Jakarta Sans", weight="400").exists())
+        self.assertTrue(CachedGoogleFont.objects.filter(family="Plus Jakarta Sans", weight="700").exists())
+
+
+class ReportFontThemeStyleTagTests(TestCase):
+    def test_no_default_profile_emits_nothing(self):
+        from .templatetags.report_fonts import report_font_theme_style
+
+        # setUpModule()'s shared seed_report_fixtures() already made a "Default"
+        # profile the instance default for the rest of this test file — clear it
+        # so this test can observe the true "no default profile at all" case.
+        ReportProfile.objects.filter(is_default=True).update(is_default=False)
+        self.assertEqual(report_font_theme_style(), "")
+
+    def test_default_profile_with_untouched_fonts_emits_nothing(self):
+        from .templatetags.report_fonts import report_font_theme_style
+
+        default_profile = ReportProfile.objects.get(is_default=True)
+        default_profile.body_font = "Plus Jakarta Sans"
+        default_profile.monospace_font = "JetBrains Mono"
+        default_profile.save()
+        self.assertEqual(report_font_theme_style(), "")
+
+    def test_default_profile_with_custom_fonts_emits_override(self):
+        from .templatetags.report_fonts import report_font_theme_style
+
+        default_profile = ReportProfile.objects.get(is_default=True)
+        default_profile.body_font = "Roboto Slab"
+        default_profile.monospace_font = "Fira Code"
+        default_profile.save()
+        css = report_font_theme_style()
+        self.assertIn("--font-sans:", css)
+        self.assertIn("Roboto Slab", css)
+        self.assertIn("--font-mono:", css)
+        self.assertIn("Fira Code", css)
+
+    def test_non_default_profile_is_ignored(self):
+        from .templatetags.report_fonts import report_font_theme_style
+
+        ReportProfile.objects.create(
+            name="SMOKE TEST font non-default profile", is_default=False, body_font="Roboto Slab",
+        )
+        self.assertEqual(report_font_theme_style(), "")
 
 
 class ReportProfileSettingsPermissionTests(TestCase):

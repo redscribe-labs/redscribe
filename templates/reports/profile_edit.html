@@ -106,6 +106,9 @@
             <section id="section-appearance" class="card" role="tabpanel" aria-labelledby="tab-appearance" hidden>
                 <h2 class="font-semibold text-slate-900 text-sm mb-1">Appearance</h2>
                 <p class="field-help mb-4">Fonts, bullet glyph, and the table/theme accent color — preview and PDF only; Markdown export is plain text.</p>
+                {% if profile.is_default %}
+                <p class="field-help mb-4 text-amber-700">This is the instance default profile — its fonts also drive the main RedScribe web app UI, not just this report.</p>
+                {% endif %}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div>
                         <label for="{{ form.body_font.id_for_label }}" class="field-label">{{ form.body_font.label }}</label>

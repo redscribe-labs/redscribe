@@ -129,7 +129,7 @@ class ReportProfile(models.Model):
 
     severity_colors = models.JSONField(default=dict, blank=True)
 
-    body_font = models.CharField(max_length=100, blank=True, default="Open Sans", validators=[validate_font_name])
+    body_font = models.CharField(max_length=100, blank=True, default="Plus Jakarta Sans", validators=[validate_font_name])
     monospace_font = models.CharField(
         max_length=100, blank=True, default="JetBrains Mono", validators=[validate_font_name],
     )

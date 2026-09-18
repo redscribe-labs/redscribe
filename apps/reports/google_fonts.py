@@ -1,3 +1,4 @@
+import base64
 import re
 import urllib.error
 import urllib.parse
@@ -23,6 +24,36 @@ _VALID_FAMILY_RE = re.compile(r"^[A-Za-z0-9 \-]{1,100}$")
 
 class GoogleFontFetchError(Exception):
     pass
+
+
+def _css_string_escape(text: str) -> str:
+    return (
+        text.replace("\\", "\\\\").replace('"', '\\"')
+        .replace("<", "\\3C ").replace(">", "\\3E ")
+    )
+
+
+def font_face_css(family: str) -> str:
+    """Emit @font-face rules embedding every cached weight/style of `family` as base64 data-URIs.
+
+    DB-read-only — never fetches over the network. Callers needing a family that
+    isn't cached yet (report generation's admin-facing save path) go through
+    fetch_and_cache_font() explicitly first; this only reads what's already there.
+    """
+    variants = CachedGoogleFont.objects.filter(family=family)
+    if not variants:
+        return ""
+    rules = []
+    for variant in variants:
+        data_uri = f"data:{variant.content_type};base64,{base64.b64encode(bytes(variant.font_data)).decode('ascii')}"
+        rules.append(
+            "@font-face {{ font-family: \"{family}\"; font-weight: {weight}; font-style: {style}; "
+            "src: url({data_uri}) format(\"{fmt}\"); font-display: swap; }}".format(
+                family=_css_string_escape(family), weight=variant.weight, style=variant.style,
+                data_uri=data_uri, fmt=variant.font_format,
+            )
+        )
+    return "".join(rules)
 
 
 def fetch_and_cache_font(family: str) -> int:

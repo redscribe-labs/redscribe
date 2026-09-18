@@ -182,33 +182,13 @@ def _css_string_escape(text: str) -> str:
     )
 
 
-def _font_face_css(family: str) -> str:
-    import base64
-
-    from .models import CachedGoogleFont
-
-    variants = CachedGoogleFont.objects.filter(family=family)
-    if not variants:
-        return ""
-    rules = []
-    for variant in variants:
-        data_uri = f"data:{variant.content_type};base64,{base64.b64encode(bytes(variant.font_data)).decode('ascii')}"
-        rules.append(
-            "@font-face {{ font-family: \"{family}\"; font-weight: {weight}; font-style: {style}; "
-            "src: url({data_uri}) format(\"{fmt}\"); font-display: swap; }}".format(
-                family=_css_string_escape(family), weight=variant.weight, style=variant.style,
-                data_uri=data_uri, fmt=variant.font_format,
-            )
-        )
-    return "".join(rules)
-
-
 def build_preview_css(meta=None) -> str:
     from .colors import contrasting_text_rgb, darken, mix_with_white
+    from .google_fonts import font_face_css
 
-    body_font = (meta and meta.body_font) or "Helvetica"
-    monospace_font = (meta and meta.monospace_font) or "Courier New"
-    font_faces = _font_face_css(body_font) + (_font_face_css(monospace_font) if monospace_font != body_font else "")
+    body_font = (meta and meta.body_font) or "Plus Jakarta Sans"
+    monospace_font = (meta and meta.monospace_font) or "JetBrains Mono"
+    font_faces = font_face_css(body_font) + (font_face_css(monospace_font) if monospace_font != body_font else "")
     table_header_color = (meta and meta.table_header_color) or "rgba(248,250,252,1)"
     empty_cell_background_color = (meta and meta.empty_cell_background_color) or "transparent"
     text_rgb = contrasting_text_rgb(table_header_color)

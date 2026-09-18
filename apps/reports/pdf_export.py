@@ -93,7 +93,7 @@ def build_pdf(document: ReportDocument) -> bytes:
         header_text=_css_content_escape(header_text),
         footer_text=_css_content_escape(footer_text),
         classification_text=_css_content_escape(meta.classification_label),
-        body_font=_css_content_escape(meta.body_font or "Helvetica"),
+        body_font=_css_content_escape(meta.body_font or "Plus Jakarta Sans"),
     )
 
     # Cover page and TOC now render inline wherever their tag sits in the
