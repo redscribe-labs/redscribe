@@ -35,7 +35,7 @@
         {% csrf_token %}
         <div class="flex-1 min-w-0">
             <label for="{{ docx_upload_form.docx_template.id_for_label }}" class="field-label">{{ profile.docx_template|yesno:"Replace template,Upload template" }}</label>
-            {{ docx_upload_form.docx_template }}
+            {{ docx_upload_form.docx_template|add_class:"field-input-file" }}
             {% for error in docx_upload_form.docx_template.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
         </div>
         <button type="submit" class="btn-primary shrink-0">Upload</button>

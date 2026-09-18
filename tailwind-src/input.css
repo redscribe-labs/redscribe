@@ -258,8 +258,11 @@
         background-size: 1rem;
     }
     .field-input-file {
-        @apply block w-full text-sm text-slate-600 dark:text-slate-500 rounded-md border border-slate-300 bg-white dark:bg-slate-50 shadow-sm
-               file:mr-3 file:my-1.5 file:rounded-md file:border file:border-slate-300 file:bg-white dark:file:bg-slate-100
+        @apply flex items-center gap-3 w-full text-sm text-slate-500 dark:text-slate-500
+               rounded-lg border border-dashed border-slate-300 dark:border-slate-400
+               bg-slate-50 dark:bg-slate-50 px-3 py-3 shadow-sm transition-colors
+               hover:border-brand-400 hover:bg-brand-50/40 dark:hover:bg-brand-950/10
+               file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white dark:file:bg-slate-100
                file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 file:shadow-sm
                file:cursor-pointer hover:file:bg-slate-50 file:transition-colors;
     }
