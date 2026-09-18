@@ -1544,6 +1544,12 @@ class SingleProviderSocialAdapterInviteTests(TestCase):
         self.assertFalse(pending.oauth_invite_pending)
         self.assertTrue(SocialAccount.objects.filter(user=pending, provider="google").exists())
 
+        from allauth.account.models import EmailAddress
+
+        email_address = EmailAddress.objects.get(user=pending, email__iexact="invited@example.com")
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
+
     @override_settings(OAUTH_PROVIDER="google")
     def test_claims_pending_invite_case_insensitively(self):
         from allauth.socialaccount.models import SocialAccount
@@ -1588,6 +1594,10 @@ class SingleProviderSocialAdapterInviteTests(TestCase):
         self.assertTrue(pending.oauth_invite_pending)
         self.assertFalse(SocialAccount.objects.filter(user=pending).exists())
 
+        from allauth.account.models import EmailAddress
+
+        self.assertFalse(EmailAddress.objects.filter(user=pending).exists())
+
     def test_existing_linked_account_is_left_alone(self):
         from .adapters import SingleProviderSocialAdapter
 
@@ -1599,6 +1609,48 @@ class SingleProviderSocialAdapterInviteTests(TestCase):
         SingleProviderSocialAdapter().pre_social_login(self._request(), sociallogin)
         user.refresh_from_db()
         self.assertFalse(user.oauth_invite_pending)
+
+    def test_heals_an_account_left_with_an_unverified_email_by_a_past_login(self):
+        # Simulates an account that claimed its invite before _mark_email_verified
+        # existed (or any other way it ended up with no verified EmailAddress) — the
+        # very next login should self-heal it, the same way UserSession rows do.
+        from allauth.account.models import EmailAddress
+
+        from .adapters import SingleProviderSocialAdapter
+
+        user = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH, email="already@example.com")
+        EmailAddress.objects.create(user=user, email="already@example.com", verified=False, primary=False)
+        sociallogin = _sociallogin("already@example.com")
+        sociallogin.user = user
+
+        SingleProviderSocialAdapter().pre_social_login(self._request(), sociallogin)
+
+        email_address = EmailAddress.objects.get(user=user, email__iexact="already@example.com")
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
+
+    def test_does_not_crash_when_user_already_has_a_different_primary_email(self):
+        # Regression test: reproduces a staging 500 (psycopg.errors.UniqueViolation on
+        # "unique_primary_email") — happened because a prior version of
+        # _mark_email_verified created the new primary row *before* clearing the old
+        # one, which Postgres's unique constraint rejects immediately since a user can
+        # only have one primary=True EmailAddress at a time.
+        from allauth.account.models import EmailAddress
+
+        from .adapters import SingleProviderSocialAdapter
+
+        user = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH, email="new@example.com")
+        EmailAddress.objects.create(user=user, email="old@example.com", verified=True, primary=True)
+        sociallogin = _sociallogin("new@example.com")
+        sociallogin.user = user
+
+        SingleProviderSocialAdapter().pre_social_login(self._request(), sociallogin)
+
+        new_address = EmailAddress.objects.get(user=user, email__iexact="new@example.com")
+        self.assertTrue(new_address.verified)
+        self.assertTrue(new_address.primary)
+        old_address = EmailAddress.objects.get(user=user, email__iexact="old@example.com")
+        self.assertFalse(old_address.primary)
 
 
 class LocalUserCreateFormOAuthInviteTests(TestCase):
@@ -1744,9 +1796,217 @@ class UserConvertToLocalViewTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
-class LoginPageOAuthDisclosureTests(TestCase):
+class UserConvertToOAuthViewTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
     @override_settings(OAUTH_PROVIDER="google")
-    def test_local_form_collapsed_and_forgot_password_hidden_when_oauth_enabled(self):
+    def test_converts_local_user_to_pending_oauth_invite(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL)
+
+        resp = self.client.post(reverse("user_management:convert_to_oauth", args=[target.uuid]), follow=True)
+        self.assertRedirects(resp, reverse("user_management:detail", args=[target.uuid]))
+        self.assertContains(resp, "pending OAuth invite")
+
+        target.refresh_from_db()
+        self.assertEqual(target.auth_type, User.AuthType.OAUTH)
+        self.assertTrue(target.oauth_invite_pending)
+        self.assertFalse(target.has_usable_password())
+
+    def test_blocked_when_oauth_unset(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL)
+
+        resp = self.client.post(reverse("user_management:convert_to_oauth", args=[target.uuid]), follow=True)
+        self.assertContains(resp, "OAuth isn&#x27;t configured")
+
+        target.refresh_from_db()
+        self.assertEqual(target.auth_type, User.AuthType.LOCAL)
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_blocked_for_superadmin_target(self):
+        target = make_user(role=User.Role.SUPERADMIN, auth_type=User.AuthType.LOCAL)
+
+        resp = self.client.post(reverse("user_management:convert_to_oauth", args=[target.uuid]), follow=True)
+        self.assertContains(resp, "local-auth only")
+
+        target.refresh_from_db()
+        self.assertEqual(target.auth_type, User.AuthType.LOCAL)
+
+    @override_settings(OAUTH_PROVIDER="google", OAUTH_ALLOWED_DOMAIN="corp.example.com")
+    def test_blocked_for_off_domain_email(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL, email="someone@othercorp.com")
+
+        resp = self.client.post(reverse("user_management:convert_to_oauth", args=[target.uuid]), follow=True)
+        self.assertContains(resp, "could never sign in")
+
+        target.refresh_from_db()
+        self.assertEqual(target.auth_type, User.AuthType.LOCAL)
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_404_for_already_oauth_user(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH)
+        resp = self.client.post(reverse("user_management:convert_to_oauth", args=[target.uuid]))
+        self.assertEqual(resp.status_code, 404)
+
+
+class SignupClosedTemplateTests(TestCase):
+    """Rendered when an OAuth login has no matching pending invite (is_open_for_signup
+    is always False) — allauth's own default is unbranded boilerplate, so this is
+    overridden at templates/account/signup_closed.html."""
+
+    def test_renders_with_redscribe_branding_and_guidance(self):
+        from django.template.loader import render_to_string
+
+        html = render_to_string("account/signup_closed.html", {})
+        self.assertIn("hasn't been invited yet", html)
+        self.assertIn("User Management", html)
+        self.assertIn(reverse("accounts:login"), html)
+
+
+class BlockedAllauthUrlsTests(TestCase):
+    """RedScribe has its own login/signup/logout/password-reset/email-management —
+    allauth's own equivalents (pulled in wholesale by include("allauth.urls")) are
+    dead surface that bypass RedScribe's lockout/MFA/invite-only logic, so they're
+    shadowed to 404 in config/urls.py rather than left reachable."""
+
+    def test_unused_allauth_urls_404(self):
+        from django.urls import reverse
+
+        blocked_names = [
+            "account_login", "account_confirm_login_code", "account_logout", "account_signup",
+            "account_change_password", "account_set_password", "account_reset_password",
+            "account_reset_password_done", "account_reset_password_from_key_done",
+            "account_email", "account_reauthenticate", "socialaccount_connections",
+            "socialaccount_signup",
+        ]
+        for name in blocked_names:
+            with self.subTest(name=name):
+                self.assertEqual(self.client.get(reverse(name)).status_code, 404)
+
+        url = reverse("account_reset_password_from_key", kwargs={"uidb36": "abc", "key": "xyz"})
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_still_used_allauth_urls_remain_reachable(self):
+        from django.urls import reverse
+
+        self.assertEqual(self.client.get(reverse("account_inactive")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("account_email_verification_sent")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("socialaccount_login_cancelled")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("socialaccount_login_error")).status_code, 401)
+        self.assertEqual(self.client.get(reverse("account_confirm_email", args=["dummy"])).status_code, 200)
+
+
+class GoogleAuthParamsTests(TestCase):
+    """SOCIALACCOUNT_PROVIDERS["google"]["AUTH_PARAMS"] forces Google's account
+    chooser every time, rather than silently reusing whichever Google account
+    already has an active browser session. This can't be exercised through the
+    login page in this environment (INSTALLED_APPS is fixed at process start, and
+    this environment has no real Google app installed), so it's verified directly
+    against the provider class allauth would otherwise construct from that setting."""
+
+    @override_settings(SOCIALACCOUNT_PROVIDERS={"google": {"AUTH_PARAMS": {"prompt": "select_account"}}})
+    def test_prompt_select_account_is_passed_to_googles_authorize_url(self):
+        from allauth.socialaccount.models import SocialApp
+        from allauth.socialaccount.providers.google.provider import GoogleProvider
+
+        app = SocialApp(provider="google", client_id="x", secret="y")
+        provider = GoogleProvider(request=None, app=app)
+        self.assertEqual(provider.get_auth_params(), {"prompt": "select_account"})
+
+    @override_settings(SOCIALACCOUNT_PROVIDERS={"microsoft": {"AUTH_PARAMS": {"prompt": "select_account"}}})
+    def test_prompt_select_account_is_passed_to_microsofts_authorize_url(self):
+        from allauth.socialaccount.models import SocialApp
+        from allauth.socialaccount.providers.microsoft.provider import MicrosoftGraphProvider
+
+        app = SocialApp(provider="microsoft", client_id="x", secret="y")
+        provider = MicrosoftGraphProvider(request=None, app=app)
+        self.assertEqual(provider.get_auth_params(), {"prompt": "select_account"})
+
+
+class AllauthPageBrandingTests(TestCase):
+    """A handful of allauth-rendered pages/emails (mandatory email verification, an
+    inactive-account login attempt) are reachable outside the normal invite-claim
+    happy path — e.g. a manually added unverified EmailAddress, or a deactivated
+    account attempting an OAuth login — so they're styled to match RedScribe's own
+    pages rather than left as allauth's unbranded defaults."""
+
+    def _confirmation_email(self):
+        from allauth.account.models import EmailAddress, EmailConfirmationHMAC
+        from allauth.core import context as allauth_context
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from django.test import RequestFactory
+
+        user = make_user(role=User.Role.CONSULTANT)
+        email_address = EmailAddress.objects.create(user=user, email=user.email, verified=False, primary=True)
+        request = RequestFactory().get("/", SERVER_NAME="localhost")
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.user = user
+        with allauth_context.request_context(request):
+            EmailConfirmationHMAC(email_address).send(request, signup=False)
+        return user
+
+    def test_subject_has_no_site_name_bracket_prefix(self):
+        mail.outbox = []
+        self._confirmation_email()
+        self.assertEqual(mail.outbox[0].subject, "Confirm your email address")
+
+    def test_body_uses_redscribe_branding_and_activation_link(self):
+        mail.outbox = []
+        user = self._confirmation_email()
+        message = mail.outbox[0]
+        self.assertIn("RedScribe", message.body)
+        self.assertIn(user.username, message.body)
+        html_body = message.alternatives[0][0]
+        self.assertIn("RedScribe", html_body)
+        self.assertIn("Confirm email address", html_body)
+
+    def test_verification_sent_page_renders_with_redscribe_branding(self):
+        from django.template.loader import render_to_string
+
+        html = render_to_string("account/verification_sent.html", {})
+        self.assertIn("Check your email", html)
+        self.assertIn(reverse("accounts:login"), html)
+
+    def test_account_inactive_page_renders_with_redscribe_branding(self):
+        resp = self.client.get(reverse("account_inactive"))
+        self.assertContains(resp, "This account is inactive")
+        self.assertContains(resp, reverse("accounts:login"))
+
+    def test_login_cancelled_page_renders_with_redscribe_branding(self):
+        resp = self.client.get(reverse("socialaccount_login_cancelled"))
+        self.assertContains(resp, "Sign-in cancelled")
+        self.assertContains(resp, reverse("accounts:login"))
+
+    def test_authentication_error_page_renders_with_redscribe_branding(self):
+        resp = self.client.get(reverse("socialaccount_login_error"))
+        self.assertContains(resp, "Sign-in failed", status_code=401)
+        self.assertContains(resp, reverse("accounts:login"), status_code=401)
+
+    def test_email_confirm_page_renders_invalid_and_valid_states(self):
+        from allauth.account.models import EmailAddress, EmailConfirmationHMAC
+
+        user = make_user(role=User.Role.CONSULTANT)
+        email_address = EmailAddress.objects.create(user=user, email=user.email, verified=False, primary=True)
+        key = EmailConfirmationHMAC(email_address).key
+
+        resp = self.client.get(reverse("account_confirm_email", args=[key]))
+        self.assertContains(resp, "Confirm your email address")
+        self.assertContains(resp, user.email)
+
+        resp = self.client.get(reverse("account_confirm_email", args=["not-a-real-key"]))
+        self.assertContains(resp, "invalid or has expired")
+
+
+class LoginPageOAuthAdditiveTests(TestCase):
+    """The login page looks the same whether or not OAuth is configured — the local
+    form is always front and center — with the provider button(s) simply added below
+    it when OAUTH_PROVIDER is set. Superadmin (and anyone else) always has full,
+    unhidden access to the local form; OAuth is additive, never a replacement."""
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_oauth_button_added_alongside_the_always_visible_local_form(self):
         from unittest.mock import MagicMock
 
         from .adapters import SingleProviderSocialAdapter
@@ -1754,18 +2014,20 @@ class LoginPageOAuthDisclosureTests(TestCase):
         # This environment has no real Google OAuth app configured (INSTALLED_APPS is
         # fixed at process start), so the provider lookup the login template's
         # {% provider_login_url %} tag makes is stubbed out — irrelevant to what's under
-        # test here, which is the template's own collapse/hide structure.
+        # test here, which is the template's own layout.
         dummy_provider = MagicMock()
         dummy_provider.get_login_url.return_value = "https://example.com/oauth/login"
         with patch.object(SingleProviderSocialAdapter, "get_provider", return_value=dummy_provider):
             resp = self.client.get(reverse("accounts:login"))
 
-        self.assertContains(resp, "<details")
-        self.assertContains(resp, "Sign in with a local account instead")
+        self.assertNotContains(resp, "<details")
         self.assertContains(resp, "Sign in with Google")
-        self.assertNotContains(resp, "Forgot your password?")
+        self.assertContains(resp, "Forgot your password?")
+        self.assertContains(resp, f'id="{resp.context["form"]["username"].id_for_label}"')
 
-    def test_local_form_visible_and_forgot_password_shown_when_oauth_disabled(self):
+    def test_no_oauth_button_when_oauth_disabled(self):
         resp = self.client.get(reverse("accounts:login"))
         self.assertNotContains(resp, "<details")
+        self.assertNotContains(resp, "Sign in with Google")
+        self.assertNotContains(resp, "Sign in with Microsoft")
         self.assertContains(resp, "Forgot your password?")

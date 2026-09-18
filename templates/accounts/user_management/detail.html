@@ -39,6 +39,13 @@
         {% csrf_token %}
         <button type="submit" class="btn-secondary w-full">Clear MFA (force re-enrollment)</button>
     </form>
+    {% if oauth_provider and not target.is_superadmin_role %}
+    <form method="post" action="{% url 'user_management:convert_to_oauth' target.uuid %}"
+          onsubmit="return confirm('Convert this account to a pending OAuth invite? Their local password will stop working, and they\'ll need to sign in through {{ oauth_provider }} with {{ target.email }} to regain access.');">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Convert to OAuth invite</button>
+    </form>
+    {% endif %}
     {% else %}
     <p class="text-xs text-slate-400">
         OAuth-provisioned account — password and MFA are managed by the identity provider, not here.

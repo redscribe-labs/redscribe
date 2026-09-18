@@ -1,0 +1,7 @@
+Hi {{ user.first_name|default:user.username }},
+
+Please confirm this is your email address on {{ branding.display_name }}:
+
+{{ activate_url }}
+
+If you weren't expecting this, you can safely ignore it.

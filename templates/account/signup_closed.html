@@ -1,0 +1,21 @@
+{% extends "base/base.html" %}
+{% block title %}Not invited yet — RedScribe{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+            <h1 class="font-mono font-semibold text-3xl tracking-tight text-white">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></h1>
+        </div>
+        <div class="card text-center">
+            <h2 class="text-lg font-semibold mb-2">This account hasn't been invited yet</h2>
+            <p class="text-sm text-slate-500 mb-4">
+                Signing in with a new identity-provider account doesn't create access by
+                itself. Ask your administrator to add you in <strong>User Management</strong>
+                with this exact email address — access activates automatically the next time
+                you sign in this way.
+            </p>
+            <a href="{% url 'accounts:login' %}" class="btn-primary w-full">Back to sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

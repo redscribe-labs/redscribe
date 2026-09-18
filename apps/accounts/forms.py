@@ -73,6 +73,21 @@ def _staff_role_queryset(requesting_user):
     return qs
 
 
+def oauth_domain_mismatch(email: str) -> str | None:
+    """Returns an error message if `email` can't ever be claimed via OAuth on this
+    instance (i.e. doesn't match OAUTH_ALLOWED_DOMAIN, when one is set), else None."""
+    domain = settings.OAUTH_ALLOWED_DOMAIN
+    if not domain or not email:
+        return None
+    email_domain = email.rsplit("@", 1)[-1].strip().lower() if "@" in email else ""
+    if email_domain == domain:
+        return None
+    return (
+        f"This invite can only be claimed by an @{domain} address — an account with this "
+        "email could never sign in through the identity provider."
+    )
+
+
 class LocalUserCreateForm(forms.ModelForm):
     class Meta:
         model = User
@@ -101,16 +116,10 @@ class LocalUserCreateForm(forms.ModelForm):
                 "'bootstrap_superadmin' management command instead.",
             )
 
-        domain = settings.OAUTH_ALLOWED_DOMAIN
         email = cleaned_data.get("email")
-        if domain and email:
-            email_domain = email.rsplit("@", 1)[-1].strip().lower() if "@" in email else ""
-            if email_domain != domain:
-                self.add_error(
-                    "email",
-                    f"This invite can only be claimed by an @{domain} address — an account "
-                    "with this email could never sign in through the identity provider.",
-                )
+        mismatch = oauth_domain_mismatch(email)
+        if mismatch:
+            self.add_error("email", mismatch)
         return cleaned_data
 
     def save(self, commit=True):

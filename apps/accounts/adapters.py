@@ -26,6 +26,7 @@ class SingleProviderSocialAdapter(DefaultSocialAccountAdapter):
             raise ImmediateHttpResponse(redirect("accounts:login"))
 
         if sociallogin.is_existing:
+            self._mark_email_verified(sociallogin.user, email)
             return
 
         User = sociallogin.user.__class__
@@ -47,8 +48,38 @@ class SingleProviderSocialAdapter(DefaultSocialAccountAdapter):
             raise ImmediateHttpResponse(redirect("accounts:login"))
 
         sociallogin.connect(request, target)
+        self._mark_email_verified(target, email)
         target.oauth_invite_pending = False
         target.save(update_fields=["oauth_invite_pending"])
+
+    def _mark_email_verified(self, user, email):
+        # The identity provider already vouches for this address, and an admin already
+        # vouched for it a second time by pre-approving it as an invite — allauth's own
+        # separate email-ownership verification step is redundant on top of that, and
+        # would otherwise send every OAuth user through its (unbranded) "verify your
+        # email" flow indefinitely, since providers like Microsoft never report a
+        # verified flag at all for allauth to trust instead. Idempotent and self-healing:
+        # runs on every login, so an account left in a bad state by a past login (e.g.
+        # before this method existed) is fixed on its very next one.
+        from allauth.account.models import EmailAddress
+        from django.db import transaction
+
+        # Order matters: a user can have at most one primary=True row (DB-enforced,
+        # "unique_primary_email"), so any other primary must be cleared *before*
+        # inserting/promoting this one — doing it after, as a prior version of this
+        # method did, throws IntegrityError whenever this user already had a
+        # different primary address (e.g. a leftover row from before this method
+        # existed, or one created some other way).
+        with transaction.atomic():
+            EmailAddress.objects.filter(user=user).exclude(email__iexact=email).update(primary=False)
+            existing = EmailAddress.objects.filter(user=user, email__iexact=email).first()
+            if existing:
+                if not existing.verified or not existing.primary:
+                    existing.verified = True
+                    existing.primary = True
+                    existing.save(update_fields=["verified", "primary"])
+            else:
+                EmailAddress.objects.create(user=user, email=email, verified=True, primary=True)
 
     def is_open_for_signup(self, request, sociallogin):
         return False

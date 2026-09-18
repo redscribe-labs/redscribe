@@ -13,7 +13,7 @@ PAGE_SIZE = 10
 from apps.findings.review import assignments_for_user
 
 from . import security
-from .forms import LocalUserCreateForm, LocalUserEditForm
+from .forms import LocalUserCreateForm, LocalUserEditForm, oauth_domain_mismatch
 from .models import LoginAttempt
 from .permissions import require_permission
 
@@ -225,6 +225,32 @@ def user_convert_to_local(request, user_uuid):
             f"'{target.username}' converted to a local account — they've been emailed a link "
             "to set their password.",
         )
+
+    return redirect("user_management:detail", user_uuid=target.uuid)
+
+
+@login_required
+def user_convert_to_oauth(request, user_uuid):
+    _require_users_manage(request.user)
+    target = _get_staff_target(user_uuid, auth_type=User.AuthType.LOCAL)
+
+    if request.method == "POST":
+        if not settings.OAUTH_PROVIDER:
+            messages.error(request, "OAuth isn't configured on this instance — set OAUTH_PROVIDER first.")
+        elif target.role.is_superadmin:
+            messages.error(request, "Superadmin is local-auth only and can't be converted to an OAuth invite.")
+        elif (mismatch := oauth_domain_mismatch(target.email)):
+            messages.error(request, mismatch)
+        else:
+            target.auth_type = User.AuthType.OAUTH
+            target.oauth_invite_pending = True
+            target.set_unusable_password()
+            target.save(update_fields=["auth_type", "oauth_invite_pending", "password"])
+            messages.success(
+                request,
+                f"'{target.username}' converted to a pending OAuth invite — they'll get access "
+                f"the first time they sign in with {target.email} through {settings.OAUTH_PROVIDER}.",
+            )
 
     return redirect("user_management:detail", user_uuid=target.uuid)
 

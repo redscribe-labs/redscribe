@@ -14,4 +14,5 @@ urlpatterns = [
     path("<uuid:user_uuid>/send-password-reset/", views.user_send_password_reset, name="send_password_reset"),
     path("<uuid:user_uuid>/clear-mfa/", views.user_clear_mfa, name="clear_mfa"),
     path("<uuid:user_uuid>/convert-to-local/", views.user_convert_to_local, name="convert_to_local"),
+    path("<uuid:user_uuid>/convert-to-oauth/", views.user_convert_to_oauth, name="convert_to_oauth"),
 ]

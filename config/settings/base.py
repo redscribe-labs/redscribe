@@ -77,6 +77,13 @@ if OAUTH_PROVIDER == "google":
                     "key": "",
                 }
             ],
+            # Without this, Google silently reuses whichever Google account already
+            # has an active session in the browser, skipping the account chooser
+            # entirely — surprising when someone has multiple Google accounts signed
+            # in (e.g. personal + work) and clicks "Sign in with Google" expecting to
+            # pick one, especially relevant given OAUTH_ALLOWED_DOMAIN only rejects
+            # the wrong account *after* it's already been silently chosen.
+            "AUTH_PARAMS": {"prompt": "select_account"},
         }
     }
 elif OAUTH_PROVIDER == "microsoft":
@@ -91,6 +98,10 @@ elif OAUTH_PROVIDER == "microsoft":
                 }
             ],
             "TENANT": env("MICROSOFT_OAUTH_TENANT_ID", "organizations"),
+            # Same reasoning as Google's AUTH_PARAMS above. allauth's Microsoft
+            # provider only forces this on its own for a re-authentication request —
+            # setting it here forces the account picker on every ordinary sign-in too.
+            "AUTH_PARAMS": {"prompt": "select_account"},
         }
     }
 elif OAUTH_PROVIDER:
@@ -237,6 +248,17 @@ SOCIALACCOUNT_ADAPTER = "apps.accounts.adapters.SingleProviderSocialAdapter"
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+# Our own login page already presents an explicit, styled "Sign in with
+# Google/Microsoft" button — that click *is* the user's confirmation, so
+# skip allauth's own unbranded intermediate "Continue?" page (GET would
+# otherwise render it) and go straight to the provider.
+SOCIALACCOUNT_LOGIN_ON_GET = True
+# Without this, allauth prefixes every subject it sends (e.g. the email-confirmation
+# message) with "[<site name>] " using django.contrib.sites — which isn't installed
+# here, so it'd fall back to the raw request host (e.g. "[redscribe.example.com] ").
+# RedScribe's own emails never do this; our own templates already say who they're
+# from, so there's nothing this prefix would add.
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 
 LANGUAGE_CODE = "en-au"
 TIME_ZONE = "Australia/Brisbane"
