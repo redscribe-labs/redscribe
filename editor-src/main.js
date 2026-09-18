@@ -6,10 +6,7 @@ import CodeBlock from "@tiptap/extension-code-block";
 import Highlight from "@tiptap/extension-highlight";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableHeader from "@tiptap/extension-table-header";
-import TableCell from "@tiptap/extension-table-cell";
+import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
@@ -130,7 +127,12 @@ function mount(element, opts) {
       transformPastedHTML: (html) => html.replace(/<img\b[^>]*>/gi, ""),
     },
     extensions: [
-      StarterKit.configure({ codeBlock: false, paragraph: false }),
+      // v3's StarterKit now bundles Underline and Link itself (in
+      // addition to CodeBlock/Paragraph, already disabled below) — both
+      // are still added explicitly further down with this app's own
+      // config (custom Link protocols/rel/target), so disable
+      // StarterKit's copies to avoid a duplicate-extension-name conflict.
+      StarterKit.configure({ codeBlock: false, paragraph: false, underline: false, link: false }),
       LeadParagraph,
       CodeBlock.extend({ marks: "bold highlight" }),
       Image,
