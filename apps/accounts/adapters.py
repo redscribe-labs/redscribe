@@ -4,8 +4,6 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.shortcuts import redirect
 
-from .models import Role
-
 
 class SingleRoleAccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request):
@@ -14,14 +12,12 @@ class SingleRoleAccountAdapter(DefaultAccountAdapter):
 
 class SingleProviderSocialAdapter(DefaultSocialAccountAdapter):
     def pre_social_login(self, request, sociallogin):
+        from django.contrib import messages
+
         domain = settings.OAUTH_ALLOWED_DOMAIN
-        if not domain:
-            return
         email = (sociallogin.user.email or "").strip().lower()
         email_domain = email.rsplit("@", 1)[-1] if "@" in email else ""
-        if email_domain != domain:
-            from django.contrib import messages
-
+        if domain and email_domain != domain:
             messages.error(
                 request,
                 "Sign-in is restricted to your organization's account. "
@@ -29,14 +25,36 @@ class SingleProviderSocialAdapter(DefaultSocialAccountAdapter):
             )
             raise ImmediateHttpResponse(redirect("accounts:login"))
 
+        if sociallogin.is_existing:
+            return
+
+        User = sociallogin.user.__class__
+        target = User.objects.filter(
+            email__iexact=email,
+            auth_type=User.AuthType.OAUTH,
+            oauth_invite_pending=True,
+            is_active=True,
+        ).first()
+        if target is None:
+            return
+
+        if target.role.is_superadmin:
+            messages.error(
+                request,
+                "Sign-in is restricted to your organization's account. "
+                "Please contact your administrator if you believe this is an error.",
+            )
+            raise ImmediateHttpResponse(redirect("accounts:login"))
+
+        sociallogin.connect(request, target)
+        target.oauth_invite_pending = False
+        target.save(update_fields=["oauth_invite_pending"])
+
     def is_open_for_signup(self, request, sociallogin):
-        return bool(settings.OAUTH_PROVIDER) and sociallogin.account.provider == settings.OAUTH_PROVIDER
+        return False
 
     def save_user(self, request, sociallogin, form=None):
-        user = super().save_user(request, sociallogin, form=form)
-        User = user.__class__
-        user.auth_type = User.AuthType.OAUTH
-        if not user.role_id:
-            user.role = Role.objects.get(slug="consultant")
-        user.save(update_fields=["auth_type", "role"])
-        return user
+        # Unreachable in normal operation: is_open_for_signup() always returns False, so
+        # allauth never calls this to create a brand-new User from an OAuth login. Kept
+        # defensive rather than removed, in case some allauth internal path calls it directly.
+        raise ImmediateHttpResponse(redirect("accounts:login"))

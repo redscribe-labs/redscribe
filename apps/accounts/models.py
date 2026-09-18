@@ -71,6 +71,11 @@ class User(AbstractUser):
 
     Role = _BuiltinRoleSlug
     auth_type = models.CharField(max_length=10, choices=AuthType.choices, default=AuthType.LOCAL)
+    oauth_invite_pending = models.BooleanField(
+        default=False,
+        help_text="True for an admin-pre-created OAuth account that has not yet been claimed "
+        "by a matching first sign-in through the identity provider.",
+    )
 
     email = models.EmailField(unique=True)
 

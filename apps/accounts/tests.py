@@ -1497,3 +1497,275 @@ class GranularAdminPermissionDelegationTests(TestCase):
         ):
             with self.subTest(url_name=url_name):
                 self.assertEqual(client.get(reverse(url_name)).status_code, 403)
+
+
+def _sociallogin(email, provider="google", uid=None):
+    from allauth.account.models import EmailAddress
+    from allauth.socialaccount.models import SocialAccount, SocialLogin
+
+    login_user = User(email=email)
+    account = SocialAccount(provider=provider, uid=uid or f"uid-{os.urandom(4).hex()}")
+    email_address = EmailAddress(email=email, verified=True, primary=True)
+    return SocialLogin(user=login_user, account=account, email_addresses=[email_address])
+
+
+class SingleProviderSocialAdapterInviteTests(TestCase):
+    """Unit tests for the adapter's pre_social_login invite-claiming logic — built directly
+    against allauth's SocialLogin/SocialAccount, since exercising the real OAuth dance would
+    require mocking the provider's token exchange."""
+
+    def _request(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/")
+        request.session = self.client.session
+        request._messages = FallbackStorage(request)
+        return request
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_claims_pending_invite_on_matching_email(self):
+        from allauth.socialaccount.models import SocialAccount
+
+        from .adapters import SingleProviderSocialAdapter
+
+        pending = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH, email="invited@example.com")
+        pending.oauth_invite_pending = True
+        pending.save(update_fields=["oauth_invite_pending"])
+
+        # allauth's connect() unconditionally resolves the provider by name to build an
+        # "account connected" notification-email context, which needs a real provider app
+        # configured — irrelevant to what's under test here (this environment has no OAuth
+        # provider actually configured), so it's stubbed out.
+        with patch.object(SocialAccount, "get_provider", return_value=None):
+            SingleProviderSocialAdapter().pre_social_login(self._request(), _sociallogin("invited@example.com"))
+
+        pending.refresh_from_db()
+        self.assertFalse(pending.oauth_invite_pending)
+        self.assertTrue(SocialAccount.objects.filter(user=pending, provider="google").exists())
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_claims_pending_invite_case_insensitively(self):
+        from allauth.socialaccount.models import SocialAccount
+
+        pending = make_user(
+            role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH, email="Invited@Example.com",
+        )
+        pending.oauth_invite_pending = True
+        pending.save(update_fields=["oauth_invite_pending"])
+
+        from .adapters import SingleProviderSocialAdapter
+
+        with patch.object(SocialAccount, "get_provider", return_value=None):
+            SingleProviderSocialAdapter().pre_social_login(self._request(), _sociallogin("invited@example.com"))
+
+        pending.refresh_from_db()
+        self.assertFalse(pending.oauth_invite_pending)
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_no_user_created_when_no_pending_invite_matches(self):
+        from .adapters import SingleProviderSocialAdapter
+
+        before = User.objects.count()
+        SingleProviderSocialAdapter().pre_social_login(self._request(), _sociallogin("nobody@example.com"))
+        self.assertEqual(User.objects.count(), before)
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_rejects_login_when_matched_target_is_superadmin(self):
+        from allauth.core.exceptions import ImmediateHttpResponse
+        from allauth.socialaccount.models import SocialAccount
+
+        from .adapters import SingleProviderSocialAdapter
+
+        pending = make_user(role=User.Role.SUPERADMIN, auth_type=User.AuthType.OAUTH, email="admin@example.com")
+        pending.oauth_invite_pending = True
+        pending.save(update_fields=["oauth_invite_pending"])
+
+        with self.assertRaises(ImmediateHttpResponse):
+            SingleProviderSocialAdapter().pre_social_login(self._request(), _sociallogin("admin@example.com"))
+
+        pending.refresh_from_db()
+        self.assertTrue(pending.oauth_invite_pending)
+        self.assertFalse(SocialAccount.objects.filter(user=pending).exists())
+
+    def test_existing_linked_account_is_left_alone(self):
+        from .adapters import SingleProviderSocialAdapter
+
+        user = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH, email="already@example.com")
+        sociallogin = _sociallogin("already@example.com")
+        sociallogin.user = user  # already a saved row -> is_existing is True
+
+        # Should return quietly (ordinary repeat login) rather than touching oauth_invite_pending.
+        SingleProviderSocialAdapter().pre_social_login(self._request(), sociallogin)
+        user.refresh_from_db()
+        self.assertFalse(user.oauth_invite_pending)
+
+
+class LocalUserCreateFormOAuthInviteTests(TestCase):
+    def setUp(self):
+        self.requesting_superadmin = make_user(role=User.Role.SUPERADMIN)
+
+    def _data(self, **overrides):
+        data = {
+            "username": f"invitee-{os.urandom(4).hex()}",
+            "email": "invitee@example.com",
+            "first_name": "In",
+            "last_name": "Vitee",
+            "role": Role.objects.get(slug="consultant").pk,
+        }
+        data.update(overrides)
+        return data
+
+    def _form(self, data):
+        from .forms import LocalUserCreateForm
+
+        return LocalUserCreateForm(data, requesting_user=self.requesting_superadmin)
+
+    def test_defaults_to_local_when_oauth_unset(self):
+        form = self._form(self._data())
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.creates_oauth_invite)
+        user = form.save()
+        self.assertEqual(user.auth_type, User.AuthType.LOCAL)
+        self.assertFalse(user.oauth_invite_pending)
+        self.assertFalse(user.has_usable_password())
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_defaults_to_oauth_pending_invite_when_oauth_configured(self):
+        form = self._form(self._data())
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertTrue(form.creates_oauth_invite)
+        user = form.save()
+        self.assertEqual(user.auth_type, User.AuthType.OAUTH)
+        self.assertTrue(user.oauth_invite_pending)
+        self.assertFalse(user.has_usable_password())
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_rejects_superadmin_role_as_oauth_invite(self):
+        form = self._form(self._data(role=Role.objects.get(slug="superadmin").pk))
+        self.assertFalse(form.is_valid())
+        self.assertIn("role", form.errors)
+
+    @override_settings(OAUTH_PROVIDER="google", OAUTH_ALLOWED_DOMAIN="corp.example.com")
+    def test_rejects_off_domain_email_as_oauth_invite(self):
+        form = self._form(self._data(email="someone@othercorp.com"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
+
+    @override_settings(OAUTH_PROVIDER="google", OAUTH_ALLOWED_DOMAIN="corp.example.com")
+    def test_accepts_on_domain_email_as_oauth_invite(self):
+        form = self._form(self._data(email="someone@corp.example.com"))
+        self.assertTrue(form.is_valid(), form.errors)
+
+
+class LocalUserEditFormOAuthGuardTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+
+    def test_rejects_superadmin_role_change_for_oauth_instance(self):
+        from .forms import LocalUserEditForm
+
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH)
+        form = LocalUserEditForm(
+            {
+                "email": target.email, "first_name": "", "last_name": "",
+                "role": Role.objects.get(slug="superadmin").pk,
+                "qualifications": "", "background": "",
+            },
+            instance=target,
+            requesting_user=self.superadmin,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("role", form.errors)
+
+    def test_allows_superadmin_role_change_for_local_instance(self):
+        from .forms import LocalUserEditForm
+
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL)
+        form = LocalUserEditForm(
+            {
+                "email": target.email, "first_name": "", "last_name": "",
+                "role": Role.objects.get(slug="superadmin").pk,
+                "qualifications": "", "background": "",
+            },
+            instance=target,
+            requesting_user=self.superadmin,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+
+class UserCreateOAuthInviteViewTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_create_produces_pending_oauth_invite_with_no_email(self):
+        mail.outbox = []
+        resp = self.client.post(reverse("user_management:create"), {
+            "username": "new-invitee",
+            "email": "new-invitee@example.com",
+            "first_name": "New", "last_name": "Invitee",
+            "role": Role.objects.get(slug="consultant").pk,
+        })
+        user = User.objects.get(username="new-invitee")
+        self.assertRedirects(resp, reverse("user_management:detail", args=[user.uuid]))
+        self.assertEqual(user.auth_type, User.AuthType.OAUTH)
+        self.assertTrue(user.oauth_invite_pending)
+        self.assertEqual(len(mail.outbox), 0)
+
+
+class UserConvertToLocalViewTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(role=User.Role.SUPERADMIN)
+        self.client = Client()
+        login(self.client, self.superadmin)
+
+    def test_converts_oauth_user_and_sends_setup_email(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.OAUTH)
+        target.oauth_invite_pending = True
+        target.save(update_fields=["oauth_invite_pending"])
+        mail.outbox = []
+
+        resp = self.client.post(reverse("user_management:convert_to_local", args=[target.uuid]))
+        self.assertRedirects(resp, reverse("user_management:detail", args=[target.uuid]))
+
+        target.refresh_from_db()
+        self.assertEqual(target.auth_type, User.AuthType.LOCAL)
+        self.assertFalse(target.oauth_invite_pending)
+        self.assertFalse(target.has_usable_password())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [target.email])
+
+    def test_404_for_already_local_user(self):
+        target = make_user(role=User.Role.CONSULTANT, auth_type=User.AuthType.LOCAL)
+        resp = self.client.post(reverse("user_management:convert_to_local", args=[target.uuid]))
+        self.assertEqual(resp.status_code, 404)
+
+
+class LoginPageOAuthDisclosureTests(TestCase):
+    @override_settings(OAUTH_PROVIDER="google")
+    def test_local_form_collapsed_and_forgot_password_hidden_when_oauth_enabled(self):
+        from unittest.mock import MagicMock
+
+        from .adapters import SingleProviderSocialAdapter
+
+        # This environment has no real Google OAuth app configured (INSTALLED_APPS is
+        # fixed at process start), so the provider lookup the login template's
+        # {% provider_login_url %} tag makes is stubbed out — irrelevant to what's under
+        # test here, which is the template's own collapse/hide structure.
+        dummy_provider = MagicMock()
+        dummy_provider.get_login_url.return_value = "https://example.com/oauth/login"
+        with patch.object(SingleProviderSocialAdapter, "get_provider", return_value=dummy_provider):
+            resp = self.client.get(reverse("accounts:login"))
+
+        self.assertContains(resp, "<details")
+        self.assertContains(resp, "Sign in with a local account instead")
+        self.assertContains(resp, "Sign in with Google")
+        self.assertNotContains(resp, "Forgot your password?")
+
+    def test_local_form_visible_and_forgot_password_shown_when_oauth_disabled(self):
+        resp = self.client.get(reverse("accounts:login"))
+        self.assertNotContains(resp, "<details")
+        self.assertContains(resp, "Forgot your password?")

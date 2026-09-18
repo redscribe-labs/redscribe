@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
@@ -83,9 +84,42 @@ class LocalUserCreateForm(forms.ModelForm):
             queryset=_staff_role_queryset(requesting_user), label="Role"
         )
 
+    @property
+    def creates_oauth_invite(self) -> bool:
+        return bool(settings.OAUTH_PROVIDER)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.creates_oauth_invite:
+            return cleaned_data
+
+        role = cleaned_data.get("role")
+        if role is not None and role.is_superadmin:
+            self.add_error(
+                "role",
+                "Superadmin can't be created as an OAuth invite from this form — use the "
+                "'bootstrap_superadmin' management command instead.",
+            )
+
+        domain = settings.OAUTH_ALLOWED_DOMAIN
+        email = cleaned_data.get("email")
+        if domain and email:
+            email_domain = email.rsplit("@", 1)[-1].strip().lower() if "@" in email else ""
+            if email_domain != domain:
+                self.add_error(
+                    "email",
+                    f"This invite can only be claimed by an @{domain} address — an account "
+                    "with this email could never sign in through the identity provider.",
+                )
+        return cleaned_data
+
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.auth_type = User.AuthType.LOCAL
+        if self.creates_oauth_invite and not user.role.is_superadmin:
+            user.auth_type = User.AuthType.OAUTH
+            user.oauth_invite_pending = True
+        else:
+            user.auth_type = User.AuthType.LOCAL
         user.set_unusable_password()
         if commit:
             user.save()
@@ -134,6 +168,21 @@ class LocalUserEditForm(forms.ModelForm):
         self.fields["role"] = forms.ModelChoiceField(
             queryset=_staff_role_queryset(requesting_user), label="Role"
         )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        role = cleaned_data.get("role")
+        if (
+            role is not None
+            and role.is_superadmin
+            and self.instance.auth_type == User.AuthType.OAUTH
+        ):
+            self.add_error(
+                "role",
+                "Superadmin is local-auth only — this account can't be given the Superadmin "
+                "role while it's an OAuth account.",
+            )
+        return cleaned_data
 
 
 class SuperadminSetupForm(UserCreationForm):

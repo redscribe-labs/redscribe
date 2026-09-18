@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -60,8 +61,16 @@ def user_create(request):
         form = LocalUserCreateForm(request.POST, requesting_user=request.user)
         if form.is_valid():
             user = form.save()
-            security.send_account_created_email(user, request)
-            messages.success(request, f"Account '{user.username}' created.")
+            if user.auth_type == User.AuthType.OAUTH:
+                messages.success(
+                    request,
+                    f"Account '{user.username}' created as a pending OAuth invite — they'll get "
+                    f"access the first time they sign in with {user.email} through "
+                    f"{settings.OAUTH_PROVIDER}.",
+                )
+            else:
+                security.send_account_created_email(user, request)
+                messages.success(request, f"Account '{user.username}' created.")
             return redirect("user_management:detail", user_uuid=user.uuid)
     else:
         form = LocalUserCreateForm(requesting_user=request.user)
@@ -93,6 +102,7 @@ def user_detail(request, user_uuid):
             "has_confirmed_mfa": has_confirmed_mfa,
             "is_self": target.pk == request.user.pk,
             "is_last_active_superadmin": security.is_last_active_superadmin(target),
+            "oauth_provider": settings.OAUTH_PROVIDER,
             "breadcrumbs": [
                 {"label": "User Management", "url": reverse("user_management:list")},
                 {"label": target.username},
@@ -195,6 +205,26 @@ def user_send_password_reset(request, user_uuid):
     if request.method == "POST":
         security.send_password_reset_email(target, request)
         messages.success(request, f"Password reset link sent to {target.email}.")
+
+    return redirect("user_management:detail", user_uuid=target.uuid)
+
+
+@login_required
+def user_convert_to_local(request, user_uuid):
+    _require_users_manage(request.user)
+    target = _get_staff_target(user_uuid, auth_type=User.AuthType.OAUTH)
+
+    if request.method == "POST":
+        target.auth_type = User.AuthType.LOCAL
+        target.oauth_invite_pending = False
+        target.set_unusable_password()
+        target.save(update_fields=["auth_type", "oauth_invite_pending", "password"])
+        security.send_account_created_email(target, request)
+        messages.success(
+            request,
+            f"'{target.username}' converted to a local account — they've been emailed a link "
+            "to set their password.",
+        )
 
     return redirect("user_management:detail", user_uuid=target.uuid)
 

@@ -15,6 +15,7 @@
         <div class="flex flex-wrap items-center gap-1.5 mt-3">
             <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
             <span class="badge-slate">{{ target.get_auth_type_display }}</span>
+            {% if target.oauth_invite_pending %}<span class="badge-amber">Invited — awaiting first login</span>{% endif %}
             {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
             {% if target.auth_type == "LOCAL" %}
                 {% if has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
@@ -42,6 +43,23 @@
     <p class="text-xs text-slate-400">
         OAuth-provisioned account — password and MFA are managed by the identity provider, not here.
     </p>
+    {% if target.oauth_invite_pending %}
+    <p class="text-xs text-amber-600 dark:text-amber-500">
+        This is a pending invite — it activates automatically the first time
+        {{ target.email }} signs in through the identity provider.
+    </p>
+    {% endif %}
+    {% if not oauth_provider %}
+    <p class="text-xs text-red-600 dark:text-red-500">
+        OAuth is not currently configured on this instance — this account can't sign in until
+        it's reconfigured, or converted to a local account below.
+    </p>
+    {% endif %}
+    <form method="post" action="{% url 'user_management:convert_to_local' target.uuid %}"
+          onsubmit="return confirm('Convert this account to a local username/password account? They will be emailed a link to set their password.');">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Convert to local account</button>
+    </form>
     {% endif %}
 
     <div class="pt-2 border-t border-slate-100 dark:border-slate-200">

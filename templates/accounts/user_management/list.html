@@ -33,6 +33,7 @@
                 <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                     <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
                     <span class="badge-slate">{{ target.get_auth_type_display }}</span>
+                    {% if target.oauth_invite_pending %}<span class="badge-amber">Invited — awaiting first login</span>{% endif %}
                     {% if not target.is_active %}<span class="badge-red">Deactivated</span>{% endif %}
                 </div>
             </div>
