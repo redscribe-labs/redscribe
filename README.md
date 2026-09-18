@@ -828,6 +828,40 @@ that's set. Don't point `prod.py` at port 8000 directly without a proxy in
 front setting that header — it force-redirects everything to HTTPS and
 you'll get a redirect loop.
 
+### Testing OAuth locally
+
+You don't need a live domain, nginx, or Method 1/2's TLS to test the OAuth
+scaffold end to end. Google and Microsoft both carve out an exception to
+their "redirect URI must be HTTPS" rule for the literal host `localhost`
+— not `127.0.0.1`, not a LAN IP, not a Tailscale hostname — specifically
+for local development.
+
+1. Bring up just `db` and `web` (Method 3/4) and leave
+   `DJANGO_SETTINGS_MODULE=config.settings.dev` — `web` is already
+   published to `127.0.0.1:8000` for exactly this.
+2. In the provider's console, add a *second* authorized redirect URI
+   alongside your production one, over plain HTTP against `localhost`:
+   - Google: `http://localhost:8000/accounts/social/google/login/callback/`
+   - Microsoft: `http://localhost:8000/accounts/social/microsoft/login/callback/`
+
+   Same client ID/secret works for both — it's an extra allowed redirect
+   on the same OAuth client, not a separate app registration.
+3. Set `OAUTH_PROVIDER`, `OAUTH_ALLOWED_DOMAIN`, and the client
+   ID/secret in `.env`, then browse to
+   `http://localhost:8000/accounts/login/` — exactly that host, so the
+   scheme/host allauth builds the callback from matches what you
+   registered.
+
+This only works because there's no reverse proxy sitting between you and
+`web` in this mode. `config.settings.dev` doesn't set
+`SECURE_PROXY_SSL_HEADER` (see above) — so if you instead put dev
+settings behind nginx/Tailscale HTTPS, Django would still think the
+connection is plain HTTP and build an `http://` callback that no longer
+matches the `https://` URI you'd have to register for a real hostname,
+producing a `redirect_uri_mismatch` (Google) or `AADSTS50011` (Microsoft)
+error. Testing straight against `localhost:8000` sidesteps that
+entirely.
+
 #### TLS cipher suite (nginx)
 
 `nginx/templates/default.conf.template` restricts TLS to a strong-only
