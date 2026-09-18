@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#111213"/>
-  <text x="16" y="23" text-anchor="middle" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="18" font-weight="700" fill="#a7bebc">R</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <rect width="40" height="40" rx="9" fill="#111213"/>
+  <rect x="9" y="11" width="22" height="4" rx="2" fill="#669966"/>
+  <rect x="9" y="18" width="15" height="4" rx="2" fill="#7a8185"/>
+  <rect x="9" y="25" width="9" height="4" rx="2" fill="#494d50"/>
 </svg>
