@@ -162,11 +162,23 @@ class MFAFeatureFlagTests(TestCase):
         self.client = Client()
         self.client.force_login(self.user)
 
-    def test_mfa_not_required_by_default(self):
+    def test_mfa_not_required_when_flag_disabled(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = False
+        flags.save()
+
         resp = self.client.get(reverse("accounts:dashboard"))
         self.assertEqual(resp.status_code, 200)
 
     def test_sidebar_renders_for_unverified_local_user_when_mfa_not_required(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = False
+        flags.save()
+
         resp = self.client.get(reverse("accounts:dashboard"))
         self.assertContains(resp, 'id="sidebar"')
         self.assertContains(resp, "sidebar-link-active")
@@ -197,7 +209,13 @@ class MFAFeatureFlagTests(TestCase):
     def test_sidebar_hidden_on_mfa_verify_for_role_required_user_even_when_global_flag_off(self):
         from django_otp.plugins.otp_totp.models import TOTPDevice
 
+        from apps.feature_flags.models import FeatureFlags
+
         from .models import Role
+
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = False
+        flags.save()
 
         superadmin = make_user("superadmin")
         TOTPDevice.objects.create(user=superadmin, name="default", confirmed=True)
@@ -214,12 +232,15 @@ class MFAFeatureFlagTests(TestCase):
         self.assertNotContains(verify_resp, "Superadmin")
 
     def test_banner_shown_only_when_disabled(self):
-        resp = self.client.get(reverse("accounts:dashboard"))
-        self.assertContains(resp, "MFA is currently disabled instance-wide")
-
         from apps.feature_flags.models import FeatureFlags
 
         flags = FeatureFlags.get_solo()
+        flags.mfa_required = False
+        flags.save()
+
+        resp = self.client.get(reverse("accounts:dashboard"))
+        self.assertContains(resp, "MFA is currently disabled instance-wide")
+
         flags.mfa_required = True
         flags.save()
         verified_client = Client()

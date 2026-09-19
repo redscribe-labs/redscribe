@@ -45,8 +45,8 @@ class FeatureFlagsModelTests(TestCase):
         self.assertTrue(flags.global_search)
         self.assertTrue(flags.scan_import)
 
-    def test_mfa_required_defaults_off(self):
-        self.assertFalse(FeatureFlags.get_solo().mfa_required)
+    def test_mfa_required_defaults_on(self):
+        self.assertTrue(FeatureFlags.get_solo().mfa_required)
 
     def test_get_solo_is_a_singleton(self):
         first = FeatureFlags.get_solo()

@@ -26,9 +26,9 @@ class FeatureFlags(models.Model):
     )
 
     mfa_required = models.BooleanField(
-        default=False,
-        help_text="Require TOTP MFA for local accounts. Turning this ON is the right call before any real "
-        "deployment; leave it OFF for local/disposable dev and test instances.",
+        default=True,
+        help_text="Require TOTP MFA for local accounts. This is the right call before any real "
+        "deployment; turn it OFF only for a local/disposable dev or test instance.",
     )
 
     client_portal_enabled = models.BooleanField(
