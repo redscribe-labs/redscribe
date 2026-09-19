@@ -1,0 +1,30 @@
+# gitignore only keeps these out of version control — it has no effect on
+# `docker build`'s context, so `COPY . .` in the Dockerfile would otherwise
+# bake any of these into the image layer if they happen to exist in the
+# build directory at build time. Mirrors the security-relevant subset of
+# .gitignore, plus standard build noise that doesn't belong in the image.
+
+.git/
+.env
+secrets/*.txt
+certs/*.pem
+certs/*.crt
+certs/*.key
+/backups/
+/creds.txt
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+staticfiles/
+node_modules/
+.vscode/
+.idea/
+.claude/
+*.log

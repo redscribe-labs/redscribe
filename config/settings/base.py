@@ -160,8 +160,19 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD", ""),
         "HOST": env("POSTGRES_HOST", "localhost"),
         "PORT": env("POSTGRES_PORT", "5432"),
+        # Default "prefer" matches psycopg's own default and is fine for the
+        # shipped docker-compose.yml topology, where `db` and `web` only
+        # ever talk over the Docker-internal network, never a real network
+        # hop. It silently allows a plaintext fallback and doesn't validate
+        # the server certificate, though, so if POSTGRES_HOST ever points
+        # at a separate host (see dev/scaling's "move Postgres onto its own
+        # host" as the next step past a single box), set this to
+        # "verify-full" and configure POSTGRES_SSLROOTCERT to match.
+        "OPTIONS": {"sslmode": env("POSTGRES_SSLMODE", "prefer")},
     }
 }
+if env("POSTGRES_SSLROOTCERT", ""):
+    DATABASES["default"]["OPTIONS"]["sslrootcert"] = env("POSTGRES_SSLROOTCERT", "")
 
 AUTH_USER_MODEL = "accounts.User"
 

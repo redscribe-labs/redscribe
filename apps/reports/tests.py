@@ -2489,6 +2489,75 @@ def _malformed_template_bytes() -> bytes:
     return _docx_bytes(build)
 
 
+def _ssti_probe_template_bytes() -> bytes:
+    def build(doc):
+        # A classic Jinja2 sandbox-escape probe: walks from a plain string
+        # literal up to `object` via __mro__, then lists every subclass —
+        # the standard first step toward finding a gadget (e.g. something
+        # __subclasses__() exposes that can run a shell command) for RCE
+        # through server-side template injection. Under an unrestricted
+        # jinja2.Environment this renders successfully; under
+        # SandboxedEnvironment, accessing a dunder attribute like
+        # __class__/__mro__/__subclasses__ raises SecurityError instead.
+        doc.add_paragraph("{{ ''.__class__.__mro__[1].__subclasses__() }}")
+
+    return _docx_bytes(build)
+
+
+class DocxTemplateSandboxingTests(TestCase):
+    """Regression coverage for the SSTI fix in docx_export.sandboxed_jinja_env().
+
+    Both render call sites (upload-time dry-run validation, and real
+    export) must reject this payload rather than execute it — proving the
+    fix closes the gap at both places `DocxTemplate.render()` is called,
+    not just one.
+    """
+
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.author = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=self.author, engagement=self.engagement)
+        self.profile = ReportProfile.objects.get(is_default=True)
+
+    def test_dry_run_render_rejects_ssti_probe_at_upload_time(self):
+        from .docx_template_validation import DocxTemplateValidationError, dry_run_render
+
+        self.profile.docx_template = _ssti_probe_template_bytes()
+        self.profile.save(update_fields=["docx_template"])
+
+        with self.assertRaises(DocxTemplateValidationError):
+            dry_run_render(self.profile)
+
+    def test_build_docx_rejects_ssti_probe_at_export_time(self):
+        from .docx_export import DocxExportError, build_docx
+        from .models import ReportConfig
+
+        self.profile.docx_template = _ssti_probe_template_bytes()
+        self.profile.save(update_fields=["docx_template"])
+
+        from apps.crypto.services import get_data_key
+
+        key = get_data_key(self.engagement)
+        config = ReportConfig(profile=self.profile)
+        with self.assertRaises(DocxExportError):
+            build_docx(config=config, engagement=self.engagement, project_key=key, user=self.author)
+
+    def test_download_view_fails_gracefully_instead_of_serving_a_docx(self):
+        self.profile.docx_template = _ssti_probe_template_bytes()
+        self.profile.save(update_fields=["docx_template"])
+
+        client = Client()
+        login(client, self.author)
+        resp = client.post(reverse("reports:download", args=[self.engagement.pk, "docx"]), follow=True)
+        # Redirected back to the options page with an error, not a 200 with
+        # a .docx body — and definitely not a body containing leaked
+        # Python internals (e.g. "subprocess.Popen") from the payload.
+        self.assertEqual(resp.status_code, 200)  # after following the redirect
+        self.assertNotIn(b"PK\x03\x04", resp.content[:4])
+        self.assertNotIn(b"subprocess", resp.content)
+
+
 class TiptapToDocxTests(TestCase):
     def _tpl_with_styles(self):
         from docxtpl import DocxTemplate

@@ -7,7 +7,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.utils.text import slugify
+from django.utils.text import get_valid_filename, slugify
 
 from apps.accounts.permissions import require_permission
 from apps.findings.models import Finding
@@ -456,7 +456,11 @@ def report_profile_docx_template_download(request, pk):
         content_type=profile.docx_template_content_type
         or "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    filename = profile.docx_template_filename or "template.docx"
+    # docx_template_filename is the original upload's name, stored verbatim
+    # (profile_views.py's upload handler) — sanitize before it goes into a
+    # header value, since an unescaped `"` in it could break out of the
+    # quoted-string filename parameter.
+    filename = get_valid_filename(profile.docx_template_filename or "template.docx")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     response["X-Content-Type-Options"] = "nosniff"
     return response

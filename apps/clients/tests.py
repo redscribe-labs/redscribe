@@ -45,8 +45,10 @@ def make_user(role, **kwargs):
     user = User.objects.create(role=role_obj, auth_type=User.AuthType.LOCAL, **kwargs)
     user.set_password(TEST_PASSWORD)
     user.save()
-    if role_obj.requires_mfa:
-        TOTPDevice.objects.create(user=user, name="test", confirmed=True)
+    # mfa_required defaults on instance-wide now, not just per-role, so every
+    # local test user needs a confirmed device for the login() helper below
+    # to mark a session as OTP-verified — not just roles with requires_mfa.
+    TOTPDevice.objects.create(user=user, name="test", confirmed=True)
     return user
 
 
@@ -189,7 +191,7 @@ class InternalViewDeniesClientRoleTests(TestCase):
         flags.save()
 
         self.http = HttpClient()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
     def test_finding_create_denied(self):
         resp = self.http.get(reverse("findings:create", args=[self.engagement.pk]))
@@ -316,6 +318,12 @@ class ClientLoginFeatureFlagTests(TestCase):
         self.acme = Client.objects.create(name="Acme Corp")
         self.client_user = make_client_user(self.acme, username="portal-user")
         self.http = HttpClient()
+        # This tests the client_portal_enabled gate specifically, not MFA —
+        # avoid a real login POST landing on the MFA-verify step instead of
+        # the portal dashboard it's actually asserting against.
+        flags = FeatureFlags.get_solo()
+        flags.mfa_required = False
+        flags.save()
 
     def test_client_login_blocked_when_flag_off(self):
         flags = FeatureFlags.get_solo()
@@ -351,7 +359,7 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         flags = FeatureFlags.get_solo()
         flags.client_portal_enabled = True
         flags.save()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
         engagement = Engagement.objects.create(client_name="Acme", client=self.acme)
         resp = self.http.get(reverse("engagements:detail", args=[engagement.pk]))
@@ -361,7 +369,7 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         flags = FeatureFlags.get_solo()
         flags.client_portal_enabled = True
         flags.save()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
         resp = self.http.get(reverse("accounts:logout"))
         self.assertNotEqual(resp.status_code, 403)
@@ -370,7 +378,7 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         flags = FeatureFlags.get_solo()
         flags.client_portal_enabled = True
         flags.save()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
         flags.client_portal_enabled = False
         flags.save()
@@ -382,7 +390,7 @@ class ClientPortalAccessMiddlewareTests(TestCase):
     def test_non_client_user_unaffected_regardless_of_flag(self):
         consultant = make_user("consultant")
         http = HttpClient()
-        http.force_login(consultant)
+        login(http, consultant)
 
         for value in (True, False):
             flags = FeatureFlags.get_solo()
@@ -402,7 +410,7 @@ class ManagementViewsAccessTests(TestCase):
         self.assertEqual(self.http.get(reverse("clients:create")).status_code, 200)
 
     def test_team_lead_can_reach_client_list_and_create(self):
-        self.http.force_login(make_user("team_lead"))
+        login(self.http, make_user("team_lead"))
         self.assertEqual(self.http.get(reverse("clients:list")).status_code, 200)
         self.assertEqual(self.http.get(reverse("clients:create")).status_code, 200)
 
@@ -415,7 +423,7 @@ class ManagementViewsAccessTests(TestCase):
         for role, kwargs in [("senior", {}), ("consultant", {}), ("client", {"client": acme})]:
             with self.subTest(role=role):
                 http = HttpClient()
-                http.force_login(make_user(role, **kwargs))
+                login(http, make_user(role, **kwargs))
                 resp = http.get(reverse("clients:list"))
                 self.assertEqual(resp.status_code, 403)
 
@@ -424,7 +432,7 @@ class ClientCompanyCrudTests(TestCase):
     def setUp(self):
         self.http = HttpClient()
         self.manager = make_user("team_lead")
-        self.http.force_login(self.manager)
+        login(self.http, self.manager)
 
     def test_create_client(self):
         resp = self.http.post(reverse("clients:create"), {"name": "New Co"})
@@ -600,7 +608,7 @@ class PortalDashboardTests(TestCase):
         Engagement.objects.create(client_name="Acme archived", client=self.acme, archived=True, client_release_approved=True)
         Engagement.objects.create(client_name="Other project", client=self.other, client_release_approved=True)
 
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
         resp = self.http.get(self._url())
 
         self.assertEqual(resp.status_code, 200)
@@ -610,7 +618,7 @@ class PortalDashboardTests(TestCase):
         Engagement.objects.create(client_name="Acme project", client=self.acme)
         other_user = make_client_user(self.other)
 
-        self.http.force_login(other_user)
+        login(self.http, other_user)
         resp = self.http.get(self._url())
 
         self.assertEqual(resp.status_code, 200)
@@ -652,7 +660,7 @@ class PortalEngagementDetailTests(TestCase):
             workflow_status=Finding.WorkflowStatus.QA_APPROVED, archived=True,
         )
 
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
         resp = self.http.get(self._url())
 
         self.assertEqual(resp.status_code, 200)
@@ -660,7 +668,7 @@ class PortalEngagementDetailTests(TestCase):
 
     def test_client_from_other_company_gets_403(self):
         other_user = make_client_user(self.other)
-        self.http.force_login(other_user)
+        login(self.http, other_user)
         resp = self.http.get(self._url())
         self.assertEqual(resp.status_code, 403)
 
@@ -683,7 +691,7 @@ class PortalFindingDetailTests(TestCase):
 
     def test_viewing_qa_approved_finding_succeeds_and_records_view(self):
         finding = make_portal_finding(self.engagement, workflow_status=Finding.WorkflowStatus.QA_APPROVED)
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
         resp = self.http.get(self._url(finding))
 
@@ -693,7 +701,7 @@ class PortalFindingDetailTests(TestCase):
 
     def test_non_approved_finding_404s(self):
         finding = make_portal_finding(self.engagement, workflow_status=Finding.WorkflowStatus.DRAFT)
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
         resp = self.http.get(self._url(finding))
         self.assertEqual(resp.status_code, 404)
 
@@ -701,13 +709,13 @@ class PortalFindingDetailTests(TestCase):
         finding = make_portal_finding(
             self.engagement, workflow_status=Finding.WorkflowStatus.QA_APPROVED, archived=True,
         )
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
         resp = self.http.get(self._url(finding))
         self.assertEqual(resp.status_code, 404)
 
     def test_second_visit_updates_without_duplicate_row(self):
         finding = make_portal_finding(self.engagement, workflow_status=Finding.WorkflowStatus.QA_APPROVED)
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
         self.http.get(self._url(finding))
         first = FindingClientView.objects.get(finding=finding, client_user=self.client_user)
@@ -737,6 +745,9 @@ class ClientLoginRedirectTests(TestCase):
         self.client_user = make_client_user(self.acme, username="portal-redirect-user")
         flags = FeatureFlags.get_solo()
         flags.client_portal_enabled = True
+        # This tests where login redirects to, not MFA — avoid a real login
+        # POST landing on the MFA-verify step instead.
+        flags.mfa_required = False
         flags.save()
         self.http = HttpClient()
 
@@ -755,7 +766,7 @@ class ClientPortalMiddlewareRealRoutesTests(TestCase):
         flags.client_portal_enabled = True
         flags.save()
         self.http = HttpClient()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
     def test_dashboard_reachable(self):
         resp = self.http.get(reverse("clients_portal:dashboard"))
@@ -784,7 +795,7 @@ class ClientPortal403EscapeHatchTests(TestCase):
         flags.client_portal_enabled = True
         flags.save()
         self.http = HttpClient()
-        self.http.force_login(self.client_user)
+        login(self.http, self.client_user)
 
     def test_403_escape_hatch_points_to_portal_dashboard_for_client(self):
         resp = self.http.get(reverse("accounts:dashboard"))
@@ -798,7 +809,7 @@ class ClientPortal403EscapeHatchTests(TestCase):
     def test_403_escape_hatch_still_plain_root_for_staff(self):
         team_lead = make_user("team_lead")
         http = HttpClient()
-        http.force_login(team_lead)
+        login(http, team_lead)
         engagement = Engagement.objects.create(client_name="Acme", client=self.acme, archived=True)
 
         resp = http.get(reverse("engagements:permanent_delete", args=[engagement.pk]))

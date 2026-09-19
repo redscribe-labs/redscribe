@@ -1211,6 +1211,9 @@ class SingleSessionEnforcementTests(TestCase):
         )
 
     def test_plain_login_revokes_other_sessions(self):
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": False})
         other_key = self._other_active_session_key()
 
         resp = Client().post(reverse("accounts:login"), {
@@ -1280,6 +1283,9 @@ class SingleSessionEnforcementTests(TestCase):
         # MFA isn't required for this user (no feature flag, no role requirement), so a
         # plain non-OTP session can already use the whole app — this simulates them
         # opting into MFA later via the "Enable 2FA" sidebar link, not completing a login.
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"mfa_required": False})
         other_key = self._other_active_session_key()
 
         client = Client()

@@ -20,12 +20,25 @@
                 before using it; RedScribe cannot determine what applies to your deployment.
             </p>
         </div>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 mb-1">⚠ Needs a second Superadmin</p>
+            <p class="text-xs text-amber-800">
+                Clearing the whole log is the one action here that could undo this feature's own
+                tamper-evidence guarantee, so it isn't left to you alone: a different, currently active
+                Superadmin has to enter their own username and password below too. Nothing is deleted
+                unless their credentials check out.
+            </p>
+        </div>
         <form method="post" data-permanent-delete-form>
             {% csrf_token %}
             <label for="confirm-phrase" class="field-label">
                 Type <span class="font-mono">{{ confirm_phrase }}</span> to confirm
             </label>
             <input type="text" id="confirm-phrase" name="confirm_phrase" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ confirm_phrase }}">
+            <label for="approver-username" class="field-label">Second Superadmin's username</label>
+            <input type="text" id="approver-username" name="approver_username" class="field-input mb-4" autocomplete="off" data-approver-field>
+            <label for="approver-password" class="field-label">Second Superadmin's password</label>
+            <input type="password" id="approver-password" name="approver_password" class="field-input mb-4" autocomplete="off" data-approver-field>
             <div class="flex gap-2">
                 <button type="submit" formaction="{% url 'audit:purge_all' %}" class="btn-danger" data-confirm-submit disabled>Clear all logs</button>
                 <a href="{% url 'audit:list' %}" class="btn-secondary">Cancel</a>
@@ -37,10 +50,16 @@
 (function () {
     var input = document.querySelector("[data-confirm-input]");
     var submit = document.querySelector("[data-confirm-submit]");
+    var approverFields = document.querySelectorAll("[data-approver-field]");
     var expected = input.getAttribute("data-expected");
-    input.addEventListener("input", function () {
-        submit.disabled = input.value !== expected;
-    });
+    function refresh() {
+        var approversFilled = Array.prototype.every.call(approverFields, function (f) {
+            return f.value.trim().length > 0;
+        });
+        submit.disabled = input.value !== expected || !approversFilled;
+    }
+    input.addEventListener("input", refresh);
+    approverFields.forEach(function (f) { f.addEventListener("input", refresh); });
 })();
 </script>
 {% endblock %}

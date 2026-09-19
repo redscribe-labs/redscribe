@@ -16,6 +16,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches
 from docxtpl import DocxTemplate
 from jinja2.exceptions import TemplateError
+from jinja2.sandbox import SandboxedEnvironment
 
 from apps.findings.display_id import assign_display_ids
 from apps.findings.models import ContentSectionDefinition, Finding
@@ -26,6 +27,22 @@ from .models import ReportSettings
 from .placeholders import build_placeholder_context, render_placeholders
 
 _RGBA_RE = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*[\d.]+\s*)?\)")
+
+
+def sandboxed_jinja_env() -> SandboxedEnvironment:
+    """The Jinja environment every .docx template render goes through.
+
+    docxtpl uses a bare, unrestricted jinja2.Template internally when no
+    jinja_env is passed to render() -- and a Report Profile's .docx
+    template is uploaded content, not code RedScribe authored. Rendering
+    uploaded content through an unrestricted Jinja2 environment lets a
+    crafted template reach Python internals (e.g. via
+    ''.__class__.__mro__) and execute arbitrary code on the server.
+    SandboxedEnvironment blocks that class of attribute access while
+    behaving identically for ordinary tag/loop usage, since nothing here
+    registers custom filters or extensions beyond Jinja2's defaults.
+    """
+    return SandboxedEnvironment()
 
 
 class DocxExportError(Exception):
@@ -457,7 +474,7 @@ def build_docx(*, config, engagement, project_key, user) -> bytes:
     ]
 
     try:
-        tpl.render(context)
+        tpl.render(context, jinja_env=sandboxed_jinja_env())
     except TemplateError as exc:
         raise DocxExportError(f"This Word template couldn't be rendered: {exc}") from exc
 

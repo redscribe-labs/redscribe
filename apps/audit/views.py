@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -143,10 +144,30 @@ def purge_all_view(request):
         messages.error(request, "Confirmation phrase didn't match — nothing was deleted.")
         return redirect(reverse("audit:purge_all_confirm"))
 
+    # A full purge is the one action that can undo this feature's own
+    # tamper-evidence guarantee (an insider covering their tracks), so it's
+    # the one action here that isn't left to a single permission holder --
+    # a second, genuinely different Superadmin has to authenticate to it too.
+    approver_username = request.POST.get("approver_username", "").strip()
+    approver_password = request.POST.get("approver_password", "")
+    approver = authenticate(request, username=approver_username, password=approver_password)
+    if approver is None:
+        messages.error(request, "Second approver's credentials didn't check out — nothing was deleted.")
+        return redirect(reverse("audit:purge_all_confirm"))
+    if not approver.is_superadmin_role or not approver.is_active:
+        messages.error(request, "The second approver must be an active Superadmin — nothing was deleted.")
+        return redirect(reverse("audit:purge_all_confirm"))
+    if approver.pk == request.user.pk:
+        messages.error(
+            request, "The second approver must be a different Superadmin from you — nothing was deleted."
+        )
+        return redirect(reverse("audit:purge_all_confirm"))
+
     counts = purge_all()
     messages.success(
         request,
         f"Cleared all audit log entries — deleted {counts['audit_log']} audit log entr"
-        f"{'y' if counts['audit_log'] == 1 else 'ies'} and {counts['login_attempts']} login attempt(s).",
+        f"{'y' if counts['audit_log'] == 1 else 'ies'} and {counts['login_attempts']} login attempt(s). "
+        f"Approved by {approver.username}.",
     )
     return redirect(reverse("audit:list"))

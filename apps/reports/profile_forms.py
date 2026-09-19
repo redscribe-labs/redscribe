@@ -134,12 +134,24 @@ class ReportSharedTextBlockContentForm(forms.Form):
     content = RichTextField(required=False)
 
 
+MAX_DOCX_TEMPLATE_BYTES = 20 * 1024 * 1024
+
+
 class ReportDocxTemplateUploadForm(forms.Form):
     docx_template = forms.FileField(
         required=True, label="Word (.docx) template",
         help_text="A .docx with {{ tag }} placeholders and a {%p for finding in findings %} loop — "
-                   "see the placeholder reference below.",
+                   "see the placeholder reference below. Max 20MB.",
     )
+
+    def clean_docx_template(self):
+        uploaded = self.cleaned_data["docx_template"]
+        if uploaded.size > MAX_DOCX_TEMPLATE_BYTES:
+            raise forms.ValidationError(
+                f"File is too large ({uploaded.size // 1024 // 1024}MB) — "
+                f"max {MAX_DOCX_TEMPLATE_BYTES // 1024 // 1024}MB."
+            )
+        return uploaded
 
 
 class ReportDocxStyleMapForm(forms.Form):

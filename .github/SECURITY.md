@@ -16,10 +16,11 @@ hash-chained tamper-evident audit log, TOTP MFA, and secure session/cookie
 defaults, among others.
 
 Also out of scope: gaps already tracked publicly as known limitations —
-see `CHANGELOG.md`'s "Known limitations" entries. Those are accepted,
-disclosed alpha-status gaps, not undiscovered vulnerabilities, so please
-don't file a fresh advisory for something already listed there — a
-comment on the relevant issue/discussion is more useful.
+see the [Alpha status & versioning](https://docs.redscribe.app/start/alpha-status/#known-limitations)
+page's "Known limitations" section. Those are accepted, disclosed
+alpha-status gaps, not undiscovered vulnerabilities, so please don't file
+a fresh advisory for something already listed there — a comment on the
+relevant issue/discussion is more useful.
 
 ## Supported Versions
 
@@ -38,8 +39,8 @@ this stage.
 
 Use GitHub's private vulnerability reporting instead: go to the
 **Security** tab on this repository → **Report a vulnerability**. If that
-isn't available (e.g. the repo is still private), email `[CONTACT TBD]`
-with details instead.
+isn't available (e.g. the repo is still private), email
+`redscribe.maintainer@proton.me` with details instead.
 
 Please include:
 

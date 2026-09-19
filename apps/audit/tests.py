@@ -425,13 +425,60 @@ class PurgeAllViewTests(TestCase):
         self.assertRedirects(resp, self.confirm_url)
         self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
 
-    def test_correct_phrase_deletes_everything_regardless_of_age(self):
+    def test_correct_phrase_alone_is_not_enough_without_a_second_approver(self):
+        entry = self._entry()
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.post(self.url, {"confirm_phrase": "DELETE ALL LOGS"})
+        self.assertRedirects(resp, self.confirm_url)
+        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
+
+    def test_second_approver_with_wrong_password_deletes_nothing(self):
+        other_superadmin = make_user(User.Role.SUPERADMIN)
+        entry = self._entry()
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.post(self.url, {
+            "confirm_phrase": "DELETE ALL LOGS",
+            "approver_username": other_superadmin.username, "approver_password": "wrong-password",
+        })
+        self.assertRedirects(resp, self.confirm_url)
+        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
+
+    def test_approving_your_own_purge_is_rejected(self):
+        entry = self._entry()
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.post(self.url, {
+            "confirm_phrase": "DELETE ALL LOGS",
+            "approver_username": self.superadmin.username, "approver_password": TEST_PASSWORD,
+        })
+        self.assertRedirects(resp, self.confirm_url)
+        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
+
+    def test_non_superadmin_approver_deletes_nothing(self):
+        team_lead = make_user(User.Role.TEAM_LEAD)
+        entry = self._entry()
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.post(self.url, {
+            "confirm_phrase": "DELETE ALL LOGS",
+            "approver_username": team_lead.username, "approver_password": TEST_PASSWORD,
+        })
+        self.assertRedirects(resp, self.confirm_url)
+        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
+
+    def test_correct_phrase_and_a_different_superadmin_approver_deletes_everything_regardless_of_age(self):
+        other_superadmin = make_user(User.Role.SUPERADMIN)
         recent = self._entry(days_old=0)
         old = self._entry(days_old=3000)
         client = Client()
         login(client, self.superadmin)
 
-        resp = client.post(self.url, {"confirm_phrase": "DELETE ALL LOGS"})
+        resp = client.post(self.url, {
+            "confirm_phrase": "DELETE ALL LOGS",
+            "approver_username": other_superadmin.username, "approver_password": TEST_PASSWORD,
+        })
 
         self.assertRedirects(resp, reverse("audit:list"))
         self.assertFalse(AuditLogEntry.objects.filter(pk=recent.pk).exists())

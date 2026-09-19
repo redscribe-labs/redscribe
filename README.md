@@ -129,11 +129,6 @@ breaking changes between releases. Two things worth knowing before
 relying on it for a real engagement (full list in the docs):
 
 - **No public API** — every workflow is web-UI-driven.
-- **Instance-wide MFA enforcement defaults off.** Deliberate, not an
-  oversight: the built-in Superadmin role always requires MFA regardless;
-  any other role can be set to require it individually from Role
-  Management. Flip the instance-wide toggle on too before a real
-  deployment if you want MFA required for everyone.
 
 See `CHANGELOG.md` for the full, dated history of what's changed release
 to release.
