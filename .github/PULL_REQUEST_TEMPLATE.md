@@ -1,22 +1,9 @@
-## What does this change?
+## Pull requests aren't accepted for this project
 
-A clear description of what changed and why.
+Every code change to RedScribe is made by the RedScribe maintainer(s)
+directly — see [CONTRIBUTING.md](../CONTRIBUTING.md). This PR will be
+closed unmerged.
 
-## Related issue
-
-Closes #
-
-## Checklist
-
-- [ ] I've read [CONTRIBUTING.md](../CONTRIBUTING.md), including the note
-      on how contributions are licensed.
-- [ ] Tests added/updated for this change, and `python manage.py test`
-      passes locally.
-- [ ] `CHANGELOG.md` updated under `[Unreleased]`.
-- [ ] If this touches frontend assets (Tiptap editor, password strength
-      meter, Tailwind), I rebuilt them per `BUILD.md`.
-
-## Anything reviewers should focus on?
-
-Optional — anything you're unsure about, or specific areas you'd like a
-closer look at.
+If you're trying to report a bug, request a change, or report a security
+issue, please open an [issue](../../../issues/new/choose) instead — that's
+the path that actually gets looked at.
