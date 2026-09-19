@@ -206,6 +206,16 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:dashboard"
 LOGOUT_REDIRECT_URL = "accounts:login"
 
+# 6 years (2190 days). There's no single audit-log-specific retention rule
+# here, but 6 years matches HIPAA's retention period for *required
+# documentation* generally (45 CFR 164.316(b)(2)(i): 6 years from creation
+# or last effective date, whichever is later) and is the most conservative
+# of the commonly-referenced regimes for this kind of tool:
+#   - PCI DSS v4.0 (10.5.1): at least 1 year, 3 months immediately available
+#   - CIS Controls v8 (8.10): at least 90 days
+#   - NIST SP 800-53 (AU-11): organization-defined, no fixed minimum
+# Override per your own compliance obligations — shortening this may not
+# satisfy whichever regime actually applies to your deployment.
 AUDIT_LOG_RETENTION_DAYS = int(env("AUDIT_LOG_RETENTION_DAYS", str(365 * 6)))
 
 BACKUP_DIR = env("BACKUP_DIR", "/app/backups")
@@ -285,6 +295,11 @@ CSRF_COOKIE_SAMESITE = "Lax"
 
 SESSION_COOKIE_AGE = 60 * 60 * 4
 
+# 30 minutes. HIPAA's Security Rule requires "automatic logoff" as an
+# addressable implementation specification (45 CFR 164.312(a)(2)(iii)) but
+# doesn't mandate a specific interval; 30 minutes is a commonly used
+# baseline for a tool handling client security/health-adjacent findings.
+# Tune this to your own risk assessment via the env var below.
 SESSION_IDLE_TIMEOUT_SECONDS = int(env("SESSION_IDLE_TIMEOUT_SECONDS", str(30 * 60)))
 
 CSRF_COOKIE_AGE = SESSION_COOKIE_AGE

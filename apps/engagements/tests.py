@@ -455,6 +455,7 @@ class EngagementPermanentDeleteViewTests(TestCase):
         resp = client.get(reverse("engagements:permanent_delete", args=[engagement.pk]))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Permanently delete")
+        self.assertContains(resp, "does not remove the data from existing backups")
 
 
 class EngagementListViewTests(TestCase):

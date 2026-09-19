@@ -843,6 +843,76 @@ class UserManagementSafetyGuardTests(TestCase):
         self.assertTrue(other_superadmin.is_team_lead_role)
 
 
+class EmergencyAccountRecoveryCommandTests(TestCase):
+    def _run(self, **kwargs):
+        from django.core.management import call_command
+
+        args = ["--username", kwargs.pop("username"), "--reason", kwargs.pop("reason", "test incident")]
+        if kwargs.pop("clear_mfa", False):
+            args.append("--clear-mfa")
+        if "operator" in kwargs:
+            args += ["--operator", kwargs.pop("operator")]
+        with patch("getpass.getpass", side_effect=["a-strong-recovery-pass-1", "a-strong-recovery-pass-1"]):
+            call_command("emergency_account_recovery", *args)
+
+    def test_resets_password_for_a_local_account(self):
+        user = make_user()
+        self._run(username=user.username, operator="oncall-engineer")
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("a-strong-recovery-pass-1"))
+
+    def test_writes_an_audit_log_entry(self):
+        from apps.audit.models import AuditLogEntry
+
+        user = make_user()
+        self._run(username=user.username, reason="INC-42", operator="oncall-engineer")
+
+        entry = AuditLogEntry.objects.get(action="emergency_account_recovery")
+        self.assertEqual(entry.actor_username, "oncall-engineer")
+        self.assertIsNone(entry.actor)
+        self.assertIn(user.username, entry.object_ref)
+        self.assertIn("INC-42", entry.object_ref)
+        self.assertNotEqual(entry.entry_hash, "")
+
+    def test_clear_mfa_flag_also_deletes_the_totp_device(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        user = make_user()
+        TOTPDevice.objects.create(user=user, name="default", confirmed=True)
+        self._run(username=user.username, clear_mfa=True)
+        self.assertFalse(TOTPDevice.objects.filter(user=user).exists())
+
+    def test_omitting_clear_mfa_leaves_an_existing_device_alone(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        user = make_user()
+        TOTPDevice.objects.create(user=user, name="default", confirmed=True)
+        self._run(username=user.username)
+        self.assertTrue(TOTPDevice.objects.filter(user=user).exists())
+
+    def test_rejects_a_blank_reason(self):
+        from django.core.management.base import CommandError
+
+        user = make_user()
+        with self.assertRaises(CommandError):
+            self._run(username=user.username, reason="   ")
+
+    def test_rejects_an_oauth_account(self):
+        from django.core.management.base import CommandError
+
+        user = make_user()
+        user.auth_type = User.AuthType.OAUTH
+        user.save(update_fields=["auth_type"])
+        with self.assertRaises(CommandError):
+            self._run(username=user.username)
+
+    def test_rejects_an_unknown_username(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            self._run(username="does-not-exist")
+
+
 class RoleModelTests(TestCase):
     def test_superadmin_role_bypasses_every_permission(self):
         superadmin_role = Role.objects.get(slug="superadmin")
