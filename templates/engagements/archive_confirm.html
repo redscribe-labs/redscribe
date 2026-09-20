@@ -1,0 +1,24 @@
+{% extends "base/base.html" %}
+{% block title %}Archive {{ engagement.client_name }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-2">Archive engagement?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This archives "<strong>{{ engagement.client_name }}</strong>". Team Lead blanket access and all
+            membership-based access are revoked immediately — only a Superadmin will still be able to reach it
+            (to unarchive it later, if needed).
+        </p>
+        <p class="text-xs text-slate-500 mb-5">
+            Every action here is kept in an append-only audit trail, so day-to-day removal is archival rather
+            than deletion. A Superadmin can still permanently delete an already-archived engagement later, for
+            data-retention purposes — that's a separate, deliberately harder-to-reach action.
+        </p>
+        <form method="post" class="flex gap-2">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Archive</button>
+            <a href="{% url 'engagements:detail' engagement.pk %}" class="btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

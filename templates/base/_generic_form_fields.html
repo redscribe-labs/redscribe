@@ -1,0 +1,25 @@
+{% load redscribe_extras %}
+{% for error in form.non_field_errors %}<p class="field-error mb-4">{{ error }}</p>{% endfor %}
+{% for field in form %}
+{% if field.field.widget.input_type == "checkbox" %}
+<div class="mb-4 flex items-center gap-2">
+    {{ field }}
+    <label for="{{ field.id_for_label }}" class="text-sm text-slate-700">{{ field.label }}</label>
+    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+</div>
+{% elif field.field.widget.input_type == "file" %}
+<div class="mb-4">
+    <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+    {{ field|add_class:"field-input-file" }}
+    {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+</div>
+{% else %}
+<div class="mb-4">
+    <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+    {{ field|add_class:"field-input" }}
+    {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+{% endfor %}

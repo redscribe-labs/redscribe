@@ -1,0 +1,680 @@
+[
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-01",
+    "title": "Conduct Search Engine Reconnaissance for Information Leakage",
+    "reference_info": "Identify what sensitive design and configuration information of the application, system, or organization is exposed directly (on the organization's site) or indirectly (via third-party services). Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/01-Conduct_Search_Engine_Reconnaissance_for_Information_Leakage"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-02",
+    "title": "Fingerprint Web Server",
+    "reference_info": "Determine the version and type of a running web server to enable further discovery of any known vulnerabilities. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/02-Fingerprint_Web_Server"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-03",
+    "title": "Review Webserver Metafiles for Information Leakage",
+    "reference_info": "Identify hidden or obfuscated paths and functionality through the analysis of metadata files. Extract and map other information that could lead to a better understanding of the systems at hand. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/03-Review_Webserver_Metafiles_for_Information_Leakage"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-04",
+    "title": "Attack Surface Identification",
+    "reference_info": "Enumerate all web applications within scope. Identify DNS names, domains, and virtual hosts associated with the target. Discover additional domains and subdomains using passive and active DNS techniques. Analyze digital certificates and Certificate Transparency logs for additional hostnames. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/04-Attack_Surface_Identification"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-05",
+    "title": "Review Web Page Content for Information Leakage",
+    "reference_info": "Review web page comments, metadata, and redirect bodies to find any information leakage. Gather JavaScript files and review the JS code to better understand the application and to find any information leakage. Identify if source map files or other frontend debug files exist. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/05-Review_Web_Page_Content_for_Information_Leakage"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-06",
+    "title": "Identify Application Entry Points",
+    "reference_info": "Identify possible entry and injection points through request and response analysis. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/06-Identify_Application_Entry_Points"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-07",
+    "title": "Map Execution Paths Through Application",
+    "reference_info": "Map the target application and understand the principal workflows. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/07-Map_Execution_Paths_Through_Application"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-08",
+    "title": "Fingerprint Web Application Framework",
+    "reference_info": "Fingerprint the components used by the web applications. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/08-Fingerprint_Web_Application_Framework"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-09",
+    "title": "Fingerprint Web Application",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/09-Fingerprint_Web_Application"
+  },
+  {
+    "category": "Information Gathering",
+    "code": "WSTG-INFO-10",
+    "title": "Map Application Architecture",
+    "reference_info": "Understand the architecture of the application and the technologies in use. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/01-Information_Gathering/10-Map_Application_Architecture"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-01",
+    "title": "Test Network Infrastructure Configuration",
+    "reference_info": "Review the applications' configurations set across the network and validate that they are not vulnerable. Validate that used frameworks and systems are secure and not susceptible to known vulnerabilities due to unmaintained software or default settings and credentials. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/01-Test_Network_Infrastructure_Configuration"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-02",
+    "title": "Test Application Platform Configuration",
+    "reference_info": "Ensure that default and known files have been removed. Validate that no debugging code or extensions are left in the production environments. Review the logging mechanisms set in place for the application. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/02-Test_Application_Platform_Configuration"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-03",
+    "title": "Test File Extensions Handling for Sensitive Information",
+    "reference_info": "Enumerate sensitive file extensions that might contain raw data such as scripts or credentials Validate that no system framework bypasses exist for the rules that have been set Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/03-Test_File_Extensions_Handling_for_Sensitive_Information"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-04",
+    "title": "Review Old Backup and Unreferenced Files for Sensitive Information",
+    "reference_info": "Find and analyse unreferenced files that might contain sensitive information. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/04-Review_Old_Backup_and_Unreferenced_Files_for_Sensitive_Information"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-05",
+    "title": "Enumerate Infrastructure and Application Admin Interfaces",
+    "reference_info": "Identify hidden administrator interfaces and functionality. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/05-Enumerate_Infrastructure_and_Application_Admin_Interfaces"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-06",
+    "title": "Test HTTP Methods",
+    "reference_info": "Enumerate supported HTTP methods. Test for access control bypass. Test HTTP method overriding techniques. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/06-Test_HTTP_Methods"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-07",
+    "title": "Test HTTP Strict Transport Security",
+    "reference_info": "Review the HSTS header and its validity. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/07-Test_HTTP_Strict_Transport_Security"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-09",
+    "title": "Test File Permission",
+    "reference_info": "Review and identify any rogue file permissions. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/09-Test_File_Permission"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-10",
+    "title": "Test for Subdomain Takeover",
+    "reference_info": "Enumerate all possible domains (previous and current). Identify any forgotten or misconfigured domains. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/10-Test_for_Subdomain_Takeover"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-11",
+    "title": "Test Cloud Storage",
+    "reference_info": "Assess that the access control configuration for the storage services is properly in place. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/11-Test_Cloud_Storage"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-12",
+    "title": "Test for Content Security Policy",
+    "reference_info": "Review the Content-Security-Policy header or meta element to identify misconfigurations. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/12-Test_for_Content_Security_Policy"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-13",
+    "title": "Test Path Confusion",
+    "reference_info": "Make sure application paths are configured correctly. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/13-Test_for_Path_Confusion"
+  },
+  {
+    "category": "Configuration and Deployment Management Testing",
+    "code": "WSTG-CONF-14",
+    "title": "Test Other HTTP Security Header Misconfigurations",
+    "reference_info": "Identify improperly configured security headers. Assess the impact of misconfigured security headers. Validate the correct implementation of required security headers. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management_Testing/14-Test_Other_HTTP_Security_Header_Misconfigurations"
+  },
+  {
+    "category": "Identity Management Testing",
+    "code": "WSTG-IDNT-01",
+    "title": "Test Role Definitions",
+    "reference_info": "Identify and document roles used by the application. Attempt to switch, change, or access another role. Review the granularity of the roles and the needs behind the permissions given. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/01-Test_Role_Definitions"
+  },
+  {
+    "category": "Identity Management Testing",
+    "code": "WSTG-IDNT-02",
+    "title": "Test User Registration Process",
+    "reference_info": "Verify that the identity requirements for user registration are aligned with business and security requirements. Validate the registration process. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/02-Test_User_Registration_Process"
+  },
+  {
+    "category": "Identity Management Testing",
+    "code": "WSTG-IDNT-03",
+    "title": "Test Account Provisioning Process",
+    "reference_info": "Verify which accounts may provision other accounts and of what type. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/03-Test_Account_Provisioning_Process"
+  },
+  {
+    "category": "Identity Management Testing",
+    "code": "WSTG-IDNT-04",
+    "title": "Testing for Account Enumeration and Guessable User Account",
+    "reference_info": "Review processes that pertain to user identification (*e.g.* registration, login, etc.). Enumerate users where possible through response analysis. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account"
+  },
+  {
+    "category": "Identity Management Testing",
+    "code": "WSTG-IDNT-05",
+    "title": "Testing for Weak or Unenforced Username Policy",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/05-Testing_for_Weak_or_Unenforced_Username_Policy"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-01",
+    "title": "Testing for Credentials Transported over an Encrypted Channel",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/01-Testing_for_Credentials_Transported_over_an_Encrypted_Channel"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-02",
+    "title": "Testing for Default Credentials",
+    "reference_info": "Determine whether the application has any user accounts with default passwords. Review whether new user accounts are created with weak or predictable passwords. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/02-Testing_for_Default_Credentials"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-03",
+    "title": "Testing for Weak Lock Out Mechanism",
+    "reference_info": "Evaluate the account lockout mechanism's ability to mitigate brute force password guessing. Evaluate the unlock mechanism's resistance to unauthorized account unlocking. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/03-Testing_for_Weak_Lock_Out_Mechanism"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-04",
+    "title": "Testing for Bypassing Authentication Schema",
+    "reference_info": "Ensure that authentication is applied across all services that require it. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/04-Testing_for_Bypassing_Authentication_Schema"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-05",
+    "title": "Testing for Vulnerable Remember Password",
+    "reference_info": "Validate that the generated session is managed securely and do not put the user's credentials in danger. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/05-Testing_for_Vulnerable_Remember_Password"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-06",
+    "title": "Testing for Browser Cache Weaknesses",
+    "reference_info": "Review if the application stores sensitive information on the client-side. Review if access can occur without authorization. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/06-Testing_for_Browser_Cache_Weaknesses"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-07",
+    "title": "Testing for Weak Authentication Methods",
+    "reference_info": "Determine the resistance of the application against brute force password guessing using available password dictionaries by evaluating the length, complexity, reuse, and aging requirements of passwords. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/07-Testing_for_Weak_Authentication_Methods"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-08",
+    "title": "Testing for Weak Security Question Answer",
+    "reference_info": "Determine the complexity and how straight-forward the questions are. Assess possible user answers and brute force capabilities. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/08-Testing_for_Weak_Security_Question_Answer"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-09",
+    "title": "Testing for Weak Password Change or Reset Functionalities",
+    "reference_info": "Determine whether the password change and reset functionality allows accounts to be compromised. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/09-Testing_for_Weak_Password_Change_or_Reset_Functionalities"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-10",
+    "title": "Testing for Weaker Authentication in Alternative Channel",
+    "reference_info": "Identify alternative authentication channels. Assess the security measures used and if any bypasses exists on the alternative channels. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/10-Testing_for_Weaker_Authentication_in_Alternative_Channel"
+  },
+  {
+    "category": "Authentication Testing",
+    "code": "WSTG-ATHN-11",
+    "title": "Testing Multi-Factor Authentication (MFA)",
+    "reference_info": "Identify the type of MFA used by the application. Determine whether the MFA implementation is robust and secure. Attempt to bypass the MFA. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/11-Testing_Multi-Factor_Authentication"
+  },
+  {
+    "category": "Authorization Testing",
+    "code": "WSTG-ATHZ-01",
+    "title": "Testing Directory Traversal File Include",
+    "reference_info": "Identify injection points that pertain to path traversal. Assess bypassing techniques and identify the extent of path traversal. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/01-Testing_Directory_Traversal_File_Include"
+  },
+  {
+    "category": "Authorization Testing",
+    "code": "WSTG-ATHZ-02",
+    "title": "Testing for Bypassing Authorization Schema",
+    "reference_info": "Assess if unauthenticated, horizontal, or vertical access is possible. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/02-Testing_for_Bypassing_Authorization_Schema"
+  },
+  {
+    "category": "Authorization Testing",
+    "code": "WSTG-ATHZ-03",
+    "title": "Testing for Privilege Escalation",
+    "reference_info": "Identify injection points related to privilege manipulation. Fuzz or otherwise attempt to bypass security measures. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/03-Testing_for_Privilege_Escalation"
+  },
+  {
+    "category": "Authorization Testing",
+    "code": "WSTG-ATHZ-04",
+    "title": "Testing for Insecure Direct Object References",
+    "reference_info": "Identify points where object references may occur. Assess the access control measures and if they're vulnerable to IDOR. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References"
+  },
+  {
+    "category": "Authorization Testing",
+    "code": "WSTG-ATHZ-05",
+    "title": "Testing for OAuth Weaknesses",
+    "reference_info": "Determine if OAuth2 implementation is vulnerable or using a deprecated or custom implementation. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/05-Testing_for_OAuth_Weaknesses"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-01",
+    "title": "Testing for Session Management Schema",
+    "reference_info": "Gather session tokens, for the same user and for different users where possible. Analyze and ensure that enough randomness exists to stop session forging attacks. Modify cookies that are not signed and contain information that can be manipulated. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/01-Testing_for_Session_Management_Schema"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-02",
+    "title": "Testing for Cookies Attributes",
+    "reference_info": "Ensure that the proper security configuration is set for cookies. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/02-Testing_for_Cookies_Attributes"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-03",
+    "title": "Testing for Session Fixation",
+    "reference_info": "Analyze the authentication mechanism and its flow. Force cookies and assess the impact. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/03-Testing_for_Session_Fixation"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-04",
+    "title": "Testing for Exposed Session Variables",
+    "reference_info": "Ensure that proper encryption is implemented. Review the caching configuration. Assess the channel and methods' security. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/04-Testing_for_Exposed_Session_Variables"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-05",
+    "title": "Testing for Cross Site Request Forgery",
+    "reference_info": "Determine whether it is possible to initiate requests on a user's behalf that are not initiated by the user. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/05-Testing_for_Cross_Site_Request_Forgery"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-06",
+    "title": "Testing for Logout Functionality",
+    "reference_info": "Assess the logout UI. Analyze the session timeout and if the session is properly killed after logout. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/06-Testing_for_Logout_Functionality"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-07",
+    "title": "Testing Session Timeout",
+    "reference_info": "Validate that a hard session timeout exists. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/07-Testing_Session_Timeout"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-08",
+    "title": "Testing for Session Puzzling",
+    "reference_info": "Identify all session variables. Break the logical flow of session generation. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/08-Testing_for_Session_Puzzling"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-09",
+    "title": "Testing for Session Hijacking",
+    "reference_info": "Identify vulnerable session cookies. Hijack vulnerable cookies and assess the risk level. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/09-Testing_for_Session_Hijacking"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-10",
+    "title": "Testing JSON Web Tokens",
+    "reference_info": "Determine whether the JWTs expose sensitive information. Determine whether the JWTs can be tampered with or modified. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/10-Testing_JSON_Web_Tokens"
+  },
+  {
+    "category": "Session Management Testing",
+    "code": "WSTG-SESS-11",
+    "title": "Testing for Concurrent Sessions",
+    "reference_info": "Evaluate the application's session management by assessing the handling of multiple active sessions for a single user account. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/06-Session_Management_Testing/11-Testing_for_Concurrent_Sessions"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-01",
+    "title": "Testing for Reflected Cross Site Scripting",
+    "reference_info": "Identify variables that are reflected in responses. Assess the input they accept and the encoding that gets applied on return (if any). Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/01-Testing_for_Reflected_Cross_Site_Scripting"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-02",
+    "title": "Testing for Stored Cross Site Scripting",
+    "reference_info": "Identify stored input that is reflected on the client-side. Assess the input they accept and the encoding that gets applied on return (if any). Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/02-Testing_for_Stored_Cross_Site_Scripting"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-03",
+    "title": "Testing for HTTP Verb Tampering",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/03-Testing_for_HTTP_Verb_Tampering"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-04",
+    "title": "Testing for HTTP Parameter Pollution",
+    "reference_info": "Identify the back end and the parsing method used. Assess injection points and try bypassing input filters using HPP. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/04-Testing_for_HTTP_Parameter_Pollution"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-05",
+    "title": "Testing for SQL Injection",
+    "reference_info": "Identify SQL injection points. Assess the severity of the injection and the level of access that can be achieved through it. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05-Testing_for_SQL_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-06",
+    "title": "Testing for LDAP Injection",
+    "reference_info": "Identify LDAP injection points. Assess the severity of the injection. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/06-Testing_for_LDAP_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-07",
+    "title": "Testing for XML Injection",
+    "reference_info": "Identify XML injection points. Assess the types of exploits that can be attained and their severities. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/07-Testing_for_XML_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-08",
+    "title": "Testing for SSI Injection",
+    "reference_info": "Identify SSI injection points. Assess the severity of the injection. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/08-Testing_for_SSI_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-09",
+    "title": "Testing for XPath Injection",
+    "reference_info": "Identify XPATH injection points. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/09-Testing_for_XPath_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-10",
+    "title": "Testing for IMAP SMTP Injection",
+    "reference_info": "Identify IMAP/SMTP injection points. Understand the data flow and deployment structure of the system. Assess the injection impacts. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/10-Testing_for_IMAP_SMTP_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-11",
+    "title": "Testing for Code Injection",
+    "reference_info": "Identify injection points where you can inject code into the application. Assess the injection severity. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11-Testing_for_Code_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-12",
+    "title": "Testing for Command Injection",
+    "reference_info": "Identify and assess command injection points. Bypass special characters and OS commands filter. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/12-Testing_for_Command_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-13",
+    "title": "Testing for Format String Injection",
+    "reference_info": "Assess whether injecting format string conversion specifiers into user-controlled fields causes undesired behavior from the application. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/13-Testing_for_Format_String_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-14",
+    "title": "Testing for Incubated Vulnerability",
+    "reference_info": "Identify injections that are stored and require a recall step to the stored injection. Understand how a recall step could occur. Set listeners or activate the recall step if possible. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/14-Testing_for_Incubated_Vulnerability"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-15",
+    "title": "Testing for HTTP Response Splitting",
+    "reference_info": "Identify user-controlled input that is reflected into HTTP response headers. Assess whether CR (`\\r`) and LF (`\\n`) characters can be injected into response headers. Determine the potential impact of successful HTTP Response Splitting attacks, such as cache poisoning or client-side exploitation. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/15-Testing_for_HTTP_Response_Splitting"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-16",
+    "title": "Testing for HTTP Request Smuggling",
+    "reference_info": "Identify request boundary inconsistencies between frontend and backend components Detect classic CL/TE desynchronization vulnerabilities Evaluate protocol translation logic (HTTP/2 → HTTP/1.1) Assess H2C upgrade handling and downgrade safety Confirm backend request queue poisoning Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/16-Testing_for_HTTP_Request_Smuggling"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-17",
+    "title": "Testing for Host Header Injection",
+    "reference_info": "Assess if the Host header is being parsed dynamically in the application. Bypass security controls that rely on the header. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-18",
+    "title": "Testing for Server-side Template Injection",
+    "reference_info": "Detect template injection vulnerability points. Identify the templating engine. Build the exploit. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/18-Testing_for_Server-side_Template_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-19",
+    "title": "Testing for Server-Side Request Forgery",
+    "reference_info": "Identify SSRF injection points. Test if the injection points are exploitable. Asses the severity of the vulnerability. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/19-Testing_for_Server-Side_Request_Forgery"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-20",
+    "title": "Testing for Mass Assignment",
+    "reference_info": "Identify requests that modify objects Assess if it is possible to modify fields never intended to be modified from outside Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/20-Testing_for_Mass_Assignment"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-21",
+    "title": "Testing for CSV Injection",
+    "reference_info": "Identify CSV/spreadsheet export features that include untrusted input. Verify whether attacker-controlled values are interpreted as formulas when the export is opened in common spreadsheet applications. Check whether separator/quote injection can move a dangerous prefix to the start of a cell. Validate whether mitigations remain effective in Microsoft Excel after saving and re-opening the CSV. Assess practical impact based on who opens the export and how it is used. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/21-Testing_for_CSV_Injection"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-22",
+    "title": "Testing for Prototype Pollution",
+    "reference_info": "Identify functions and libraries that recursively merge, clone, or assign user-controlled properties. Determine whether user input can reach and modify `Object.prototype`. Identify gadgets that turn prototype pollution into a concrete impact. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/22-Testing_for_Prototype_Pollution"
+  },
+  {
+    "category": "Input Validation Testing",
+    "code": "WSTG-INPV-23",
+    "title": "Testing for Insecure Deserialization",
+    "reference_info": "Identify entry points where the application accepts serialized objects from untrusted urces (for example, HTTP headers, parameters, or cookies). Determine the serialization format used by the application. Assess whether serialized input is validated or restricted prior to deserialization. Evaluate whether manipulation of serialized data leads to unsafe behavior or security pact. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/23-Testing_for_Insecure_Deserialization"
+  },
+  {
+    "category": "Testing for Error Handling",
+    "code": "WSTG-ERRH-01",
+    "title": "Testing for Improper Error Handling",
+    "reference_info": "Identify existing error output. Analyze the different output returned. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/01-Testing_For_Improper_Error_Handling"
+  },
+  {
+    "category": "Testing for Error Handling",
+    "code": "WSTG-ERRH-02",
+    "title": "Testing for Stack Traces",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/08-Testing_for_Error_Handling/02-Testing_for_Stack_Traces"
+  },
+  {
+    "category": "Testing for Weak Cryptography",
+    "code": "WSTG-CRYP-01",
+    "title": "Testing for Weak Transport Layer Security",
+    "reference_info": "Validate the service configuration. Review the digital certificate's cryptographic strength and validity. Ensure that the TLS security is not bypassable and is properly implemented across the application. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/09-Testing_for_Weak_Cryptography/01-Testing_for_Weak_Transport_Layer_Security"
+  },
+  {
+    "category": "Testing for Weak Cryptography",
+    "code": "WSTG-CRYP-02",
+    "title": "Testing for Padding Oracle",
+    "reference_info": "Identify encrypted messages that rely on padding. Attempt to break the padding of the encrypted messages and analyze the returned error messages for further analysis. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/09-Testing_for_Weak_Cryptography/02-Testing_for_Padding_Oracle"
+  },
+  {
+    "category": "Testing for Weak Cryptography",
+    "code": "WSTG-CRYP-03",
+    "title": "Testing for Sensitive Information Sent via Unencrypted Channels",
+    "reference_info": "Identify sensitive information transmitted through the various channels. Assess the privacy and security of the channels used. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/09-Testing_for_Weak_Cryptography/03-Testing_for_Sensitive_Information_Sent_via_Unencrypted_Channels"
+  },
+  {
+    "category": "Testing for Weak Cryptography",
+    "code": "WSTG-CRYP-04",
+    "title": "Testing for Weak Cryptographic Primitives",
+    "reference_info": "Provide a guideline for the identification weak encryption or hashing uses and implementations. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/09-Testing_for_Weak_Cryptography/04-Testing_for_Weak_Cryptographic_Primitives"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-01",
+    "title": "Test Business Logic Data Validation",
+    "reference_info": "Identify data injection points. Validate that all checks are occurring on the backend and can't be bypassed. Attempt to break the format of the expected data and analyze how the application is handling it. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/01-Test_Business_Logic_Data_Validation"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-02",
+    "title": "Test Ability to Forge Requests",
+    "reference_info": "Review the project documentation looking for guessable, predictable, or hidden functionality of fields. Insert logically valid data in order to bypass normal business logic workflow. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/02-Test_Ability_to_Forge_Requests"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-03",
+    "title": "Test Integrity Checks",
+    "reference_info": "Review the project documentation for components of the system that move, store, or handle data. Determine what type of data is logically acceptable by the component and what types the system should guard against. Determine who should be allowed to modify or read that data in each component. Attempt to insert, update, or delete data values used by each component that should not be allowed per the business logic workflow. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/03-Test_Integrity_Checks"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-04",
+    "title": "Test for Process Timing",
+    "reference_info": "Review the project documentation for system functionality that may be impacted by time. Develop and execute misuse cases. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/04-Test_for_Process_Timing"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-05",
+    "title": "Test Number of Times a Function Can Be Used Limits",
+    "reference_info": "Identify functions that must set limits to the times they can be called. Assess if there is a logical limit set on the functions and if it is properly validated. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/05-Test_Number_of_Times_a_Function_Can_Be_Used_Limits"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-06",
+    "title": "Testing for the Circumvention of Work Flows",
+    "reference_info": "Review the project documentation for methods to skip or go through steps in the application process in a different order from the intended business logic flow. Develop a misuse case and try to circumvent every logic flow identified. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/06-Testing_for_the_Circumvention_of_Work_Flows"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-07",
+    "title": "Test Defenses Against Application Misuse",
+    "reference_info": "Generate notes from all tests conducted against the system. Review which tests had a different functionality based on aggressive input. Understand the defenses in place and verify if they are enough to protect the system against bypassing techniques. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/07-Test_Defenses_Against_Application_Misuse"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-08",
+    "title": "Test Upload of Unexpected File Types",
+    "reference_info": "Review the project documentation for file types that are rejected by the system. Verify that the unwelcomed file types are rejected and handled safely. Verify that file batch uploads are secure and do not allow any bypass against the set security measures. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/08-Test_Upload_of_Unexpected_File_Types"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-09",
+    "title": "Test Upload of Malicious Files",
+    "reference_info": "Identify the file upload functionality. Review the project documentation to identify what file types are considered acceptable, and what types would be considered dangerous or malicious. If documentation is not available then consider what would be appropriate based on the purpose of the application. Determine how the uploaded files are processed. Obtain or create a set of malicious files for testing. Try to upload the malicious files to the application and determine whether it is accepted and processed. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/09-Test_Upload_of_Malicious_Files"
+  },
+  {
+    "category": "Business Logic Testing",
+    "code": "WSTG-BUSL-10",
+    "title": "Test Payment Functionality",
+    "reference_info": "Determine whether the business logic for the e-commerce functionality is robust. Understand how the payment functionality works. Determine whether the payment functionality is secure. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/10-Test-Payment-Functionality"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-01",
+    "title": "Testing for DOM-Based Cross Site Scripting",
+    "reference_info": "Identify DOM sinks. Build payloads that pertain to every sink type. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/01-Testing_for_DOM-based_Cross_Site_Scripting"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-02",
+    "title": "Testing for JavaScript Execution",
+    "reference_info": "Identify sinks and possible JavaScript injection points. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/02-Testing_for_JavaScript_Execution"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-03",
+    "title": "Testing for HTML Injection",
+    "reference_info": "Identify HTML injection points and assess the severity of the injected content. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/03-Testing_for_HTML_Injection"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-04",
+    "title": "Testing for Client-side URL Redirect",
+    "reference_info": "Identify injection points that handle URLs or paths. Assess the locations that the system could redirect to. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/04-Testing_for_Client-side_URL_Redirect"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-05",
+    "title": "Testing for CSS Injection",
+    "reference_info": "Identify CSS injection points. Assess the impact of the injection. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/05-Testing_for_CSS_Injection"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-06",
+    "title": "Testing for Client-side Resource Manipulation",
+    "reference_info": "Identify sinks with weak input validation. Assess the impact of the resource manipulation. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/06-Testing_for_Client-side_Resource_Manipulation"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-07",
+    "title": "Testing Cross Origin Resource Sharing",
+    "reference_info": "Identify endpoints that implement CORS. Ensure that the CORS configuration is secure or harmless. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-09",
+    "title": "Testing for Clickjacking",
+    "reference_info": "Assess application vulnerability to clickjacking attacks. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/09-Testing_for_Clickjacking"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-10",
+    "title": "Testing WebSockets",
+    "reference_info": "Identify the usage of WebSockets. Assess its implementation by using the same tests on normal HTTP channels. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/10-Testing_WebSockets"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-11",
+    "title": "Testing Web Messaging",
+    "reference_info": "Assess the security of the message's origin. Validate that it's using safe methods and validating its input. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/11-Testing_Web_Messaging"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-12",
+    "title": "Testing Browser Storage",
+    "reference_info": "Determine whether the site is storing sensitive data in client-side storage. The code handling of the storage objects should be examined for possibilities of injection attacks, such as utilizing unvalidated input or vulnerable libraries. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/12-Testing_Browser_Storage"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-13",
+    "title": "Testing for Cross Site Script Inclusion",
+    "reference_info": "Locate sensitive data across the system. Assess the leakage of sensitive data through various techniques. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/13-Testing_for_Cross_Site_Script_Inclusion"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-14",
+    "title": "Testing for Reverse Tabnabbing",
+    "reference_info": "Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/14-Testing_for_Reverse_Tabnabbing"
+  },
+  {
+    "category": "Client-side Testing",
+    "code": "WSTG-CLNT-15",
+    "title": "Testing for Client-side Template Injection",
+    "reference_info": "Identify the client-side framework and its version used by the application. Detect injection points where user input is reflected into the DOM and processed by the template engine. Assess if the injection allows for arbitrary JavaScript execution (XSS) via the template syntax. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/15-Testing_for_Client-Side_Template_Injection"
+  },
+  {
+    "category": "API Testing",
+    "code": "WSTG-APIT-01",
+    "title": "API Reconnaissance",
+    "reference_info": "Find all API endpoints supported by the backend server code, documented or undocumented. Find all parameters for each endpoint supported by the backend server, documented or undocumented. Discover interesting data related to APIs in HTML and JavaScript sent to clients. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/01-API_Reconnaissance"
+  },
+  {
+    "category": "API Testing",
+    "code": "WSTG-APIT-02",
+    "title": "API Broken Object Level Authorization",
+    "reference_info": "The objective of this test is to identify whether the API enforces proper **object-level authorization** checks, ensuring that users can only access and manipulate objects they are authorized to interact with. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/02-API_Broken_Object_Level_Authorization"
+  },
+  {
+    "category": "API Testing",
+    "code": "WSTG-APIT-03",
+    "title": "Testing for Excessive Data Exposure",
+    "reference_info": "Identify API responses that contain more data than what the client application displays or requires. Detect sensitive fields returned in API responses such as password hashes, authentication tokens, internal object IDs, PII, or infrastructure details. Determine whether the API relies on client-side filtering rather than server-side field selection to control data exposure. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/03-Testing_for_Excessive_Data_Exposure"
+  },
+  {
+    "category": "API Testing",
+    "code": "WSTG-APIT-04",
+    "title": "API Broken Function Level Authorization",
+    "reference_info": "The goal of this test is to determine if the API enforces **role or privilege-based access control** to restrict users from accessing or executing functions they are not authorized to use. This ensures that function-level security boundaries are properly enforced. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/04-API_Broken_Function_Level_Authorization"
+  },
+  {
+    "category": "API Testing",
+    "code": "WSTG-APIT-99",
+    "title": "Testing GraphQL",
+    "reference_info": "Assess that a secure and production-ready configuration is deployed. Validate all input fields against generic attacks. Ensure that proper access controls are applied. Reference: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/99-Testing_GraphQL"
+  }
+]

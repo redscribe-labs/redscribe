@@ -1,0 +1,258 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ profile.name }} — Report Profiles{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-xl font-bold text-slate-900 mb-1">{{ profile.name }}</h1>
+        <p class="text-sm text-slate-500">
+            Everything about how a report built from this profile is structured and how it looks — manage its
+            tags, then write the document, then set its cover details and appearance below.
+        </p>
+    </div>
+
+    <nav class="flex items-center gap-1 border-b border-slate-200 dark:border-slate-200 mb-6 overflow-x-auto" role="tablist" aria-label="Profile sections">
+        <button type="button" id="tab-manage-text-blocks" class="tab-link-active" role="tab" aria-selected="true" aria-controls="section-manage-text-blocks" data-tab-target="section-manage-text-blocks">Text blocks</button>
+        <button type="button" id="tab-document" class="tab-link" role="tab" aria-selected="false" aria-controls="section-document" data-tab-target="section-document">Document</button>
+        <button type="button" id="tab-cover" class="tab-link" role="tab" aria-selected="false" aria-controls="section-cover" data-tab-target="section-cover">Cover &amp; numbering</button>
+        <button type="button" id="tab-appearance" class="tab-link" role="tab" aria-selected="false" aria-controls="section-appearance" data-tab-target="section-appearance">Appearance</button>
+        <button type="button" id="tab-labels" class="tab-link" role="tab" aria-selected="false" aria-controls="section-labels" data-tab-target="section-labels">Labels</button>
+        <button type="button" id="tab-docx-template" class="tab-link" role="tab" aria-selected="false" aria-controls="section-docx-template" data-tab-target="section-docx-template">Word (.docx)</button>
+    </nav>
+
+    <div>
+        <section id="section-manage-text-blocks" role="tabpanel" aria-labelledby="tab-manage-text-blocks">
+            {% include "reports/_text_block_manager.html" %}
+        </section>
+
+        <form method="post" enctype="multipart/form-data" id="profile-template-form">
+            {% csrf_token %}
+
+            <section id="section-document" class="card" role="tabpanel" aria-labelledby="tab-document" hidden>
+                <h2 class="font-semibold text-slate-900 text-sm mb-1">Document</h2>
+                <p class="field-help mb-3">
+                    Write the report's document directly below — use heading levels for chapters and subsections,
+                    and type a tag from the reference lists on its own line anywhere that content should appear.
+                    Use the page-break button in the toolbar to force a new page at any point.
+                </p>
+                <div class="grid grid-cols-1 xl:grid-cols-[1fr_16rem] gap-6">
+                    <div>
+                        <div class="rte-editor" data-rte-field="template" data-rte-editable="true" data-rte-page-breaks="true"
+                             data-rte-initial='{{ form.template.value|default:"" }}'></div>
+                        <input type="hidden" name="template" id="{{ form.template.id_for_label }}" data-rte-hidden="template">
+                        {% for error in form.template.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+
+                    <aside class="text-xs text-slate-500 space-y-4">
+                        <div>
+                            <h3 class="font-semibold text-slate-700 mb-1">Computed blocks</h3>
+                            <p class="mb-2">
+                                Always drawn from live engagement/finding data — placed exactly where you put the
+                                tag, like everything else. cover_page and table_of_contents are entirely optional;
+                                omit either to leave it out of the report. cover_page's own text comes from the
+                                Cover &amp; numbering tab below, plus this engagement's own details. document_control
+                                is auto-generated from this engagement's review/QA/approval history — nothing to
+                                fill in for either.
+                            </p>
+                            <ul class="space-y-1 font-mono">
+                                {% for tag in structural_tags %}<li>{% templatetag openvariable %} {{ tag }} {% templatetag closevariable %}</li>{% endfor %}
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-700 mb-1">Text blocks</h3>
+                            <p class="mb-2">
+                                This profile's own starting text, one "Edit content" link per tag.
+                                <a href="#section-manage-text-blocks" class="text-brand-600 hover:underline" data-tab-target="section-manage-text-blocks">Manage the set of tags</a>.
+                            </p>
+                            <ul class="space-y-1 font-mono">
+                                {% for block in custom_tags %}<li>{% templatetag openvariable %} {{ block.slug }} {% templatetag closevariable %}</li>{% empty %}<li class="italic">None yet.</li>{% endfor %}
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-700 mb-1">Engagement placeholders</h3>
+                            <p class="mb-2">Work inline anywhere in this document, and in the Cover title below.</p>
+                            <ul class="space-y-1 font-mono">
+                                {% for token, label in placeholders %}<li title="{{ label }}">{% templatetag openvariable %} {{ token }} {% templatetag closevariable %}</li>{% endfor %}
+                            </ul>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+
+            <section id="section-cover" class="card" role="tabpanel" aria-labelledby="tab-cover" hidden>
+                <h2 class="font-semibold text-slate-900 text-sm mb-1">Cover &amp; numbering</h2>
+                <p class="field-help mb-4">Shown on the cover page, in every page footer, and in each finding's own ID.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label for="{{ form.cover_title.id_for_label }}" class="field-label">{{ form.cover_title.label }}</label>
+                        {{ form.cover_title|add_class:"field-input" }}
+                        {% for error in form.cover_title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.classification_label.id_for_label }}" class="field-label">{{ form.classification_label.label }}</label>
+                        {{ form.classification_label|add_class:"field-input" }}
+                        {% for error in form.classification_label.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.finding_id_prefix.id_for_label }}" class="field-label">{{ form.finding_id_prefix.label }}</label>
+                        {{ form.finding_id_prefix|add_class:"field-input" }}
+                        <p class="field-help">{{ form.finding_id_prefix.help_text }}</p>
+                        {% for error in form.finding_id_prefix.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-appearance" class="card" role="tabpanel" aria-labelledby="tab-appearance" hidden>
+                <h2 class="font-semibold text-slate-900 text-sm mb-1">Appearance</h2>
+                <p class="field-help mb-4">Fonts, bullet glyph, and the table/theme accent color — preview and PDF only; Markdown export is plain text.</p>
+                {% if profile.is_default %}
+                <p class="field-help mb-4 text-amber-700">This is the instance default profile — its fonts also drive the main RedScribe web app UI, not just this report.</p>
+                {% endif %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label for="{{ form.body_font.id_for_label }}" class="field-label">{{ form.body_font.label }}</label>
+                        {{ form.body_font|add_class:"field-input" }}
+                        {% for error in form.body_font.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.monospace_font.id_for_label }}" class="field-label">{{ form.monospace_font.label }}</label>
+                        {{ form.monospace_font|add_class:"field-input" }}
+                        {% for error in form.monospace_font.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.bullet_character.id_for_label }}" class="field-label">{{ form.bullet_character.label }}</label>
+                        {{ form.bullet_character|add_class:"field-input" }}
+                        {% for error in form.bullet_character.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.table_header_color.id_for_label }}" class="field-label">{{ form.table_header_color.label }}</label>
+                        {{ form.table_header_color|add_class:"field-input font-mono" }}
+                        {% for error in form.table_header_color.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div>
+                        <label for="{{ form.empty_cell_background_color.id_for_label }}" class="field-label">{{ form.empty_cell_background_color.label }}</label>
+                        {{ form.empty_cell_background_color|add_class:"field-input font-mono" }}
+                        <p class="field-help">{{ form.empty_cell_background_color.help_text }}</p>
+                        {% for error in form.empty_cell_background_color.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <p class="field-label mb-1">{{ form.finding_table_layout.label }}</p>
+                    <div class="flex gap-4">
+                        {% for radio in form.finding_table_layout %}
+                        <label class="flex items-center gap-1.5 text-sm text-slate-700">{{ radio.tag }} {{ radio.choice_label }}</label>
+                        {% endfor %}
+                    </div>
+                    <p class="field-help">{{ form.finding_table_layout.help_text }}</p>
+                    {% for error in form.finding_table_layout.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+
+                <h3 class="font-semibold text-slate-700 text-sm mb-1">Breakdown-of-findings bar colors</h3>
+                <p class="field-help mb-3">
+                    rgb()/rgba() values, one pair per severity — the "closed" variant is normally a lighter/more
+                    transparent version of "open", used for closed findings in the breakdown-of-findings bar graph.
+                    Leave a severity/status table cell's own color blank (below) to use "Empty cell background
+                    color" above instead — the bar graph itself always falls back to a built-in default, since a bar
+                    can't be left uncolored.
+                </p>
+                <div class="space-y-3">
+                    {% for label, open_field, closed_field in severity_color_fields %}
+                    <div class="grid grid-cols-1 sm:grid-cols-[8rem_1fr_1fr] gap-2 items-start">
+                        <p class="field-label sm:pt-2">{{ label }}</p>
+                        <div>
+                            {{ open_field|add_class:"field-input font-mono" }}
+                            {% for error in open_field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                        </div>
+                        <div>
+                            {{ closed_field|add_class:"field-input font-mono" }}
+                            {% for error in closed_field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section id="section-labels" class="card" role="tabpanel" aria-labelledby="tab-labels" hidden>
+                <h2 class="font-semibold text-slate-900 text-sm mb-1">Labels</h2>
+                <p class="field-help mb-4">
+                    Field/column text baked into the report by default — rename any of these to fit your firm's
+                    house style. Leave blank to use the default shown as a placeholder. Preview and PDF only;
+                    Markdown export uses whatever text is set here too, since it's the same underlying content.
+                </p>
+                <div class="space-y-6">
+                    {% for group_title, fields in label_groups %}
+                    <div>
+                        <h3 class="font-semibold text-slate-700 text-sm mb-2">{{ group_title }}</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {% for field_label, field in fields %}
+                            <div>
+                                <label for="{{ field.id_for_label }}" class="field-label">{{ field_label }}</label>
+                                {{ field|add_class:"field-input" }}
+                                {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% include "base/_form_action_bar.html" with submit_label="Save changes" %}
+        </form>
+
+        <section id="section-docx-template" role="tabpanel" aria-labelledby="tab-docx-template" hidden>
+            {% include "reports/_docx_template_panel.html" %}
+        </section>
+    </div>
+
+    {% url 'report_profiles:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Report Profiles" %}
+</div>
+{% endblock %}
+{% block extra_body %}
+{% include "findings/_editor_scripts.html" %}
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"][data-tab-target]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('[role="tabpanel"]'));
+  if (!tabs.length || !panels.length) return;
+
+  function selectTab(targetId) {
+    var matched = false;
+    tabs.forEach(function (tab) {
+      var active = tab.getAttribute("data-tab-target") === targetId;
+      if (active) matched = true;
+      tab.classList.toggle("tab-link-active", active);
+      tab.classList.toggle("tab-link", !active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (!matched) return;
+    panels.forEach(function (panel) {
+      panel.hidden = panel.id !== targetId;
+    });
+  }
+
+  document.addEventListener("click", function (e) {
+    var trigger = e.target.closest("[data-tab-target]");
+    if (!trigger) return;
+    e.preventDefault();
+    var targetId = trigger.getAttribute("data-tab-target");
+    selectTab(targetId);
+    history.replaceState(null, "", "#" + targetId);
+  });
+
+  // Errors re-rendered after a failed save can land in any tab — surface
+  // whichever one actually has them rather than defaulting to the first,
+  // which would silently hide a rejected field behind an unselected tab.
+  var panelWithError = panels.find(function (panel) {
+    return panel.querySelector(".field-error");
+  });
+  var hashId = location.hash.slice(1);
+  var hashMatchesPanel = panels.some(function (panel) { return panel.id === hashId; });
+  var initial = (panelWithError && panelWithError.id) || (hashMatchesPanel && hashId) || panels[0].id;
+  selectTab(initial);
+})();
+</script>
+{% endblock %}

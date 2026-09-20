@@ -1,0 +1,53 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ heading }} — {{ template.name }}{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <p class="page-eyebrow !mb-0.5">{{ template.name }}</p>
+    <h1 class="page-title">{{ heading }}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card space-y-4">
+    <form method="post">
+        {% csrf_token %}
+        <div class="grid sm:grid-cols-[1fr_auto] gap-4 mb-4">
+            <div>
+                <label for="{{ form.category.id_for_label }}" class="field-label">Category</label>
+                {{ form.category|add_class:"field-input" }}
+                {% for error in form.category.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+                <label for="{{ form.code.id_for_label }}" class="field-label">Code</label>
+                {{ form.code|add_class:"field-input sm:w-32" }}
+                {% for error in form.code.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+        </div>
+        <datalist id="template-item-categories">
+            {% for category in categories %}<option value="{{ category }}">{% endfor %}
+        </datalist>
+
+        <div class="mb-4">
+            <label for="{{ form.title.id_for_label }}" class="field-label">Title</label>
+            {{ form.title|add_class:"field-input" }}
+            {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="field-label">Reference info</label>
+            <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
+            <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
+            {% for error in form.reference_info.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <button type="submit" class="btn-primary w-full">{% if item %}Save changes{% else %}Add item{% endif %}</button>
+    </form>
+</div>
+
+{% url 'checklist_templates:detail' template.pk as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to template" %}
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

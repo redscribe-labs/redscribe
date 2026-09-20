@@ -1,0 +1,89 @@
+{% extends "base/portal_base.html" %}
+{% load redscribe_extras %}
+{% block title %}Engagements — {{ user.client.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <p class="page-eyebrow">{{ user.client.name }}</p>
+    <h1 class="page-title">Your engagements</h1>
+    <p class="text-sm text-slate-500 mt-1">
+        {% if engagements %}
+        {{ engagements|length }} engagement{{ engagements|length|pluralize }} available to review.
+        {% else %}
+        Nothing to show yet.
+        {% endif %}
+    </p>
+</div>
+
+{% if engagements %}
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+    <div class="stat-tile">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ engagements|length }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Engagement{{ engagements|length|pluralize }}</p>
+        </div>
+    </div>
+    <div class="stat-tile">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ finding_total }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Finding{{ finding_total|pluralize }} published</p>
+        </div>
+    </div>
+    <div class="stat-tile">
+        <span class="stat-tile-icon {% if attention_total %}!bg-red-50 !text-red-600 dark:!bg-red-950 dark:!text-red-300{% endif %}">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 2.5 16h15L10 3.5Z"/><path d="M10 8.5v3.25"/><circle cx="10" cy="14" r=".75" fill="currentColor" stroke="none"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="text-2xl font-bold tabular-nums {% if attention_total %}text-red-600 dark:text-red-300{% else %}text-slate-900{% endif %}">{{ attention_total }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Critical/High needing attention</p>
+        </div>
+    </div>
+</div>
+
+<ul class="space-y-3">
+    {% for engagement in engagements %}
+    <li>
+        <a href="{% url 'clients_portal:engagement_detail' engagement.pk %}"
+           class="group block rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+                  px-5 py-4 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all">
+            <div class="flex items-start gap-4">
+                <span class="stat-tile-icon !h-10 !w-10 shrink-0">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p class="font-semibold text-slate-800 group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ engagement.client_name }}</p>
+                        <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-slate-500">
+                        {% if engagement.reference_number %}<span class="font-mono">{{ engagement.reference_number }}</span>{% endif %}
+                        {% if engagement.test_type %}<span>{{ engagement.get_test_type_display }}</span>{% endif %}
+                        <span>{{ engagement.start_date|default:"—" }} – {{ engagement.end_date|default:"—" }}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                        {% for row in engagement.severity_breakdown %}
+                        <span class="badge-severity" style="{{ row.value|severity_chip_style }}">{{ row.count }} {{ row.label }}</span>
+                        {% empty %}
+                        <span class="text-xs text-slate-400">No findings published yet.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors mt-1.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
+            </div>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="card text-center py-12">
+    <p class="text-slate-500">No engagements are available to view yet.</p>
+    <p class="text-sm text-slate-400 mt-1">Once your assessment team publishes findings, they'll appear here.</p>
+</div>
+{% endif %}
+{% endblock %}

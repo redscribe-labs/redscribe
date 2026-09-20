@@ -1,0 +1,52 @@
+{% extends "base/base.html" %}
+{% block title %}Permanently delete {{ engagement.client_name }} — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Permanently delete engagement?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This <strong>permanently and irreversibly</strong> destroys "<strong>{{ engagement.client_name }}</strong>"
+            and everything under it — findings, checklist runs, comments, scope-change history, and its
+            encryption key — from the live database. This is not the same as archiving: there is no undo.
+        </p>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 mb-1">⚠ This does not remove the data from existing backups</p>
+            <p class="text-xs text-amber-800">
+                A <span class="font-mono">create_backup</span> snapshot taken before this deletion, or a
+                <span class="font-mono">restore_backup</span> pre-restore safety snapshot, still contains this
+                engagement's data until it's separately pruned or overwritten. Routine backups age out after
+                <span class="font-mono">BACKUP_RETENTION_DAYS</span> (30 days by default); pre-restore safety
+                snapshots aren't auto-pruned at all. If a retention or disposal obligation requires this data
+                gone from every copy, that means cleaning up backups taken before this point too — see
+                Backup &amp; restore.
+            </p>
+        </div>
+        <p class="text-xs text-slate-500 mb-5">
+            Existing audit log entries referencing this engagement are kept — only the engagement's own data is
+            removed. Intended for satisfying a data-retention policy on engagements that are no longer needed,
+            not routine cleanup.
+        </p>
+        <form method="post" data-permanent-delete-form>
+            {% csrf_token %}
+            <label for="confirm-client-name" class="field-label">
+                Type the client name (<span class="font-mono">{{ engagement.client_name }}</span>) to confirm
+            </label>
+            <input type="text" id="confirm-client-name" name="confirm_client_name" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ engagement.client_name }}">
+            <div class="flex gap-2">
+                <button type="submit" class="btn-danger" data-confirm-submit disabled>Permanently delete</button>
+                <a href="{% url 'engagements:detail' engagement.pk %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var input = document.querySelector("[data-confirm-input]");
+    var submit = document.querySelector("[data-confirm-submit]");
+    var expected = input.getAttribute("data-expected");
+    input.addEventListener("input", function () {
+        submit.disabled = input.value !== expected;
+    });
+})();
+</script>
+{% endblock %}

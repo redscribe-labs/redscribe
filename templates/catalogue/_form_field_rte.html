@@ -1,0 +1,10 @@
+<div>
+    {% include "base/_field_section_header.html" with field_name=field_name label=label %}
+    <div class="rte-editor"
+         data-rte-field="{{ field_name }}"
+         data-rte-editable="true"
+         data-rte-initial='{{ field.value|default:"" }}'
+    ></div>
+    <input type="hidden" name="{{ field.html_name }}" id="{{ field.id_for_label }}" data-rte-hidden="{{ field_name }}">
+    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+</div>

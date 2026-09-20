@@ -1,0 +1,52 @@
+{% extends "base/base.html" %}
+{% block title %}Checklist templates — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <h1 class="page-title">Checklist templates</h1>
+    <div class="flex gap-2 shrink-0">
+        <a href="{% url 'checklist_templates:upload' %}" class="btn-secondary">Upload / replace template</a>
+        <a href="{% url 'checklist_templates:create' %}" class="btn-primary">New template</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if templates %}
+<ul class="space-y-2">
+    {% for template in templates %}
+    <li class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100 px-4 py-3.5 shadow-sm">
+        <a href="{% url 'checklist_templates:detail' template.pk %}" class="group flex items-center gap-4 min-w-0 flex-1">
+            <span class="stat-tile-icon shrink-0">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.5"/><path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h1A1.5 1.5 0 0 1 12 3.5V4"/><path d="M7.5 10.5 9 12l3.5-3.5"/></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                    <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ template.name }}</p>
+                    {% if template.is_default %}<span class="badge-green">Default</span>{% endif %}
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">{{ template.items.count }} item{{ template.items.count|pluralize }} &middot; updated {{ template.updated_at|date:"d/m/Y H:i" }}</p>
+            </div>
+        </a>
+        {% if not template.is_default %}
+        <form method="post" action="{% url 'checklist_templates:set_default' template.pk %}" class="shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="btn-secondary">Make default</button>
+        </form>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="card text-center py-12">
+    <p class="text-slate-500">No checklist templates yet.</p>
+    <div class="flex items-center justify-center gap-2 mt-4">
+        <a href="{% url 'checklist_templates:create' %}" class="btn-primary">New template</a>
+        <a href="{% url 'checklist_templates:upload' %}" class="btn-secondary">Upload / replace template</a>
+    </div>
+</div>
+{% endif %}
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

@@ -1,0 +1,168 @@
+# Templated by the base nginx image's own docker-entrypoint.d/20-envsubst-
+# on-templates.sh at container startup (built in since nginx:1.19) —
+# substitutes ${NGINX_SERVER_NAME} from the container's environment, and
+# ONLY variable names that are actually set (see its source), so nginx's
+# own runtime variables below ($host, $remote_addr, ...) are never touched
+# by the substitution as long as nothing sets an env var with those exact
+# names.
+client_max_body_size 100m;  # report exports / scan-import uploads can be sizeable
+
+# Drops the version number from the Server response header and from any
+# nginx-generated error page (e.g. a raw 497/400 before Django is ever
+# reached) — an attacker fingerprinting for a version-specific nginx CVE
+# gets "nginx", not "nginx/1.27.x". This is the standard, no-rebuild fix;
+# it does NOT remove the header/"nginx" token entirely — that needs the
+# third-party headers-more-nginx-module compiled into a custom image,
+# which the stock nginx:1.27-alpine base here doesn't include.
+server_tokens off;
+
+server {
+    listen 80;
+    server_name ${NGINX_SERVER_NAME};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    # Only relevant if you're using `tailscale funnel --tcp` (see this
+    # file's git history / README's Funnel section) with
+    # --proxy-protocol=2: Funnel forwards raw TCP over loopback, so
+    # without this, nginx's own view of the TCP peer is just 127.0.0.1
+    # for every visitor, not the real internet client — the same
+    # "IP recorded as something meaningless instead of the real client"
+    # failure mode this project's Docker userland-proxy fix addressed
+    # once already, just one hop further out. A second, more specific
+    # listen directive bound only to loopback (nginx picks the most
+    # specific matching socket, so this never affects the wildcard
+    # listener above) with `proxy_protocol` turned on for anything using
+    # exactly this socket — never the direct/tailnet-only listener above,
+    # which would otherwise mistake a real client's TLS ClientHello for a
+    # PROXY protocol preamble and fail every connection that isn't
+    # actually going through Funnel.
+    listen 127.0.0.1:443 ssl proxy_protocol;
+    listen [::1]:443 ssl proxy_protocol;
+    server_name ${NGINX_SERVER_NAME};
+
+    # Same two filenames regardless of where the cert came from (Tailscale
+    # auto-issuance or your own CA/Let's Encrypt/etc) — see certs/README
+    # and the "Installation" section of the main README.
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+    # Strong-cipher-only config (Mozilla "Intermediate" baseline —
+    # https://ssl-config.mozilla.org/ — re-verify against that generator
+    # occasionally, this list isn't meant to be hand-maintained forever).
+    # No TLS 1.0/1.1, no RC4/3DES/export/NULL ciphers, no non-forward-
+    # secret (static RSA/DH) key exchange — every listed TLS 1.2 suite is
+    # ECDHE/DHE (forward secrecy) + AEAD (GCM/ChaCha20-Poly1305), nothing
+    # CBC-mode. TLS 1.3's own 3 ciphersuites (AES-256-GCM, AES-128-GCM,
+    # ChaCha20-Poly1305) are all AEAD by spec and aren't configurable here
+    # — there's no weak TLS 1.3 suite to exclude.
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA256;
+    ssl_prefer_server_ciphers on;
+    # X25519 first (fastest + strong); secp384r1 as a fallback for older
+    # clients that don't support X25519. Not yet the PQ-hybrid
+    # X25519MLKEM768 noted in the architecture doc — that needs OpenSSL
+    # 3.5+, and this image's nginx is built against 3.3.3 as of this
+    # writing (`docker exec <nginx container> nginx -V`); swap the base
+    # image once one ships with a newer OpenSSL.
+    ssl_ecdh_curve X25519:secp384r1;
+
+    # No session tickets — this is a single nginx instance with no
+    # ticket-key-rotation infrastructure, and a static/long-lived ticket
+    # key would quietly undermine the forward secrecy the cipher list
+    # above is there for. The session cache (not ticket-based) still
+    # avoids a full handshake on reconnect.
+    ssl_session_tickets off;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
+
+    # Best-effort — silently skipped if the CA's OCSP responder isn't
+    # reachable (e.g. fully air-gapped), never blocks a handshake.
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # Pairs with the loopback-only proxy_protocol listeners above: when a
+    # connection comes from loopback specifically (i.e. only ever Funnel,
+    # relaying a real internet client's connection — a genuine direct
+    # visitor's TCP connection is never *from* 127.0.0.1/::1), trust the
+    # PROXY protocol preamble Funnel prepended and use the real client IP
+    # it conveys as $remote_addr instead of 127.0.0.1, for every directive
+    # below — including the X-Forwarded-For one a few lines down. Harmless
+    # when Funnel isn't in use: nothing ever connects from loopback in
+    # that case, so this simply never triggers. Loopback-only is a
+    # deliberately narrow trust boundary — only a process already running
+    # on this host could ever land on the proxy_protocol-enabled listener
+    # at all, the same trust level host-level access already implies
+    # everywhere else.
+    set_real_ip_from 127.0.0.1;
+    set_real_ip_from ::1;
+    real_ip_header proxy_protocol;
+
+    # Shared by both locations below — proxy_set_header inherits from this
+    # server block into a location only if that location defines none of
+    # its own, so keeping these here (rather than duplicated in each
+    # location) is both DRY and correct, not just tidy.
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    # $remote_addr (nginx's own view of the TCP peer, and — per the
+    # real_ip_header directive above — Funnel's PROXY protocol-conveyed
+    # client IP when this connection came in on the loopback listener), not
+    # $proxy_add_x_forwarded_for — this is a single reverse-proxy hop
+    # with no further trusted proxy in front of nginx, so there's no
+    # legitimate upstream chain to append to. $proxy_add_x_forwarded_for
+    # appends onto whatever X-Forwarded-For the client already sent,
+    # which apps.accounts.security.client_ip / apps.audit.middleware
+    # both read as `xff.split(",")[0]` (their own doc comments say
+    # they trust nginx to have stripped client-supplied values first)
+    # — an external client could otherwise spoof the first hop and
+    # both bypass IP-based login lockout and pollute the audit log
+    # with a fake address. Overwriting with $remote_addr always
+    # reflects the real, unspoofable TCP peer instead.
+    proxy_set_header X-Forwarded-For $remote_addr;
+    # config.settings.prod's SECURE_PROXY_SSL_HEADER trusts exactly
+    # this header/value to decide a request came in over HTTPS.
+    proxy_set_header X-Forwarded-Proto https;
+
+    # config.settings.prod's SECURE_HSTS_* already makes Django emit this
+    # same header (identical value) — hidden here so the client only ever
+    # sees one copy, with nginx as the single source of truth. Applies to
+    # every response from this server block, static or not: one year
+    # (the standard "eligible for browser HSTS preload lists" minimum),
+    # subdomains included.
+    proxy_hide_header Strict-Transport-Security;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Static assets (Tailwind CSS, the Tiptap editor bundle, vendored JS)
+    # are served by whitenoise with their own long-lived immutable
+    # Cache-Control — content-hashed filenames change whenever the content
+    # does, so caching them aggressively is both safe and the entire
+    # point of that setup (see config.settings.prod's STORAGES override).
+    # Deliberately NOT covered by the no-store policy below.
+    location /static/ {
+        # 127.0.0.1, not the `web` service name — nginx runs in the host's
+        # network namespace (see docker-compose.yml), not the compose
+        # bridge network, so Docker's embedded DNS for service names isn't
+        # available here. `web`'s own 127.0.0.1:8000 port mapping is what
+        # this reaches instead.
+        proxy_pass http://127.0.0.1:8000;
+    }
+
+    location / {
+        # 127.0.0.1, not the `web` service name — nginx runs in the host's
+        # network namespace (see docker-compose.yml), not the compose
+        # bridge network, so Docker's embedded DNS for service names isn't
+        # available here. `web`'s own 127.0.0.1:8000 port mapping is what
+        # this reaches instead.
+        proxy_pass http://127.0.0.1:8000;
+        proxy_read_timeout 300s;  # report PDF export can run a while
+
+        # Every other response here is the actual application — findings,
+        # engagement detail, decrypted content, exported reports. Never
+        # let a browser, intermediate proxy, or back-forward cache retain
+        # any of it.
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+    }
+}

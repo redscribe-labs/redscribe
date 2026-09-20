@@ -1,0 +1,137 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Findings — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="findings" %}
+{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <p class="page-eyebrow">{{ engagement.client_name }}</p>
+        <h1 class="page-title">Findings</h1>
+    </div>
+    <div class="flex gap-2">
+        {% if feature_flags.scan_import %}
+        <a href="{% url 'findings:import' engagement.pk %}" class="btn-secondary">Import scan</a>
+        {% endif %}
+        <a href="{% url 'findings:create' engagement.pk %}" class="btn-primary">New finding</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if is_manager and awaiting_review_count or my_review_count or is_manager and awaiting_qa_count or my_qa_count %}
+<div class="card mb-6">
+    <h2 class="font-semibold text-slate-900 mb-1">Bulk review / QA</h2>
+    <p class="text-xs text-slate-500 mb-4">Act on every eligible finding in this engagement at once, instead of one at a time.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="space-y-2">
+            {% if is_manager and awaiting_review_count %}
+            <form method="post" action="{% url 'findings:bulk_assign_reviewer' engagement.pk %}" class="flex flex-col gap-2">
+                {% csrf_token %}
+                <label class="field-label !mb-0">Assign reviewer to {{ awaiting_review_count }} draft finding{{ awaiting_review_count|pluralize }}</label>
+                <select name="reviewer" class="field-input">
+                    {% for candidate in bulk_reviewer_candidates %}
+                    <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-secondary">Assign reviewer to all</button>
+            </form>
+            {% endif %}
+            {% if my_review_count %}
+            <form method="post" action="{% url 'findings:bulk_submit_review' engagement.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="outcome" value="REVIEWED">
+                <button type="submit" class="btn-primary w-full">Approve all {{ my_review_count }} finding{{ my_review_count|pluralize }} awaiting my review</button>
+            </form>
+            {% endif %}
+        </div>
+        <div class="space-y-2">
+            {% if is_manager and awaiting_qa_count %}
+            <form method="post" action="{% url 'findings:bulk_assign_qa' engagement.pk %}" class="flex flex-col gap-2">
+                {% csrf_token %}
+                <label class="field-label !mb-0">Assign QA to {{ awaiting_qa_count }} reviewed finding{{ awaiting_qa_count|pluralize }}</label>
+                <select name="qa_reviewer" class="field-input">
+                    {% for candidate in bulk_qa_candidates %}
+                    <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-secondary">Assign QA to all</button>
+            </form>
+            {% endif %}
+            {% if my_qa_count %}
+            <form method="post" action="{% url 'findings:bulk_submit_qa' engagement.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="outcome" value="QA_APPROVED">
+                <button type="submit" class="btn-primary w-full">Approve all {{ my_qa_count }} finding{{ my_qa_count|pluralize }} awaiting my QA</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% include "base/_search_box.html" with query=query placeholder="Search by title or CVE ID" %}
+
+{% if archived_count %}
+<p class="text-xs text-slate-500 mb-3">
+    {% if show_archived %}
+    Showing {{ archived_count }} archived finding{{ archived_count|pluralize }} too.
+    <a href="?{% if query %}q={{ query }}&{% endif %}" class="text-brand-600 dark:text-brand-300 hover:underline">Hide archived</a>
+    {% else %}
+    {{ archived_count }} archived finding{{ archived_count|pluralize }} hidden.
+    <a href="?{% if query %}q={{ query }}&{% endif %}archived=1" class="text-brand-600 dark:text-brand-300 hover:underline">Show archived</a>
+    {% endif %}
+</p>
+{% endif %}
+
+{% if findings %}
+<ul class="space-y-2">
+    {% for finding in findings %}
+    <li>
+        <a href="{% url 'findings:detail' engagement.pk finding.pk %}"
+           class="group flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-200 bg-white dark:bg-slate-100
+                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all rail-severity {% if finding.archived %}opacity-60{% endif %}"
+           style="{{ finding|severity_rail_style }}">
+            <div class="min-w-0 flex-1">
+                <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ finding.title }}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span class="badge-severity" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+                    <span class="{{ finding.status|badge_class }}">{{ finding.get_status_display }}</span>
+                    <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+                    {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
+                    {% if finding.assigned_reviewer %}
+                    <span class="text-xs text-slate-400 flex items-center gap-1">
+                        <span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>
+                        Reviewer: {{ finding.assigned_reviewer }}
+                    </span>
+                    {% endif %}
+                    {% if finding.assigned_qa %}
+                    <span class="text-xs text-slate-400 flex items-center gap-1">
+                        <span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>
+                        QA: {{ finding.assigned_qa }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% include "base/_pagination.html" %}
+{% else %}
+{% url 'findings:create' engagement.pk as create_url %}
+{% if query %}
+{% include "base/_empty_state.html" with icon="search" title="No matches" message="No finding titles or CVE IDs match your search." %}
+{% else %}
+{% include "base/_empty_state.html" with icon="document" title="No findings yet" message="Write one up directly, or import results from a scanner." action_url=create_url action_label="New finding" %}
+{% endif %}
+{% endif %}
+
+{% url 'engagements:detail' engagement.pk as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to engagement" %}
+{% endblock %}

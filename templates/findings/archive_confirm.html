@@ -1,0 +1,27 @@
+{% extends "base/base.html" %}
+{% block title %}Archive {{ finding.title }} — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="findings" %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-2">Archive finding?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This archives "<strong>{{ finding.title }}</strong>". It's hidden from the findings list by default
+            and can't be edited further until a manager unarchives it.
+        </p>
+        <p class="text-xs text-slate-500 mb-5">
+            RedScribe doesn't offer a way to permanently delete findings — every action here is kept in an
+            append-only audit trail, so removal is archival rather than deletion.
+        </p>
+        <form method="post" class="flex gap-2">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Archive</button>
+            <a href="{% url 'findings:detail' engagement.pk finding.pk %}" class="btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+.dark .flatpickr-calendar {
+    background: #1c1e1f; border-color: #313435; box-shadow: 0 3px 13px rgba(0, 0, 0, 0.4);
+}
+.dark .flatpickr-months, .dark .flatpickr-weekdays { background: #1c1e1f; }
+.dark .flatpickr-month, .dark .flatpickr-weekday { color: #cacdce; fill: #cacdce; }
+.dark .flatpickr-current-month .flatpickr-monthDropdown-months,
+.dark .flatpickr-current-month input.cur-year { background: transparent; color: #f2f2f3; }
+.dark .flatpickr-day { color: #cacdce; }
+.dark .flatpickr-day.flatpickr-disabled, .dark .flatpickr-day.prevMonthDay, .dark .flatpickr-day.nextMonthDay {
+    color: #55595b;
+}
+.dark .flatpickr-day:hover { background: #313435; border-color: #313435; }
+.dark .flatpickr-day.selected, .dark .flatpickr-day.selected:hover {
+    background: #527a52; border-color: #527a52; color: #fff;
+}
+.dark .flatpickr-day.today { border-color: #527a52; }
+.dark .flatpickr-prev-month svg, .dark .flatpickr-next-month svg { fill: #cacdce; }
+
+input.flatpickr-alt-input { width: 100%; }

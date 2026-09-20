@@ -1,0 +1,21 @@
+{% extends "base/base.html" %}
+{% block title %}New client — RedScribe{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">New client</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Registers a client-portal company. Add its portal user accounts and
+            link engagements to it afterward, from its detail page.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Create client</button>
+        </form>
+    </div>
+    {% url 'clients:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to Manage Clients" %}
+</div>
+{% endblock %}

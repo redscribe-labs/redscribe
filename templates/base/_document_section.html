@@ -1,0 +1,6 @@
+<div>
+    <h2 class="text-base font-semibold text-slate-900 mb-3 tracking-tight">
+        {{ label }}
+    </h2>
+    {% include readonly_partial with field_name=field_name label=label content_json=content_json encrypted=encrypted engagement=engagement finding=finding %}
+</div>

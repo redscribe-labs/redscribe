@@ -1,0 +1,41 @@
+{% extends "base/base.html" %}
+{% block title %}Notifications — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <h1 class="page-title">Notifications</h1>
+    {% if page_obj.object_list %}
+    <form method="post" action="{% url 'notifications:mark_all_read' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary">Mark all as read</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+{% if page_obj.object_list %}
+<ul class="space-y-2">
+    {% for notification in page_obj.object_list %}
+    <li>
+        <a href="{% url 'notifications:open' notification.pk %}"
+           class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all
+                  {% if not notification.read %}border-l-4 border-l-brand-500{% endif %}">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm {% if not notification.read %}font-semibold text-slate-900{% else %}text-slate-600{% endif %}">{{ notification.message }}</p>
+                <p class="text-xs text-slate-400 mt-1">{{ notification.created_at|date:"d/m/Y H:i" }}{% if not notification.read %} &middot; <span class="text-brand-600 dark:text-brand-300">unread</span>{% endif %}</p>
+            </div>
+            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% include "base/_pagination.html" %}
+{% else %}
+{% include "base/_empty_state.html" with icon="inbox" title="Nothing here yet" message="Assignments, review requests, and QA hand-offs will show up here as they happen." %}
+{% endif %}
+
+{% url 'accounts:dashboard' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% endblock %}

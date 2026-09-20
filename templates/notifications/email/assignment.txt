@@ -1,0 +1,7 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+{{ summary }}
+
+{% if actor %}Triggered by {{ actor }}.{% endif %}
+
+Log in to {{ branding.display_name }} for details.

@@ -1,0 +1,32 @@
+{
+  "name": "redscribe-editor-build",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build-time only: bundles Tiptap into a self-hosted static asset. Not required at runtime — the committed output in static/vendor/ is what actually ships.",
+  "scripts": {
+    "build:editor": "esbuild editor-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-editor.bundle.js --minify",
+    "build:strength": "esbuild strength-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-password-strength.bundle.js --minify",
+    "build:datepicker": "esbuild datepicker-src/main.js --bundle --format=iife --outfile=static/vendor/redscribe-datepicker.bundle.js --minify",
+    "build:css": "tailwindcss -i tailwind-src/input.css -o static/css/tailwind.css --minify",
+    "build": "npm run build:editor && npm run build:strength && npm run build:datepicker && npm run build:css"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-code-block": "^3.31.3",
+    "@tiptap/extension-highlight": "^3.31.3",
+    "@tiptap/extension-image": "^3.31.3",
+    "@tiptap/extension-link": "^3.31.3",
+    "@tiptap/extension-paragraph": "^3.31.3",
+    "@tiptap/extension-table": "^3.31.3",
+    "@tiptap/extension-underline": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "@zxcvbn-ts/core": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-en": "^3.0.2",
+    "esbuild": "^0.28.2",
+    "flatpickr": "^4.6.13",
+    "tailwindcss": "^4.3.3"
+  }
+}

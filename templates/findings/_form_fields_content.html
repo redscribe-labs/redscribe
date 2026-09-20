@@ -1,0 +1,9 @@
+<div class="card max-w-5xl space-y-6 divide-y divide-slate-100 dark:divide-slate-200 [&>*:not(:first-child)]:pt-6">
+    {% for section, field in form.content_bound_fields %}
+    {% if section.slug == "affects" %}
+    {% include "findings/_form_field_plain_textarea.html" with field=field label=section.label %}
+    {% else %}
+    {% include "findings/_form_field_rte.html" with field=field field_name=section.slug label=section.label encrypted=True supports_image_upload=section.supports_image_upload %}
+    {% endif %}
+    {% endfor %}
+</div>

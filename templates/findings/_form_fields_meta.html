@@ -1,0 +1,41 @@
+{% load redscribe_extras %}
+<div class="card space-y-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+            <label for="{{ form.severity.id_for_label }}" class="field-label">{{ form.severity.label }}</label>
+            {{ form.severity|add_class:"field-input" }}
+            {% for error in form.severity.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+            <label for="{{ form.status.id_for_label }}" class="field-label">{{ form.status.label }}</label>
+            {{ form.status|add_class:"field-input" }}
+            {% for error in form.status.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+    </div>
+
+    <div class="pt-4 border-t border-slate-200 space-y-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">CVSS</p>
+        <div>
+            <label for="{{ form.cvss_score.id_for_label }}" class="field-label">Score</label>
+            {{ form.cvss_score|add_class:"field-input" }}
+            {% if form.cvss_score.help_text %}<p class="field-help">{{ form.cvss_score.help_text }}</p>{% endif %}
+            {% for error in form.cvss_score.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+            <label for="{{ form.cvss_vector.id_for_label }}" class="field-label">Vector</label>
+            {{ form.cvss_vector|add_class:"field-input font-mono text-xs" }}
+            {% if form.cvss_vector.help_text %}<p class="field-help">{{ form.cvss_vector.help_text }}</p>{% endif %}
+            {% for error in form.cvss_vector.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+    </div>
+
+    <div class="pt-4 border-t border-slate-200">
+        <label for="{{ form.cve_id.id_for_label }}" class="field-label">{{ form.cve_id.label }}</label>
+        {{ form.cve_id|add_class:"field-input" }}
+        {% for error in form.cve_id.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="pt-4 border-t border-slate-200">
+        {% include "base/_classifications_field.html" %}
+    </div>
+</div>

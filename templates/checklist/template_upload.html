@@ -1,0 +1,20 @@
+{% extends "base/base.html" %}
+{% block title %}Upload checklist template — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Upload / replace checklist template</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Re-uploading a template with the same name replaces its items — but never
+            affects an engagement whose checklist has already been started.
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Upload / replace</button>
+        </form>
+    </div>
+    {% url 'checklist_templates:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to templates" %}
+</div>
+{% endblock %}

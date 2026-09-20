@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/OWNER/REPO/security/advisories/new
+    about: Please report security vulnerabilities privately — see .github/SECURITY.md, do not open a public issue. Update the OWNER/REPO placeholder to the left once the repo exists.

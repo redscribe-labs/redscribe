@@ -1,0 +1,39 @@
+{% extends "base/base.html" %}
+{% block title %}Confirm email address — RedScribe{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+            <h1 class="font-mono font-semibold text-3xl tracking-tight text-white">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></h1>
+        </div>
+        <div class="card text-center">
+            {% if confirmation %}
+                {% if can_confirm %}
+                <h2 class="text-lg font-semibold mb-2">Confirm your email address</h2>
+                <p class="text-sm text-slate-500 mb-4">
+                    Please confirm that <strong>{{ confirmation.email_address.email }}</strong> is yours.
+                </p>
+                <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
+                    {% csrf_token %}
+                    {{ redirect_field }}
+                    <button type="submit" class="btn-primary w-full">Confirm</button>
+                </form>
+                {% else %}
+                <h2 class="text-lg font-semibold mb-2">Already confirmed</h2>
+                <p class="text-sm text-slate-500 mb-4">
+                    This email address is already confirmed by a different account.
+                </p>
+                <a href="{% url 'accounts:login' %}" class="btn-primary w-full">Back to sign in</a>
+                {% endif %}
+            {% else %}
+                <h2 class="text-lg font-semibold mb-2">This link is invalid or has expired</h2>
+                <p class="text-sm text-slate-500 mb-4">
+                    Confirmation links are single-use. Contact your administrator if you still
+                    need access.
+                </p>
+                <a href="{% url 'accounts:login' %}" class="btn-primary w-full">Back to sign in</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

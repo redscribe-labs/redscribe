@@ -1,0 +1,19 @@
+{% extends "base/base.html" %}
+{% block title %}Invite link invalid — RedScribe{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+            <h1 class="font-mono font-semibold text-3xl tracking-tight text-white">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></h1>
+        </div>
+        <div class="card text-center">
+            <h2 class="text-lg font-semibold mb-2">This link is invalid or has expired</h2>
+            <p class="text-sm text-slate-500 mb-4">
+                Account setup links are single-use and expire after 24 hours. Contact your
+                administrator for a new invitation.
+            </p>
+            <a href="{% url 'accounts:login' %}" class="btn-primary w-full">Back to sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

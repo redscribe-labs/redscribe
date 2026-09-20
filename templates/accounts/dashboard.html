@@ -1,0 +1,174 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Dashboard — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <p class="page-eyebrow">{{ user.role.name }}</p>
+        <h1 class="page-title">Welcome back, {{ user.first_name|default:user.username }}</h1>
+    </div>
+    <a href="{% url 'engagements:list' %}" class="btn-primary">View engagements</a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <a href="{% url 'engagements:list' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="font-mono text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{{ engagement_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Engagements{% if not user.is_superadmin_role %} you can access{% endif %}</p>
+        </div>
+    </a>
+    <div class="stat-tile">
+        <span class="stat-tile-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="font-mono text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{{ my_finding_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Findings you've drafted</p>
+        </div>
+    </div>
+    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon {% if to_review_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% endif %}">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s2.7-5 8-5 8 5 8 5-2.7 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if to_review_count %}text-amber-600 dark:text-amber-300{% else %}text-slate-900{% endif %}">{{ to_review_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Awaiting your review</p>
+        </div>
+    </a>
+    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+        <span class="stat-tile-icon {% if to_qa_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% endif %}">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M7 10l2 2 4-4"/></svg>
+        </span>
+        <div class="min-w-0">
+            <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if to_qa_count %}text-amber-600 dark:text-amber-300{% else %}text-slate-900{% endif %}">{{ to_qa_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Awaiting your QA</p>
+        </div>
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="card lg:col-span-1">
+        <div class="flex items-baseline justify-between mb-1">
+            <h2 class="font-semibold text-slate-900">My findings by severity</h2>
+            <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ my_finding_count }} total</span>
+        </div>
+        <div class="mt-3">
+            {% include "base/_bar_chart.html" with data=my_severity_chart %}
+        </div>
+    </div>
+    <div class="card lg:col-span-1">
+        <div class="flex items-baseline justify-between mb-1">
+            <h2 class="font-semibold text-slate-900">My findings by workflow status</h2>
+            <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ my_finding_count }} total</span>
+        </div>
+        <div class="mt-3">
+            {% include "base/_bar_chart.html" with data=my_status_chart %}
+        </div>
+    </div>
+
+    <div class="card lg:col-span-1">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-slate-900">Recent engagements</h2>
+            <a href="{% url 'engagements:list' %}" class="text-xs text-brand-600 dark:text-brand-300 hover:underline">View all</a>
+        </div>
+        {% if recent_engagements %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200 -mx-1">
+            {% for engagement in recent_engagements %}
+            <li class="flex items-center justify-between gap-2 px-1 py-2.5">
+                <div class="min-w-0">
+                    <a href="{% url 'engagements:detail' engagement.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300 truncate block">{{ engagement.client_name }}</a>
+                    <p class="text-xs text-slate-400 mt-0.5">Updated {{ engagement.updated_at|timesince }} ago</p>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
+                    {% if engagement.archived %}<span class="badge-red">Archived</span>{% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-400">No engagements yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_manager_view %}
+<div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-200">
+    <div class="flex items-center gap-2 mb-4">
+        <span class="stat-tile-icon !bg-navy-50 !text-navy-600 dark:!bg-navy-950 dark:!text-navy-300 !h-7 !w-7">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6.5" r="2.5"/><path d="M3 16v-1a4 4 0 0 1 4-4h1a4 4 0 0 1 4 4v1"/><circle cx="14.5" cy="7" r="2"/><path d="M13 11.2a3.6 3.6 0 0 1 3.5 3.3V16"/></svg>
+        </span>
+        <h2 class="page-eyebrow !mb-0">Team overview</h2>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card lg:col-span-1">
+            <div class="flex items-baseline justify-between mb-1">
+                <h3 class="font-semibold text-slate-900">All accessible findings by severity</h3>
+                <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ org_finding_count }} total</span>
+            </div>
+            <div class="mt-3">
+                {% include "base/_bar_chart.html" with data=org_severity_chart %}
+            </div>
+        </div>
+        <div class="card lg:col-span-2">
+            <h3 class="font-semibold text-slate-900 mb-4">Assignment queue health</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="stat-tile !shadow-none">
+                    <span class="stat-tile-icon shrink-0 {% if needs_reviewer_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% else %}!bg-green-50 !text-green-600 dark:!bg-green-950 dark:!text-green-300{% endif %}">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s2.7-5 8-5 8 5 8 5-2.7 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if needs_reviewer_count %}text-amber-600 dark:text-amber-300{% else %}text-green-600 dark:text-green-300{% endif %}">{{ needs_reviewer_count }}</span>
+                        <p class="text-xs text-slate-500 mt-0.5">Drafts with no reviewer</p>
+                    </div>
+                </div>
+                <div class="stat-tile !shadow-none">
+                    <span class="stat-tile-icon shrink-0 {% if needs_qa_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% else %}!bg-green-50 !text-green-600 dark:!bg-green-950 dark:!text-green-300{% endif %}">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M7 10l2 2 4-4"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if needs_qa_count %}text-amber-600 dark:text-amber-300{% else %}text-green-600 dark:text-green-300{% endif %}">{{ needs_qa_count }}</span>
+                        <p class="text-xs text-slate-500 mt-0.5">Reviewed with no QA</p>
+                    </div>
+                </div>
+                <div class="stat-tile !shadow-none">
+                    <span class="stat-tile-icon shrink-0 !bg-mist-50 !text-mist-600 dark:!bg-mist-950 dark:!text-mist-300">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+                    </span>
+                    <div class="min-w-0">
+                        <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums text-slate-900">{{ active_engagement_count }}</span>
+                        <p class="text-xs text-slate-500 mt-0.5">Active engagements</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+    <a href="{% url 'catalogue:list' %}" class="flex items-center gap-1.5 text-brand-600 dark:text-brand-300 hover:underline">
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5.5c-1.2-1-3-1.5-6-1.5v10.5c3 0 4.8.5 6 1.5 1.2-1 3-1.5 6-1.5V4c-3 0-4.8.5-6 1.5Z"/><path d="M10 5.5v10.5"/></svg>
+        Vulnerability catalogue
+    </a>
+    {% if feature_flags.global_search %}
+    <a href="{% url 'search:results' %}" class="flex items-center gap-1.5 text-brand-600 dark:text-brand-300 hover:underline">
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+        Search everything
+    </a>
+    {% endif %}
+    {% if feature_flags.recurrence_and_trends and user|has_permission:"reports.trends" %}
+    <a href="{% url 'trends:view' %}" class="flex items-center gap-1.5 text-brand-600 dark:text-brand-300 hover:underline">
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14 8 9l3 3 5-6"/><path d="M14 5h3v3"/></svg>
+        Trend reporting
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

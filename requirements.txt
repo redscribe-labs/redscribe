@@ -1,0 +1,73 @@
+# Web framework
+Django==5.2.17
+
+# Auth: single-provider, single-domain OAuth (Google/Microsoft) alongside
+# local username/password
+django-allauth==65.19.2
+# Required by allauth's Google provider to verify the id_token JWT it gets
+# back from the token endpoint.
+PyJWT==2.13.0
+# Required by allauth's Google (and OAuth2 base) provider for the
+# token-exchange HTTP calls to the provider's endpoints.
+requests==2.34.2
+
+# MFA: TOTP
+django-otp==1.7.3
+qrcode==8.2
+# Also used by apps.reports.docx_export to raster the severity/status
+# breakdown bar chart into a PNG for DOCX export — python-docx has no
+# charting API, so this is drawn by hand instead of via a native Word
+# chart object.
+Pillow==12.3.0
+
+# Password hashing backend for Django's built-in Argon2PasswordHasher
+argon2-cffi==25.1.0
+
+# Cryptography (AES-256-GCM data keys / root-key wrapping) - well-audited.
+# Kept current for CVE fixes; bump deliberately, not automatically.
+cryptography==50.0.1
+
+# Postgres driver
+psycopg[binary]==3.3.5
+
+# Local dev/prod env
+gunicorn==26.2.0
+
+# Serves static files directly from the app process (no separate nginx
+# container needed just for this) — small, single-purpose, widely used.
+whitenoise==6.12.0
+
+# Report export (apps.reports). WeasyPrint: HTML/CSS -> PDF, actively
+# maintained, needs system Pango/Cairo (see Dockerfile) — deliberately not
+# wkhtmltopdf/pdfkit, which wrap an abandoned upstream binary.
+weasyprint==70.0
+# pypdf: post-processes a rendered PDF to add password encryption
+# (apps.reports.pdf_export.encrypt_pdf) — WeasyPrint/pydyf have no
+# encryption support at all, so this is a separate pass over the finished
+# bytes, not part of rendering. Pure Python, no system dependency.
+pypdf==6.18.0
+
+# DOCX report export (apps.reports.docx_export / tiptap_docx / docx_styles).
+# docxtpl (Jinja2 templating over python-docx) fills {{ tag }} placeholders
+# and {%p for %}/{%tr for %} loops in a superadmin-uploaded .docx template,
+# including docxtpl "subdocuments" for rich multi-block content (code
+# blocks, images, tables) styled using the uploaded template's own named
+# Word styles. Pulls in python-docx, Jinja2, lxml transitively — pure
+# Python OOXML zip/XML manipulation, no system dependency (unlike
+# WeasyPrint's Pango/Cairo above).
+docxtpl==0.20.2
+# docxtpl's subdocument feature (tpl.new_subdoc() — how rich multi-block
+# content like code blocks/images/tables gets inserted into a template
+# placeholder) imports docxcompose internally; not pulled in by docxtpl's
+# own install_requires, so it must be listed explicitly.
+docxcompose==2.2.0
+
+# Scan import (apps.findings.importers.burp/nmap) parses fully untrusted
+# XML from whatever scanner produced it — stdlib xml.etree.ElementTree has
+# no DTD/entity-expansion hardening on its own, so a small crafted DOCTYPE
+# can cheaply blow up in-memory size well past what the upload itself
+# cost. defusedxml.ElementTree is a drop-in replacement (same parse API)
+# that forbids DTDs/external entities/entity expansion outright, raising
+# instead of processing them. Tiny, single-purpose, the de facto standard
+# fix for this exact class of issue.
+defusedxml==0.7.1

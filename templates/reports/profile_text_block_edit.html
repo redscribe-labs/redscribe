@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+{% block title %}Edit {{ block.label }} — RedScribe{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <p class="page-eyebrow !mb-0.5">{{ profile.name }}</p>
+    <h1 class="page-title">{{ block.label }}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+{% url 'report_profiles:edit' profile.pk as back_url %}
+<div class="max-w-5xl mx-auto">
+    <form method="post" class="card">
+        {% csrf_token %}
+        <p class="field-help mb-4">
+            This profile's own starting text for
+            <span class="font-mono">{% templatetag openvariable %} {{ block.slug }} {% templatetag closevariable %}</span>
+            — a reporter can still edit their own copy per engagement.
+        </p>
+        <div class="rte-editor" data-rte-field="content" data-rte-editable="true"
+             data-rte-initial='{{ form.content.value|default:"" }}'></div>
+        <input type="hidden" name="content" id="{{ form.content.id_for_label }}" data-rte-hidden="content">
+        {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        {% include "base/_form_action_bar.html" with cancel_url=back_url submit_label="Save" %}
+    </form>
+
+    {% include "base/_back_link.html" with url=back_url label=profile.name %}
+</div>
+{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

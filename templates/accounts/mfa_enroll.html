@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Set up MFA — RedScribe{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+            <h1 class="font-mono font-semibold text-3xl tracking-tight text-white">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></h1>
+        </div>
+        <div class="card">
+            <h2 class="text-lg font-semibold mb-1">Set up two-factor authentication</h2>
+            <p class="text-sm text-slate-500 mb-4">
+                Local accounts require an authenticator app (Google Authenticator, 1Password, Authy, ...).
+                Scan this, then enter the 6-digit code it shows.
+            </p>
+            <img src="{{ qr_data_uri }}" alt="TOTP enrollment QR code" width="180" height="180" class="mx-auto mb-3 rounded-lg border border-slate-200 p-2">
+            <p class="break-all text-xs bg-slate-50 border border-slate-200 rounded-md p-2 mb-4 text-slate-600">
+                Can't scan? Enter manually: {{ otpauth_url }}
+            </p>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label for="{{ form.token.id_for_label }}" class="field-label">{{ form.token.label }}</label>
+                    {{ form.token|add_class:"field-input text-center tracking-widest text-lg" }}
+                    {% for error in form.token.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                <button type="submit" class="btn-primary w-full">Confirm &amp; enable MFA</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

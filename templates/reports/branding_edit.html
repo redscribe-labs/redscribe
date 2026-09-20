@@ -1,0 +1,45 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras static %}
+{% block title %}Firm branding — RedScribe{% endblock %}
+
+{% block page_header %}
+{% include "base/_page_header.html" with title="Firm branding" subtitle="Shown in the sidebar, the login page, and every report's cover page — the logo takes priority over the name when both are set." %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card mb-6">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Current logo</h2>
+        {% if has_logo %}
+        <img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="Current logo" class="max-h-24 max-w-full rounded-md border border-slate-200 bg-white p-2">
+        {% else %}
+        <p class="text-sm text-slate-400">No logo uploaded — the sidebar, login page, and report cover currently show the company name (if set) or "RedScribe".</p>
+        {% endif %}
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="card space-y-4">
+            <div>
+                <label for="{{ form.firm_name.id_for_label }}" class="field-label">{{ form.firm_name.label }}</label>
+                {{ form.firm_name|add_class:"field-input" }}
+                {% if form.firm_name.help_text %}<p class="field-help">{{ form.firm_name.help_text }}</p>{% endif %}
+                {% for error in form.firm_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+                <label for="{{ form.logo.id_for_label }}" class="field-label">{{ form.logo.label }}</label>
+                {{ form.logo|add_class:"field-input-file" }}
+                {% if form.logo.help_text %}<p class="field-help">{{ form.logo.help_text }}</p>{% endif %}
+                {% for error in form.logo.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {% if has_logo %}
+            <div class="flex items-center gap-2">
+                {{ form.remove_logo }}
+                <label for="{{ form.remove_logo.id_for_label }}" class="text-sm text-slate-700">{{ form.remove_logo.label }}</label>
+            </div>
+            {% endif %}
+        </div>
+        <button type="submit" class="btn-primary w-full mt-6">Save</button>
+    </form>
+</div>
+{% endblock %}

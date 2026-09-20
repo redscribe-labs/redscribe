@@ -1,0 +1,70 @@
+{% extends "base/portal_base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ finding.title }} — {{ engagement.client_name }}{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'clients_portal:engagement_detail' engagement.pk %}" class="crumb-trail hover:text-brand-600 dark:hover:text-brand-300">&larr; {{ engagement.client_name }}</a>
+</div>
+
+<div class="rail-severity pl-4 mb-6" style="{{ finding|severity_rail_style }}">
+    <p class="page-eyebrow !text-slate-400 dark:!text-slate-400 !mb-0.5">{{ engagement.client_name }}</p>
+    <h1 class="text-3xl font-bold text-slate-900 leading-tight break-words">{{ finding.title }}</h1>
+</div>
+
+<div class="flex flex-wrap items-center gap-x-6 gap-y-3 pb-6 mb-6 border-b border-slate-200">
+    <span class="badge-severity text-sm px-3 py-1" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+    <div class="flex items-center gap-1.5 text-sm">
+        <span class="text-slate-400">Status</span>
+        <span class="{{ finding.status|badge_class }}">{{ finding.get_status_display }}</span>
+    </div>
+    {% if finding.retest_status != "NOT_RETESTED" %}
+    <div class="flex items-center gap-1.5 text-sm">
+        <span class="text-slate-400">Retest</span>
+        <span class="{{ finding.retest_status|badge_class }}">{{ finding.get_retest_status_display }}</span>
+    </div>
+    {% endif %}
+    <div class="flex items-baseline gap-1.5 text-sm">
+        <span class="text-slate-400">CVSS</span>
+        <span class="font-mono font-semibold text-slate-800">{{ finding.cvss_score|default:"—" }}</span>
+    </div>
+    {% if finding.cve_id %}
+    <div class="flex items-baseline gap-1.5 text-sm">
+        <span class="text-slate-400">CVE</span>
+        <span class="font-mono text-slate-700">{{ finding.cve_id }}</span>
+    </div>
+    {% endif %}
+    {% if finding.cvss_vector %}
+    <code class="text-xs bg-slate-100 rounded px-2 py-1 text-slate-600 break-all">{{ finding.cvss_vector }}</code>
+    {% endif %}
+    {% for tag in finding.classifications.all %}
+    <span class="badge-slate" title="{{ tag.taxonomy }}">{{ tag.value }}</span>
+    {% endfor %}
+</div>
+
+<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 -mt-3 mb-6 text-xs text-slate-400">
+    <span>Reported {{ finding.created_at|date:"d/m/Y" }}{% if finding.updated_at|date:"d/m/Y" != finding.created_at|date:"d/m/Y" %} &middot; Last updated {{ finding.updated_at|date:"d/m/Y" }}{% endif %}</span>
+</div>
+
+{% if finding.affects_list %}
+<div class="flex flex-wrap items-center gap-2 mb-8">
+    <span class="text-xs uppercase tracking-wide text-slate-400">Affects</span>
+    {% for item in finding.affects_list %}
+    <code class="text-xs bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-300 border border-red-100 dark:border-red-900 rounded px-2 py-1 break-all">{{ item }}</code>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if document_sections %}
+<div class="card space-y-6 divide-y divide-slate-100 dark:divide-slate-200 [&>*:not(:first-child)]:pt-6">
+    {% for section in document_sections %}
+    <div>
+        {% include "clients_portal/_rte_readonly.html" with field_name=section.field_name label=section.label content_json=section.content_json %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}

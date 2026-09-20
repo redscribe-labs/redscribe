@@ -1,0 +1,65 @@
+{% extends "base/base.html" %}
+{% block title %}Clear all audit logs — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Clear all audit logs?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This <strong>permanently and irreversibly</strong> deletes every audit log entry and login
+            attempt record — not just entries older than the retention window, all of them, regardless
+            of age. There is no undo, and nothing can be recovered afterward, including from a database
+            backup taken before this point in time.
+        </p>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 mb-1">⚠ This may violate regulatory requirements</p>
+            <p class="text-xs text-amber-800">
+                Regimes that commonly apply to a tool handling client security/health-related findings —
+                notably HIPAA's six-year documentation retention requirement — expect audit trails to be
+                kept for a fixed minimum period, not cleared on demand. This action exists purely as a
+                storage-management escape hatch. Confirm your organization's own retention obligations
+                before using it; RedScribe cannot determine what applies to your deployment.
+            </p>
+        </div>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-amber-800 mb-1">⚠ Needs a second Superadmin</p>
+            <p class="text-xs text-amber-800">
+                Clearing the whole log is the one action here that could undo this feature's own
+                tamper-evidence guarantee, so it isn't left to you alone: a different, currently active
+                Superadmin has to enter their own username and password below too. Nothing is deleted
+                unless their credentials check out.
+            </p>
+        </div>
+        <form method="post" data-permanent-delete-form>
+            {% csrf_token %}
+            <label for="confirm-phrase" class="field-label">
+                Type <span class="font-mono">{{ confirm_phrase }}</span> to confirm
+            </label>
+            <input type="text" id="confirm-phrase" name="confirm_phrase" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ confirm_phrase }}">
+            <label for="approver-username" class="field-label">Second Superadmin's username</label>
+            <input type="text" id="approver-username" name="approver_username" class="field-input mb-4" autocomplete="off" data-approver-field>
+            <label for="approver-password" class="field-label">Second Superadmin's password</label>
+            <input type="password" id="approver-password" name="approver_password" class="field-input mb-4" autocomplete="off" data-approver-field>
+            <div class="flex gap-2">
+                <button type="submit" formaction="{% url 'audit:purge_all' %}" class="btn-danger" data-confirm-submit disabled>Clear all logs</button>
+                <a href="{% url 'audit:list' %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var input = document.querySelector("[data-confirm-input]");
+    var submit = document.querySelector("[data-confirm-submit]");
+    var approverFields = document.querySelectorAll("[data-approver-field]");
+    var expected = input.getAttribute("data-expected");
+    function refresh() {
+        var approversFilled = Array.prototype.every.call(approverFields, function (f) {
+            return f.value.trim().length > 0;
+        });
+        submit.disabled = input.value !== expected || !approversFilled;
+    }
+    input.addEventListener("input", refresh);
+    approverFields.forEach(function (f) { f.addEventListener("input", refresh); });
+})();
+</script>
+{% endblock %}

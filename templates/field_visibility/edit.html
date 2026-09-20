@@ -1,0 +1,122 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Finding structure — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Finding structure</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            These are the narrative content sections a Finding and a Catalogue entry can carry — add, relabel,
+            reorder, or retire them freely. Retiring a section (uncheck "Active") hides it from create/edit/detail
+            pages and blocks new comments on it, but never deletes content already saved against it — re-activate
+            it any time to see that content again. Deleting a section below is permanent and takes its stored
+            content with it.
+        </p>
+
+        <div class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-3 py-3 mb-5">
+            <p class="text-sm font-medium text-amber-900 dark:text-amber-300">This defines the structure of every finding, past and present</p>
+            <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                Every finding and catalogue entry — on active, archived, and already-delivered engagements — reads
+                its content through the sections defined here. Relabeling, retiring, reordering, or deleting a
+                section changes how that finding's existing content is shown (or hides it) everywhere, immediately,
+                including reports already generated from live data. Changes here are not scoped to new engagements
+                only.
+            </p>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {{ formset.management_form }}
+            <div class="md:overflow-x-auto">
+            <div class="hidden md:grid md:min-w-[54rem] grid-cols-[2.5rem_minmax(11rem,1fr)_4.5rem_4.5rem_4.5rem_5.5rem_5.5rem_3.5rem] gap-x-3 items-end pb-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <div></div>
+                <div>Label</div>
+                <div class="text-center border-l border-slate-200 dark:border-slate-300 pl-3" title="Shown on create/edit/detail pages and open to new comments">Active</div>
+                <div class="text-center" title="Offers drag-and-drop image upload in this section's editor">Image</div>
+                <div class="text-center" title="Shown to client-portal accounts">Portal</div>
+                <div class="text-center" title="Only printed in a remediation report, not a full report">Remed.</div>
+                <div class="text-center" title="Where an imported scan's raw finding output lands by default">Scan import</div>
+                <div></div>
+            </div>
+
+            {% for form in formset %}
+            <div class="grid grid-cols-1 md:grid-cols-[2.5rem_minmax(11rem,1fr)_4.5rem_4.5rem_4.5rem_5.5rem_5.5rem_3.5rem] md:min-w-[54rem] gap-x-3 gap-y-2 md:items-center py-3 border-b border-slate-100 dark:border-slate-200 last:border-0">
+                {{ form.id }}
+                <div class="flex items-center gap-3 md:block md:space-y-0">
+                    {% if form.instance.pk %}
+                    <button type="submit" formaction="{% url 'field_visibility:move' form.instance.pk 'up' %}" formmethod="post"
+                            class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move up" {% if forloop.first %}disabled{% endif %}>&uarr;</button>
+                    <button type="submit" formaction="{% url 'field_visibility:move' form.instance.pk 'down' %}" formmethod="post"
+                            class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move down" {% if forloop.last %}disabled{% endif %}>&darr;</button>
+                    {% endif %}
+                    <span class="md:hidden text-sm font-semibold text-slate-800">Section {{ forloop.counter }}</span>
+                </div>
+                <div>
+                    <label class="field-label md:hidden">Label</label>
+                    {{ form.label|add_class:"field-input" }}
+                    {% if form.instance.is_protected %}
+                    <p class="text-xs text-slate-400 mt-1">Built-in finding metadata — can be renamed and reordered, but not deleted.</p>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-2 md:justify-center md:border-l md:border-slate-100 dark:md:border-slate-200 md:pl-3">
+                    {{ form.is_active }}
+                    <label class="md:hidden text-sm text-slate-700">Active</label>
+                </div>
+                <div class="flex items-center gap-2 md:justify-center">
+                    {{ form.supports_image_upload }}
+                    <label class="md:hidden text-sm text-slate-700">Image upload</label>
+                </div>
+                <div class="flex items-center gap-2 md:justify-center">
+                    {{ form.portal_visible }}
+                    <label class="md:hidden text-sm text-slate-700">Client portal</label>
+                </div>
+                <div class="flex items-center gap-2 md:justify-center">
+                    {{ form.include_in_remediation_report_only }}
+                    <label class="md:hidden text-sm text-slate-700">Remediation report only</label>
+                </div>
+                <div class="flex items-center gap-2 md:justify-center">
+                    {{ form.is_import_target }}
+                    <label class="md:hidden text-sm text-slate-700">Scan import target</label>
+                </div>
+                <div class="md:text-right">
+                    {% if form.instance.pk and not form.instance.is_protected %}
+                    <a href="{% url 'field_visibility:delete' form.instance.pk %}" class="text-red-600 hover:underline text-xs">Delete</a>
+                    {% endif %}
+                </div>
+                {% for field in form %}{% for error in field.errors %}<p class="field-error col-span-full">{{ field.label }}: {{ error }}</p>{% endfor %}{% endfor %}
+            </div>
+            {% endfor %}
+            </div>
+            <button type="submit" class="btn-primary w-full mt-5">Save changes</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Add a new section</h2>
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div>
+                <label for="{{ create_form.label.id_for_label }}" class="field-label">Label</label>
+                {{ create_form.label|add_class:"field-input" }}
+                {% for error in create_form.label.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <p class="text-xs text-slate-500">New sections are added to the end of the list — reorder with the &uarr;/&darr; arrows above once it's created.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                {% for field in create_form %}
+                {% if field.name != "label" %}
+                <div class="flex items-center gap-2">
+                    {{ field }}
+                    <label for="{{ field.id_for_label }}" class="text-sm text-slate-700">{{ field.label }}</label>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn-primary w-full">Add section</button>
+        </form>
+    </div>
+
+    {% url 'accounts:dashboard' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+</div>
+{% endblock %}

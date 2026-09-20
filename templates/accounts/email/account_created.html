@@ -1,0 +1,18 @@
+{% extends "email/_base.html" %}
+{% block content %}
+<h1 style="margin:0 0 16px;font-size:18px;line-height:1.4;color:#0f172a;">Welcome to {{ branding.display_name }}</h1>
+<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#334155;">Hi {{ user.first_name|default:user.username }},</p>
+<p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#334155;">
+    An account was just created for you on {{ branding.display_name }}
+    (username: <strong>{{ user.username }}</strong>). Set your password to finish getting set up.
+</p>
+<p style="margin:0 0 18px;">
+<a href="{{ setup_url }}" style="display:inline-block;padding:10px 18px;background-color:#0f172a;color:#ffffff;border-radius:6px;font-size:14px;text-decoration:none;">Set your password</a>
+</p>
+<p style="margin:0 0 18px;font-size:13px;line-height:1.6;color:#64748b;">
+    This link expires in 24 hours and can only be used once.
+</p>
+<p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
+    If you weren't expecting this, contact your {{ branding.display_name }} administrator.
+</p>
+{% endblock %}

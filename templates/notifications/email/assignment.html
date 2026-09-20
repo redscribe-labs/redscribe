@@ -1,0 +1,10 @@
+{% extends "email/_base.html" %}
+{% block content %}
+<h1 style="margin:0 0 16px;font-size:18px;line-height:1.4;color:#0f172a;">{{ branding.display_name }} notification</h1>
+<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#334155;">Hi {{ recipient.first_name|default:recipient.username }},</p>
+<p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#0f172a;font-weight:600;">{{ summary }}</p>
+{% if actor %}
+<p style="margin:0 0 24px;font-size:13px;line-height:1.6;color:#64748b;">Triggered by {{ actor }}.</p>
+{% endif %}
+<p style="margin:0;font-size:13px;line-height:1.6;color:#334155;">Log in to {{ branding.display_name }} for details.</p>
+{% endblock %}

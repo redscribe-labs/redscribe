@@ -1,0 +1,23 @@
+<div>
+    <div class="rte-editor"
+         data-rte-field="{{ field_name }}"
+         data-rte-editable="false"
+         data-rte-initial='{{ content_json|default:"" }}'
+         data-comments-list-url="{% url 'findings:comment_thread_list' engagement.pk finding.pk field_name %}"
+         data-comments-create-url="{% url 'findings:comment_thread_create' engagement.pk finding.pk field_name %}"
+         data-comments-reply-template="/engagements/{{ engagement.pk }}/findings/{{ finding.pk }}/comments/thread/THREADID/reply/"
+         data-comments-resolve-template="/engagements/{{ engagement.pk }}/findings/{{ finding.pk }}/comments/thread/THREADID/resolve/"
+         data-comments-delete-template="/engagements/{{ engagement.pk }}/findings/{{ finding.pk }}/comments/thread/THREADID/delete/"
+    ></div>
+    <button type="button" data-add-comment="{{ field_name }}" class="btn-secondary mt-2">Add comment</button>
+    <div class="rte-new-comment-box" data-new-comment-box="{{ field_name }}" hidden>
+        <div class="rte-comment-form">
+            <textarea rows="2" class="field-input" placeholder="Comment on the selected text..."></textarea>
+            <div class="flex gap-2 mt-2">
+                <button type="button" data-save class="btn-primary">Save comment</button>
+                <button type="button" data-cancel class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div class="rte-comments-panel" data-comments-panel="{{ field_name }}"></div>
+</div>

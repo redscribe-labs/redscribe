@@ -1,0 +1,39 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Map Word styles — {{ profile.name }}{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <p class="page-eyebrow !mb-0.5">{{ profile.name }}</p>
+    <h1 class="page-title">Map Word styles</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+{% url 'report_profiles:edit' profile.pk as back_url %}
+<div class="max-w-3xl mx-auto">
+    <div class="card">
+        <p class="field-help mb-4">
+            For each content role RedScribe fills in, pick which style from
+            <span class="font-medium text-slate-700">{{ profile.docx_template_filename }}</span>'s own style catalog
+            should be used — your own naming, your own formatting. Leave a role unmapped to fall back to Word's
+            default paragraph style (still readable, just unstyled).
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for label, field in role_fields %}
+                <div>
+                    <label for="{{ field.id_for_label }}" class="field-label">{{ label }}</label>
+                    {{ field|add_class:"field-input" }}
+                    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            {% include "base/_form_action_bar.html" with cancel_url=back_url submit_label="Save mapping" %}
+        </form>
+    </div>
+
+    {% include "base/_back_link.html" with url=back_url label=profile.name %}
+</div>
+{% endblock %}

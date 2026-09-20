@@ -1,0 +1,135 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-redscribe}
+      POSTGRES_USER: ${POSTGRES_USER:-redscribe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Bound to loopback only — for local dev/admin access (e.g. psql,
+      # running migrations from the host). Not reachable off-box.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-redscribe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    secrets:
+      - redscribe_root_key
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Loopback only — nginx is the real public entry point (see below).
+      # Left bound here too for direct host-side debugging without TLS.
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      # Plain `python -c` with urllib rather than curl/wget, which aren't
+      # installed in the image (see Dockerfile) — avoids adding a system
+      # package just for this. Hits config.health's DB-ping view.
+      test: ["CMD", "python", "-c", "import sys,urllib.request as u; sys.exit(0 if u.urlopen('http://localhost:8000/health/', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    volumes:
+      # Server-side backups (apps.backup — no web UI) land here. A host
+      # bind mount rather than a named volume so it's a plain directory
+      # you can point rsync/rclone/etc. at directly, same as ./certs
+      # below — Docker's own volume storage path is needless indirection
+      # for something you're meant to sync off-box yourself.
+      - ./backups:/app/backups
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    # Host network namespace instead of a published-port mapping: nginx
+    # binds host ports 80/443 directly, so it sees the real client TCP
+    # connection with no Docker NAT/port-forwarding layer in between.
+    # (A `ports:` mapping here would instead run every connection through
+    # Docker's own port-forwarding — which on a default Docker install
+    # relays each connection through a userspace `docker-proxy` process
+    # that substitutes its own address as the source, so nginx would see
+    # a Docker-internal address instead of the real client IP for every
+    # request. That's a host-level Docker daemon quirk that would need
+    # re-fixing on every machine this gets deployed to; host networking
+    # sidesteps it entirely, for free, on any host.) `web`'s own
+    # `127.0.0.1:8000` mapping below is unaffected — proxy_pass in the
+    # nginx templates targets that address directly since both are now on
+    # the host's own network.
+    network_mode: host
+    environment:
+      # nginx's own catch-all default if unset — fine for a BYO-cert setup
+      # where you haven't picked a specific server_name yet.
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/watch-certs.sh:/watch-certs.sh:ro
+      - ./certs:/etc/nginx/certs:ro
+    # Overrides CMD only, not ENTRYPOINT — the base image's own
+    # docker-entrypoint.sh still runs first (does the ${NGINX_SERVER_NAME}
+    # templating above) and then execs this instead of its default
+    # `nginx -g daemon off;`.
+    command: ["/bin/sh", "/watch-certs.sh"]
+
+  # Automated TLS cert issuance/renewal via Tailscale — opt-in only:
+  #   docker compose --profile tailscale up -d
+  # Bringing your own cert instead? Skip this service entirely (plain
+  # `docker compose up -d`) and just drop fullchain.pem/privkey.pem into
+  # ./certs yourself; nginx (above) doesn't care which path put them there.
+  # Requires the host to already be `tailscale up` with HTTPS certs
+  # enabled for the tailnet. Runs as the image's default root user
+  # (deliberately not pinned to HOST_UID/HOST_GID) so it needs no
+  # `tailscale set --operator=` step on the host: root is always trusted
+  # by tailscaled for `tailscale cert` over the bind-mounted socket, the
+  # same as running the command with `sudo` directly on the host, and
+  # root also bypasses any host-side ownership mismatch on a freshly
+  # cloned ./certs (Docker auto-creates bind-mount targets as root:root,
+  # which broke a non-root cert-renew with "permission denied" on a
+  # brand-new host that had never written into ./certs before).
+  cert-renew:
+    image: tailscale/tailscale:v1.102.3
+    profiles: ["tailscale"]
+    restart: unless-stopped
+    # Purely to dodge a known Docker Compose race (docker/compose#9054):
+    # this container has no functional dependency on `db`, but without
+    # some depends_on it's the only service that starts immediately
+    # alongside `db` on a clean `up`, both racing to attach to the
+    # just-created default network before the daemon has fully
+    # registered it — intermittently "failed to set up container
+    # networking: network ... not found". Every other service here
+    # already serializes after something (web after db, nginx after
+    # web); this just gives cert-renew the same protection.
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TS_CERT_DOMAIN: ${NGINX_SERVER_NAME:?set NGINX_SERVER_NAME to your tailnet hostname to use the tailscale profile}
+    volumes:
+      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+      - ./certs:/certs
+      - ./scripts/tailscale-cert-loop.sh:/tailscale-cert-loop.sh:ro
+    entrypoint: ["/bin/sh", "/tailscale-cert-loop.sh"]
+
+volumes:
+  pgdata:
+
+secrets:
+  # File-based Docker secret, not an env var — see apps/crypto/root_key.py
+  # and secrets/README.md for why. Compose (no swarm needed) mounts this
+  # read-only at /run/secrets/redscribe_root_key inside the container.
+  redscribe_root_key:
+    file: ./secrets/root_key.txt

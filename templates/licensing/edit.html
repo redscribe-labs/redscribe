@@ -1,0 +1,41 @@
+{% extends "base/base.html" %}
+{% block title %}Licensing — RedScribe{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Licensing</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            RedScribe is free for personal/community use. If you've purchased a commercial license, paste the
+            key you were given below — this only changes what's shown in the footer, nothing is unlocked or
+            restricted either way. See <code>COMMERCIAL-LICENSE.md</code> in the repository for terms.
+        </p>
+
+        {% if status.state == "active" %}
+        <div class="rounded-lg border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/50 px-3 py-3 mb-5">
+            <p class="text-sm font-medium text-green-900 dark:text-green-300">Licensed to {{ status.org }}</p>
+            <p class="text-xs text-green-700 dark:text-green-400 mt-0.5">Expires {{ status.expires }} ({{ status.days_left }} days left)</p>
+        </div>
+        {% elif status.state == "expiring_soon" %}
+        <div class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-3 py-3 mb-5">
+            <p class="text-sm font-medium text-amber-900 dark:text-amber-300">Licensed to {{ status.org }} — expiring soon</p>
+            <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Expires {{ status.expires }} ({{ status.days_left }} days left) — renew to avoid a lapse.</p>
+        </div>
+        {% elif status.state == "expired" %}
+        <div class="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/50 px-3 py-3 mb-5">
+            <p class="text-sm font-medium text-red-900 dark:text-red-300">Licensed to {{ status.org }} — expired</p>
+            <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">Expired {{ status.expires }}. Nothing is blocked, but the instance is no longer shown as licensed until renewed.</p>
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <label for="{{ form.key_text.id_for_label }}" class="field-label">License key</label>
+            {{ form.key_text }}
+            {% for error in form.key_text.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            <button type="submit" class="btn-primary w-full mt-5">Save</button>
+        </form>
+    </div>
+    {% url 'accounts:dashboard' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+<div>
+    <label class="field-label">Classifications</label>
+
+    <div data-classification-chips class="flex flex-wrap gap-1.5 mb-2">
+        {% for row in classification_rows %}
+        <span class="badge-slate gap-1 normal-case tracking-normal" data-classification-chip>
+            <input type="hidden" name="classification_taxonomy" value="{{ row.taxonomy }}">
+            <input type="hidden" name="classification_value" value="{{ row.value }}">
+            <span title="{{ row.taxonomy }}">{{ row.value }}</span>
+            <button type="button" class="text-slate-400 hover:text-red-600 dark:hover:text-red-400 leading-none" data-remove-classification-chip aria-label="Remove classification">&times;</button>
+        </span>
+        {% endfor %}
+    </div>
+
+    <div class="space-y-1.5">
+        <input type="text" list="classification-taxonomies" class="field-input"
+               placeholder="Taxonomy, e.g. OWASP Top 10 2021" data-classification-taxonomy-input>
+        <input type="text" class="field-input"
+               placeholder="Value, e.g. A03:2021 &ndash; Injection" data-classification-value-input>
+        <button type="button" class="btn-secondary w-full" data-add-classification>+ Add classification</button>
+    </div>
+    <p class="field-help">Type any taxonomy and value — not limited to the suggestions.</p>
+    {% for error in classification_errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+
+    <template data-classification-chip-template>
+        <span class="badge-slate gap-1 normal-case tracking-normal" data-classification-chip>
+            <input type="hidden" name="classification_taxonomy" value="">
+            <input type="hidden" name="classification_value" value="">
+            <span></span>
+            <button type="button" class="text-slate-400 hover:text-red-600 dark:hover:text-red-400 leading-none" data-remove-classification-chip aria-label="Remove classification">&times;</button>
+        </span>
+    </template>
+
+    <datalist id="classification-taxonomies">
+        {% for taxonomy in classification_suggestions.keys %}<option value="{{ taxonomy }}">{% endfor %}
+    </datalist>
+    {{ classification_suggestions|json_script:"classification-suggestions-data" }}
+</div>

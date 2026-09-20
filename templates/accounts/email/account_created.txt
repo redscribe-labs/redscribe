@@ -1,0 +1,11 @@
+Hi {{ user.first_name|default:user.username }},
+
+An account was just created for you on {{ branding.display_name }}
+(username: {{ user.username }}). Set your password to finish getting set up:
+
+{{ setup_url }}
+
+This link expires in 24 hours and can only be used once.
+
+If you weren't expecting this, contact your {{ branding.display_name }}
+administrator.

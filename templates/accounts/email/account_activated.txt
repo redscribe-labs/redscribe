@@ -1,0 +1,6 @@
+Hi {{ user.first_name|default:user.username }},
+
+Your RedScribe account ({{ user.username }}) is now active — you can sign
+in with the password you just set.
+
+If you didn't do this, contact your RedScribe administrator immediately.

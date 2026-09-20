@@ -1,0 +1,131 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ target.username }} — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3">
+            <span class="avatar !h-10 !w-10 !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ target|initials }}</span>
+            <div>
+                <h1 class="page-title">{{ target.get_full_name|default:target.username }}</h1>
+                <p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 mt-3">
+            <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
+            <span class="badge-slate">{{ target.get_auth_type_display }}</span>
+            {% if target.oauth_invite_pending %}<span class="badge-amber">Invited — awaiting first login</span>{% endif %}
+            {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+            {% if target.auth_type == "LOCAL" %}
+                {% if has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+    <a href="{% url 'user_management:edit' target.uuid %}" class="btn-secondary">Edit</a>
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel space-y-3">
+    <h2 class="font-semibold text-slate-900 mb-1">Actions</h2>
+
+    {% if target.auth_type == "LOCAL" %}
+    <form method="post" action="{% url 'user_management:send_password_reset' target.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Send password reset link</button>
+    </form>
+    <form method="post" action="{% url 'user_management:clear_mfa' target.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Clear MFA (force re-enrollment)</button>
+    </form>
+    {% if oauth_provider and not target.is_superadmin_role %}
+    <form method="post" action="{% url 'user_management:convert_to_oauth' target.uuid %}"
+          onsubmit="return confirm('Convert this account to a pending OAuth invite? Their local password will stop working, and they\'ll need to sign in through {{ oauth_provider }} with {{ target.email }} to regain access.');">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Convert to OAuth invite</button>
+    </form>
+    {% endif %}
+    {% else %}
+    <p class="text-xs text-slate-400">
+        OAuth-provisioned account — password and MFA are managed by the identity provider, not here.
+    </p>
+    {% if target.oauth_invite_pending %}
+    <p class="text-xs text-amber-600 dark:text-amber-500">
+        This is a pending invite — it activates automatically the first time
+        {{ target.email }} signs in through the identity provider.
+    </p>
+    {% endif %}
+    {% if not oauth_provider %}
+    <p class="text-xs text-red-600 dark:text-red-500">
+        OAuth is not currently configured on this instance — this account can't sign in until
+        it's reconfigured, or converted to a local account below.
+    </p>
+    {% endif %}
+    <form method="post" action="{% url 'user_management:convert_to_local' target.uuid %}"
+          onsubmit="return confirm('Convert this account to a local username/password account? They will be emailed a link to set their password.');">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Convert to local account</button>
+    </form>
+    {% endif %}
+
+    <div class="pt-2 border-t border-slate-100 dark:border-slate-200">
+        {% if target.is_active %}
+            {% if is_self %}
+            <button type="button" disabled class="btn-danger w-full opacity-50 cursor-not-allowed">Deactivate account</button>
+            <p class="field-help mt-1.5">You can't deactivate your own account — ask another Superadmin.</p>
+            {% elif is_last_active_superadmin %}
+            <button type="button" disabled class="btn-danger w-full opacity-50 cursor-not-allowed">Deactivate account</button>
+            <p class="field-help mt-1.5">This is the last active Superadmin — grant Superadmin to another account first.</p>
+            {% else %}
+            <form method="post" action="{% url 'user_management:deactivate' target.uuid %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger w-full">Deactivate account</button>
+            </form>
+            <p class="field-help mt-1.5">Signs them out of every active session immediately.</p>
+            {% endif %}
+        {% else %}
+        <form method="post" action="{% url 'user_management:reactivate' target.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary w-full">Reactivate account</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Account</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div><dt class="text-slate-400">Joined</dt><dd class="text-slate-700">{{ target.date_joined|date:"d/m/Y" }}</dd></div>
+            <div><dt class="text-slate-400">Last login</dt><dd class="text-slate-700">{{ target.last_login|date:"d/m/Y H:i"|default:"Never" }}</dd></div>
+            <div><dt class="text-slate-400">MFA enrolled</dt><dd class="text-slate-700">{{ target.mfa_enrolled_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+            <div><dt class="text-slate-400">Deactivated</dt><dd class="text-slate-700">{{ target.deactivated_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Recent login attempts</h2>
+        {% if recent_attempts %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for attempt in recent_attempts %}
+            <li class="flex items-center justify-between py-2 text-sm">
+                <span class="{% if attempt.successful %}badge-green{% else %}badge-red{% endif %}">
+                    {% if attempt.successful %}Success{% else %}Failed{% endif %}
+                </span>
+                <span class="text-slate-400 font-mono text-xs">{{ attempt.ip_address|default:"—" }}</span>
+                <span class="text-slate-500">{{ attempt.created_at|date:"d/m/Y H:i:s" }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-500">No login attempts recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% url 'user_management:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to User Management" %}
+{% endblock %}

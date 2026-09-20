@@ -1,0 +1,7 @@
+{% extends "errors/_base.html" %}
+{% block title %}404 Not Found{% endblock %}
+{% block code %}404{% endblock %}
+{% block heading %}Not found{% endblock %}
+{% block message %}We ran recon on this URL and it just isn't in scope. Checked robots.txt too, in case you were hoping.{% endblock %}
+{% block cta_url %}{% if user.is_authenticated and user.is_client_role %}{% url 'clients_portal:dashboard' %}{% else %}/{% endif %}{% endblock %}
+{% block cta_label %}Back to dashboard{% endblock %}

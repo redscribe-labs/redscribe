@@ -1,0 +1,33 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}New role — RedScribe{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-4">New role</h1>
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-5">
+                <label for="{{ form.name.id_for_label }}" class="field-label">Name</label>
+                {{ form.name|add_class:"field-input" }}
+                {% for error in form.name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            <div class="mb-5 flex items-start gap-3 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 px-3 py-3">
+                {{ form.requires_mfa }}
+                <div class="min-w-0">
+                    <label for="{{ form.requires_mfa.id_for_label }}" class="text-sm font-medium text-red-900 dark:text-red-300">Require MFA</label>
+                    <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">{{ form.requires_mfa.help_text }}</p>
+                </div>
+            </div>
+            <div class="mb-5">
+                <p class="field-label mb-2">Permissions</p>
+                {% include "accounts/role_management/_permission_checkboxes.html" %}
+            </div>
+            <button type="submit" class="btn-primary w-full">Create role</button>
+        </form>
+    </div>
+    {% url 'role_management:list' as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to Roles" %}
+</div>
+{% endblock %}

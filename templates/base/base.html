@@ -1,0 +1,332 @@
+{% load static %}
+{% load redscribe_extras %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script nonce="{{ request.csp_nonce }}">
+        (function () {
+            var stored = localStorage.getItem("theme");
+            var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+            if (dark) document.documentElement.classList.add("dark");
+            if (localStorage.getItem("sidebarCollapsed") === "1") document.documentElement.classList.add("sidebar-collapsed");
+        })();
+    </script>
+    <title>{% block title %}RedScribe{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    {% include "base/_font_theme_head.html" %}
+    <style>
+        @media (min-width: 1024px) {
+            #sidebar { transition: width 200ms ease; }
+            html.sidebar-collapsed #sidebar { width: 4.5rem; }
+            html.sidebar-collapsed #sidebar .sidebar-label,
+            html.sidebar-collapsed #sidebar .sidebar-group-label,
+            html.sidebar-collapsed #sidebar .sidebar-logo-full { display: none; }
+            html.sidebar-collapsed #sidebar .sidebar-logo-mark { display: flex; }
+            html.sidebar-collapsed #sidebar .sidebar-logo-image { max-width: 2rem; }
+            html.sidebar-collapsed #sidebar .sidebar-header {
+                flex-direction: column; justify-content: center; padding-left: 0; padding-right: 0; gap: 0.5rem;
+            }
+            html.sidebar-collapsed #sidebar .sidebar-link,
+            html.sidebar-collapsed #sidebar .sidebar-link-active { justify-content: center; padding-left: 0; padding-right: 0; }
+            html.sidebar-collapsed #sidebar .sidebar-user-row { justify-content: center; }
+            html.sidebar-collapsed #sidebar .sidebar-badge-count { display: none; }
+            html.sidebar-collapsed #sidebar .sidebar-badge-dot { display: block; }
+            #sidebar-desktop-toggle svg { transition: transform 200ms ease; }
+            html.sidebar-collapsed #sidebar-desktop-toggle svg { transform: rotate(180deg); }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full font-sans text-slate-900 antialiased twilight-surface">
+
+    <div class="lg:flex lg:min-h-full">
+        {% if user.is_authenticated %}
+        {% if user|mfa_satisfied:feature_flags %}
+        <div class="lg:hidden flex items-center justify-between h-14 px-4 twilight-surface shadow-md">
+            <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
+                {% if branding.has_logo %}
+                <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="h-7 max-w-[9rem] object-contain">
+                {% elif branding.firm_name %}
+                <span class="truncate">{{ branding.firm_name }}</span>
+                {% else %}
+                <span class="flex items-baseline gap-0.5">Red<span class="text-mist-300">Scribe</span></span>
+                {% endif %}
+            </a>
+            <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-white/80 hover:bg-white/10 hover:text-white" aria-expanded="false" aria-controls="sidebar">
+                <span class="sr-only">Open main menu</span>
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+        <div id="sidebar-backdrop" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden"></div>
+
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full transition-transform duration-200
+                                    lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0 lg:w-64 lg:shrink-0
+                                    flex flex-col twilight-surface shadow-md">
+            <div class="sidebar-header flex items-center justify-between gap-1 px-4 py-3.5 border-b border-white/15">
+                <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
+                    {% if branding.has_logo %}
+                    <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="sidebar-logo-image h-7 max-w-[9rem] object-contain">
+                    {% elif branding.firm_name %}
+                    <span class="sidebar-logo-full truncate">{{ branding.firm_name }}</span>
+                    <span class="sidebar-logo-mark hidden h-7 w-7 items-center justify-center rounded-md bg-white/10 text-mist-300 text-base uppercase">{{ branding.firm_name|slice:":1" }}</span>
+                    {% else %}
+                    <span class="sidebar-logo-full flex items-baseline gap-0.5">Red<span class="text-mist-300">Scribe</span><span class="text-mist-400/70 animate-pulse">_</span></span>
+                    <svg class="sidebar-logo-mark hidden h-7 w-7" viewBox="0 0 40 40" aria-hidden="true">
+                        <rect width="40" height="40" rx="9" fill="#111213"/>
+                        <rect x="9" y="11" width="22" height="4" rx="2" fill="#669966"/>
+                        <rect x="9" y="18" width="15" height="4" rx="2" fill="#7a8185"/>
+                        <rect x="9" y="25" width="9" height="4" rx="2" fill="#494d50"/>
+                    </svg>
+                    {% endif %}
+                </a>
+                <button type="button" id="sidebar-desktop-toggle"
+                        class="hidden lg:inline-flex items-center justify-center h-7 w-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                        aria-expanded="true" aria-controls="sidebar" title="Collapse sidebar">
+                    <span class="sr-only">Toggle sidebar</span>
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+            <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+                <a href="{% url 'accounts:dashboard' %}" title="Dashboard" class="{% if request.path == '/' %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg>
+                    <span class="sidebar-label">Dashboard</span>
+                </a>
+                <a href="{% url 'engagements:list' %}" title="Engagements" class="{% if '/engagements/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
+                    <span class="sidebar-label">Engagements</span>
+                </a>
+                <a href="{% url 'queue:my_queue' %}" title="My Queue" class="{% if '/reviews/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 5 4h10l2 7"/><path d="M3 11v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4h-4.2a2 2 0 0 1-1.8 1.2H9a2 2 0 0 1-1.8-1.2H3Z"/></svg>
+                    <span class="sidebar-label">My Queue</span>
+                </a>
+                {% if feature_flags.notifications %}
+                <a href="{% url 'notifications:list' %}" title="Notifications" class="relative {% if '/notifications/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5a4 4 0 0 0-4 4v2.3l-1.3 2.6a1 1 0 0 0 .9 1.6h8.8a1 1 0 0 0 .9-1.6L14 9.8V7.5a4 4 0 0 0-4-4Z"/><path d="M8.3 15a1.7 1.7 0 0 0 3.4 0"/></svg>
+                    <span class="sidebar-label">Notifications</span>
+                    {% if unread_notification_count %}
+                    <span class="sidebar-badge-count badge-red ml-auto !py-0 !px-1.5 text-[0.65rem]">{{ unread_notification_count }}</span>
+                    <span class="sidebar-badge-dot hidden absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[#111213]"></span>
+                    {% endif %}
+                </a>
+                {% endif %}
+                {% if feature_flags.global_search %}
+                <a href="{% url 'search:results' %}" title="Search" class="{% if '/search/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+                    <span class="sidebar-label">Search</span>
+                </a>
+                {% endif %}
+                <p class="sidebar-group-label">Knowledge Base</p>
+                <a href="{% url 'catalogue:list' %}" title="Catalogue" class="{% if '/catalogue/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5.5c-1.2-1-3-1.5-6-1.5v10.5c3 0 4.8.5 6 1.5 1.2-1 3-1.5 6-1.5V4c-3 0-4.8.5-6 1.5Z"/><path d="M10 5.5v10.5"/></svg>
+                    <span class="sidebar-label">Catalogue</span>
+                </a>
+                {% if user|has_permission:"checklist_templates.manage" %}
+                <a href="{% url 'checklist_templates:list' %}" title="Checklist Templates" class="{% if '/checklist-templates/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.5"/><path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h1A1.5 1.5 0 0 1 12 3.5V4"/><path d="M7.5 10.5 9 12l3.5-3.5"/></svg>
+                    <span class="sidebar-label">Checklist Templates</span>
+                </a>
+                {% endif %}
+                {% if feature_flags.recurrence_and_trends and user|has_permission:"reports.trends" or user|has_permission:"report_settings.manage" or user|has_permission:"branding.manage" %}
+                <p class="sidebar-group-label">Reporting</p>
+                {% if feature_flags.recurrence_and_trends and user|has_permission:"reports.trends" %}
+                <a href="{% url 'trends:view' %}" title="Trends" class="{% if '/trends/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14 8 9l3 3 5-6"/><path d="M14 5h3v3"/></svg>
+                    <span class="sidebar-label">Trends</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"report_settings.manage" %}
+                <a href="{% url 'report_profiles:list' %}" title="Report Profiles" class="{% if '/report-profiles/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="5" height="5" rx="1"/><rect x="11.5" y="3.5" width="5" height="5" rx="1"/><rect x="3.5" y="11.5" width="5" height="5" rx="1"/><rect x="11.5" y="11.5" width="5" height="5" rx="1"/></svg>
+                    <span class="sidebar-label">Report Profiles</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"branding.manage" %}
+                <a href="{% url 'branding:edit' %}" title="Firm Branding" class="{% if '/branding/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 4-2.6 6.6-6 7.5-3.4-.9-6-3.5-6-7.5V5l6-2.5Z"/><path d="M10 6.5v7M6.5 10h7"/></svg>
+                    <span class="sidebar-label">Firm Branding</span>
+                </a>
+                {% endif %}
+                {% endif %}
+                {% if user|has_permission:"users.manage" or user|has_permission:"roles.manage" or user|has_permission:"clients.manage" %}
+                <p class="sidebar-group-label">Access</p>
+                {% if user|has_permission:"users.manage" %}
+                <a href="{% url 'user_management:list' %}" title="User Management" class="{% if '/user-management/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6.5" r="2.5"/><path d="M3 16v-1a4 4 0 0 1 4-4h1a4 4 0 0 1 4 4v1"/><circle cx="14.5" cy="7" r="2"/><path d="M13 11.2a3.6 3.6 0 0 1 3.5 3.3V16"/></svg>
+                    <span class="sidebar-label">User Management</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"roles.manage" %}
+                <a href="{% url 'role_management:list' %}" title="Roles" class="{% if '/roles/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 4-2.6 6.6-6 7.5-3.4-.9-6-3.5-6-7.5V5l6-2.5Z"/><path d="M7.5 10 9 11.5l3.5-3.5"/></svg>
+                    <span class="sidebar-label">Roles</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"clients.manage" %}
+                <a href="{% url 'clients:list' %}" title="Manage Clients" class="{% if '/clients/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5V7l4.5-2.5V16.5"/><path d="M8.5 8.5 16 6v10.5"/><path d="M6.5 10.5h0M6.5 13h0M12 9.5h0M12 12h0M12 14.5h0"/></svg>
+                    <span class="sidebar-label">Manage Clients</span>
+                </a>
+                {% endif %}
+                {% endif %}
+                {% if user|has_permission:"feature_flags.manage" or user|has_permission:"field_visibility.manage" or user|has_permission:"licensing.manage" or user|has_permission:"audit_log.manage" %}
+                <p class="sidebar-group-label">System</p>
+                {% if user|has_permission:"feature_flags.manage" %}
+                <a href="{% url 'feature_flags:edit' %}" title="Feature Flags" class="{% if '/feature-flags/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v14"/><path d="M5 4h9l-2 3 2 3H5"/></svg>
+                    <span class="sidebar-label">Feature Flags</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"field_visibility.manage" %}
+                <a href="{% url 'field_visibility:edit' %}" title="Finding Structure" class="{% if '/field-visibility/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h12M6 10h8M8 14.5h4"/></svg>
+                    <span class="sidebar-label">Finding Structure</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"licensing.manage" %}
+                <a href="{% url 'licensing:edit' %}" title="Licensing" class="{% if '/licensing/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 4-2.6 6.6-6 7.5-3.4-.9-6-3.5-6-7.5V5l6-2.5Z"/><path d="M7.5 10.2 9.2 12l3.3-3.5"/></svg>
+                    <span class="sidebar-label">Licensing</span>
+                </a>
+                {% endif %}
+                {% if user|has_permission:"audit_log.manage" %}
+                <a href="{% url 'audit:list' %}" title="Audit Log" class="{% if '/audit/' in request.path %}sidebar-link-active{% else %}sidebar-link{% endif %}">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="12" height="14" rx="1.5"/><path d="M7 7h6M7 10h6M7 13h3"/></svg>
+                    <span class="sidebar-label">Audit Log</span>
+                </a>
+                {% endif %}
+                {% endif %}
+            </nav>
+            <div class="px-3 py-4 border-t border-white/15 space-y-2">
+                <div class="sidebar-user-row flex items-center gap-2.5 px-1 py-1">
+                    <span class="avatar" title="{{ user }}">{{ user|initials }}</span>
+                    <div class="sidebar-label min-w-0 flex-1">
+                        <p class="text-sm text-white truncate leading-tight">{{ user }}</p>
+                        <p class="text-xs text-white/50 truncate leading-tight">{{ user.role.name }}</p>
+                    </div>
+                    <span class="sidebar-label text-white">{% include 'base/_theme_toggle.html' %}</span>
+                </div>
+                <a href="{% url 'accounts:profile' %}" title="Profile" class="sidebar-link">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4 16.5a6 6 0 0 1 12 0"/></svg>
+                    <span class="sidebar-label">Profile</span>
+                </a>
+                {% if feature_flags.notifications %}
+                <a href="{% url 'accounts:notification_preferences' %}" title="Notification preferences" class="sidebar-link">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5a4 4 0 0 0-4 4v2.3l-1.3 2.6a1 1 0 0 0 .9 1.6h8.8a1 1 0 0 0 .9-1.6L14 9.8V7.5a4 4 0 0 0-4-4Z"/><path d="M8.3 15a1.7 1.7 0 0 0 3.4 0"/></svg>
+                    <span class="sidebar-label">Notification preferences</span>
+                </a>
+                {% endif %}
+                {% if user.auth_type == "LOCAL" %}
+                <a href="{% url 'accounts:password_change' %}" title="Change password" class="sidebar-link">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8.5" width="10" height="8" rx="1.5"/><path d="M7 8.5V6a3 3 0 0 1 6 0v2.5"/></svg>
+                    <span class="sidebar-label">Change password</span>
+                </a>
+                {% endif %}
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" title="Sign out" class="sidebar-link w-full text-left">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><path d="M12.5 13.5 16 10l-3.5-3.5"/><path d="M16 10H7.5"/></svg>
+                        <span class="sidebar-label">Sign out</span>
+                    </button>
+                </form>
+                <p class="sidebar-label text-xs text-white/30 text-center pt-1">
+                    RedScribe v{{ app_version }}{% if license_status.state == "active" or license_status.state == "expiring_soon" %} — Licensed to {{ license_status.org }}{% elif license_status.state == "expired" %} — License expired ({{ license_status.org }}){% endif %}
+                </p>
+            </div>
+        </aside>
+
+        <script nonce="{{ request.csp_nonce }}">
+            (function () {
+                var toggle = document.getElementById("sidebar-toggle");
+                var sidebar = document.getElementById("sidebar");
+                var backdrop = document.getElementById("sidebar-backdrop");
+                if (!toggle || !sidebar) return;
+                function open() {
+                    sidebar.classList.remove("-translate-x-full");
+                    if (backdrop) backdrop.classList.remove("hidden");
+                    toggle.setAttribute("aria-expanded", "true");
+                }
+                function close() {
+                    sidebar.classList.add("-translate-x-full");
+                    if (backdrop) backdrop.classList.add("hidden");
+                    toggle.setAttribute("aria-expanded", "false");
+                }
+                toggle.addEventListener("click", function () {
+                    if (sidebar.classList.contains("-translate-x-full")) open(); else close();
+                });
+                if (backdrop) backdrop.addEventListener("click", close);
+            })();
+            (function () {
+                var dtoggle = document.getElementById("sidebar-desktop-toggle");
+                if (!dtoggle) return;
+                function applyState(collapsed) {
+                    document.documentElement.classList.toggle("sidebar-collapsed", collapsed);
+                    dtoggle.setAttribute("aria-expanded", String(!collapsed));
+                    dtoggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+                }
+                applyState(document.documentElement.classList.contains("sidebar-collapsed"));
+                dtoggle.addEventListener("click", function () {
+                    var collapsed = !document.documentElement.classList.contains("sidebar-collapsed");
+                    localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0");
+                    applyState(collapsed);
+                });
+            })();
+        </script>
+        {% else %}
+        {% include 'base/_theme_toggle_floating.html' %}
+        {% endif %}
+        {% else %}
+        {% include 'base/_theme_toggle_floating.html' %}
+        {% endif %}
+
+        <div class="flex-1 min-w-0">
+            {% if user.is_authenticated and not feature_flags.mfa_required %}
+            <div class="bg-red-600 text-white text-sm text-center py-1.5 px-4">
+                MFA is currently disabled instance-wide — local accounts are not required to use TOTP.
+                {% if user|has_permission:"feature_flags.manage" %}<a href="{% url 'feature_flags:edit' %}" class="underline font-medium">Change this</a>{% endif %}
+            </div>
+            {% endif %}
+            {% if user.is_authenticated and user|has_permission:"licensing.manage" and license_status.state == "expiring_soon" %}
+            <div class="bg-amber-500 text-white text-sm text-center py-1.5 px-4">
+                Your commercial license for {{ license_status.org }} expires in {{ license_status.days_left }} day{{ license_status.days_left|pluralize }} ({{ license_status.expires }}).
+                <a href="{% url 'licensing:edit' %}" class="underline font-medium">Renew</a>
+            </div>
+            {% elif user.is_authenticated and user|has_permission:"licensing.manage" and license_status.state == "expired" %}
+            <div class="bg-red-600 text-white text-sm text-center py-1.5 px-4">
+                Your commercial license for {{ license_status.org }} expired on {{ license_status.expires }}. Nothing is
+                blocked, but the instance is no longer shown as licensed.
+                <a href="{% url 'licensing:edit' %}" class="underline font-medium">Renew</a>
+            </div>
+            {% endif %}
+            {% include 'base/_toasts.html' %}
+            <div class="w-full xl:max-w-[1800px] mx-auto px-4 xl:px-8 py-8">
+                {% if user.is_authenticated %}
+                {% if user|mfa_satisfied:feature_flags %}
+                <div id="page-sticky-header" class="sticky top-0 z-20 bg-slate-50 pt-3 -mt-3 pb-4">
+                    {% include 'base/_breadcrumbs.html' %}
+                    {% block engagement_subnav %}{% endblock %}
+                </div>
+                {% endif %}
+                {% endif %}
+                {% block page_header %}{% endblock %}
+                <div class="flex flex-col xl:flex-row xl:items-start gap-8">
+                    <main class="{% block main_class %}min-w-0 flex-1{% endblock %}">
+                        {% block content %}{% endblock %}
+                    </main>
+                    {% block side_panel %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/redscribe-validation.js' %}"></script>
+    {% include "base/_session_watch.html" %}
+    {% block extra_body %}{% endblock %}
+</body>
+</html>

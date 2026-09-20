@@ -1,0 +1,72 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}{{ target.username }} — RedScribe{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3">
+            <span class="avatar !h-10 !w-10 !bg-orange-50 !text-orange-700 dark:!bg-orange-950/50 dark:!text-orange-300">{{ target|initials }}</span>
+            <div>
+                <h1 class="page-title">{{ target.get_full_name|default:target.username }}</h1>
+                <p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 mt-3">
+            <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
+            {% if target.client %}
+            <a href="{% url 'clients:detail' target.client.pk %}" class="badge-slate hover:ring-brand-400">{{ target.client.name }}</a>
+            {% endif %}
+            {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+            {% if has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
+        </div>
+    </div>
+    <a href="{% url 'clients:user_edit' target.uuid %}" class="btn-secondary">Edit</a>
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel space-y-3">
+    <h2 class="font-semibold text-slate-900 mb-1">Actions</h2>
+
+    <form method="post" action="{% url 'clients:user_send_password_reset' target.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Send password reset link</button>
+    </form>
+    <form method="post" action="{% url 'clients:user_clear_mfa' target.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-secondary w-full">Clear MFA (force re-enrollment)</button>
+    </form>
+
+    <div class="pt-2 border-t border-slate-100 dark:border-slate-200">
+        {% if target.is_active %}
+        <form method="post" action="{% url 'clients:user_deactivate' target.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger w-full">Deactivate account</button>
+        </form>
+        <p class="field-help mt-1.5">Signs them out of every active session immediately.</p>
+        {% else %}
+        <form method="post" action="{% url 'clients:user_reactivate' target.uuid %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary w-full">Reactivate account</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 class="font-semibold text-slate-900 mb-3">Account</h2>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        <div><dt class="text-slate-400">Client company</dt><dd class="text-slate-700">{{ target.client.name|default:"—" }}</dd></div>
+        <div><dt class="text-slate-400">Joined</dt><dd class="text-slate-700">{{ target.date_joined|date:"d/m/Y" }}</dd></div>
+        <div><dt class="text-slate-400">Last login</dt><dd class="text-slate-700">{{ target.last_login|date:"d/m/Y H:i"|default:"Never" }}</dd></div>
+        <div><dt class="text-slate-400">MFA enrolled</dt><dd class="text-slate-700">{{ target.mfa_enrolled_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+        <div><dt class="text-slate-400">Deactivated</dt><dd class="text-slate-700">{{ target.deactivated_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+    </dl>
+</div>
+
+{% url 'clients:list' as back_url %}
+{% include "base/_back_link.html" with url=back_url label="Back to Manage Clients" %}
+{% endblock %}

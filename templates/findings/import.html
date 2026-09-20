@@ -1,0 +1,25 @@
+{% extends "base/base.html" %}
+{% block title %}Import scan — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="findings" %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <h1 class="text-xl font-bold text-slate-900 mb-1">Import scan results</h1>
+        <p class="text-sm text-slate-500 mb-5">
+            Creates one Draft finding per result — nothing is published automatically, everything
+            goes through the normal review/QA flow from there.
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% include "base/_generic_form_fields.html" %}
+            <button type="submit" class="btn-primary w-full">Import</button>
+        </form>
+    </div>
+    {% url 'findings:list' engagement.pk as back_url %}
+    {% include "base/_back_link.html" with url=back_url label="Back to findings" %}
+</div>
+{% endblock %}
