@@ -139,12 +139,20 @@ _PREVIEW_CSS_BASE = """
    contrast against it. Long unbroken lines wrap instead of running off
    the printed page (WeasyPrint has no horizontal scroll to fall back on
    the way a browser tab does). */
-.report-section pre, .report-section pre code {{ font-family: "{monospace_font}", monospace; }}
+.report-section pre, .report-section pre code, .report-section code {{ font-family: "{monospace_font}", monospace; }}
 .report-section pre {{
     background: {code_bg}; color: {code_text}; border: 1px solid {code_border}; border-radius: .4rem;
     padding: .6rem .75rem; font-size: .75rem;
     white-space: pre-wrap; overflow-wrap: anywhere;
 }}
+/* Inline code (a bare <code> mark, not inside a fenced block above) gets
+   the same theme-derived colors as the code block — this stylesheet, not
+   static/css/editor.css, is what actually styles exported reports;
+   editor.css only affects the live Tiptap editing UI in the browser. */
+.report-section code {{
+    background: {code_bg}; color: {code_text}; border-radius: .2rem; padding: .1rem .3rem; font-size: .85em;
+}}
+.report-section pre code {{ background: none; padding: 0; border-radius: 0; font-size: inherit; }}
 /* Highlight and links both key off the same table-theme color as the
    code block and table headers above — one consistent report accent
    color throughout, rather than an independent yellow/blue. */
