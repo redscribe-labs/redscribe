@@ -14,7 +14,6 @@ LABEL_DEFAULTS: dict[str, str] = {
     "untitled_section": "Untitled section",
     "assessment_team": "Assessment team",
     "testing_methodology_coverage": "Testing Methodology / Coverage",
-    "affects": "Affects",
     "retest_history": "Retest history",
     "finding_severity_rating": "Severity rating",
     "finding_id_row": "Vulnerability/Finding ID",
@@ -61,7 +60,6 @@ LABEL_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         ("untitled_section", "Fallback for a heading with no text"),
         ("assessment_team", "Assessment team section title"),
         ("testing_methodology_coverage", "Checklist coverage section title"),
-        ("affects", "Finding \"Affects\" subsection title"),
         ("retest_history", "Retest history subsection title"),
     ]),
     ("Finding details table", [

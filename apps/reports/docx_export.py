@@ -248,9 +248,9 @@ def _assessment_team_subdoc(tpl, engagement, profile, styles):
         member = entry["member"]
         _set_style_attr(subdoc.add_paragraph(f"{member} — {entry['role_name']}"), styles.get("heading_3"))
         if entry["background"]:
-            _set_style_attr(subdoc.add_paragraph(entry["background"]), styles.get("body_paragraph"))
-        for qualification in entry["qualifications_list"] or []:
-            _set_style_attr(subdoc.add_paragraph(qualification), styles.get("bullet_list"))
+            tiptap_docx.render_tiptap_into(subdoc, entry["background"], styles=styles)
+        if entry["qualifications"]:
+            tiptap_docx.render_tiptap_into(subdoc, entry["qualifications"], styles=styles)
     return subdoc
 
 
@@ -463,7 +463,10 @@ def build_docx(*, config, engagement, project_key, user) -> bytes:
         is_remediation_report=config.is_remediation_report,
     )
 
-    active_sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    # "affects" is always available in the template as its own {{ finding.affects }}
+    # merge field (set explicitly in _finding_context below) — excluded here so this
+    # generic per-section loop doesn't clobber that with an empty subdoc.
+    active_sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     context["findings"] = [
         _finding_context(
             tpl, f, project_key=project_key, image_resolver=image_resolver, styles=styles,
@@ -490,7 +493,10 @@ def build_dummy_context(profile):
     loop body is actually exercised, not skipped over an empty list."""
     tpl = DocxTemplate(io.BytesIO(bytes(profile.docx_template)))
     styles = profile.docx_style_map if isinstance(profile.docx_style_map, dict) else {}
-    active_sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    # "affects" is always available in the template as its own {{ finding.affects }}
+    # merge field (set explicitly in _finding_context below) — excluded here so this
+    # generic per-section loop doesn't clobber that with an empty subdoc.
+    active_sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
 
     context = {
         "client_name": "Example Client", "reference_number": "PROJ-0001", "scope": "example.com",

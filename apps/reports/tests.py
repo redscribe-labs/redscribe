@@ -1066,7 +1066,7 @@ class FindingMetadataClassificationTests(TestCase):
         self.assertEqual(localized_rows["Severity rating"].text, "Critique")
         self.assertEqual(localized_rows["Status"].text, "Ouverte")
 
-    def test_affects_renders_right_after_business_impact(self):
+    def test_affects_position_is_admin_configurable(self):
         from .assembly import build_report_document, get_draft_config
 
         finding = make_finding(
@@ -1076,6 +1076,16 @@ class FindingMetadataClassificationTests(TestCase):
         set_finding_section(finding, key, "vulnerability-description", doc_json("desc"))
         set_finding_section(finding, key, "business-impact", doc_json("impact"))
         set_finding_section(finding, key, "testing-summary", doc_json("summary"))
+
+        # "affects" has no content of its own (backed by finding.affects, not
+        # a FindingSection) — its report position comes entirely from its
+        # ContentSectionDefinition.order, set here between "business-impact"
+        # and "testing-summary" to prove that's honored, not hardcoded.
+        affects = ContentSectionDefinition.objects.get(slug="affects")
+        business_impact = ContentSectionDefinition.objects.get(slug="business-impact")
+        testing_summary = ContentSectionDefinition.objects.get(slug="testing-summary")
+        affects.order = (business_impact.order + testing_summary.order) // 2
+        affects.save(update_fields=["order"])
 
         config = get_draft_config(self.engagement)
         document = build_report_document(
@@ -1097,9 +1107,9 @@ class FindingMetadataClassificationTests(TestCase):
         titles = [c.title for c in finding_section.children]
         self.assertEqual(
             titles[titles.index("Business impact"):titles.index("Business impact") + 2],
-            ["Business impact", "Affects"],
+            ["Business impact", "Affected Assets"],
         )
-        self.assertLess(titles.index("Affects"), titles.index("Testing summary"))
+        self.assertLess(titles.index("Affected Assets"), titles.index("Testing summary"))
 
     def test_no_classifications_shows_placeholder_row(self):
         from .assembly import _finding_metadata_table
@@ -1870,7 +1880,7 @@ class ReportProfileViewTests(TestCase):
             config=config, engagement=self.engagement, project_key=project_key, user=None,
         )
         html = ir_render.render_document_html(document)
-        self.assertIn("Affects", html)
+        self.assertIn("Affected Assets", html)
         self.assertIn("Severity rating", html)
 
     def test_custom_label_overrides_default_text(self):
@@ -1894,12 +1904,12 @@ class ReportProfileViewTests(TestCase):
             "bullet_character": profile.bullet_character,
             "table_header_color": profile.table_header_color,
             "empty_cell_background_color": profile.empty_cell_background_color,
-            "label__affects": "Impact area",
+            "label__finding_cvss_score": "Score override",
             "label__finding_severity_rating": "Risk rating",
         })
         self.assertEqual(resp.status_code, 302)
         profile.refresh_from_db()
-        self.assertEqual(profile.labels["affects"], "Impact area")
+        self.assertEqual(profile.labels["finding_cvss_score"], "Score override")
         self.assertEqual(profile.labels["finding_severity_rating"], "Risk rating")
         # Untouched fields never got an explicit entry — still inherit.
         self.assertNotIn("finding_status", profile.labels)
@@ -1915,9 +1925,9 @@ class ReportProfileViewTests(TestCase):
             config=config, engagement=self.engagement, project_key=project_key, user=None,
         )
         html = ir_render.render_document_html(document)
-        self.assertIn("Impact area", html)
+        self.assertIn("Score override", html)
         self.assertIn("Risk rating", html)
-        self.assertNotIn(">Affects<", html)
+        self.assertNotIn(">CVSS score<", html)
 
     def test_plain_table_cells_use_configured_fill_color(self):
         from . import ir_render

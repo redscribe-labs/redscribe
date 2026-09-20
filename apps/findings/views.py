@@ -51,6 +51,11 @@ def _save_finding(form, engagement, project_key, *, classification_tags, instanc
     finding.save()
 
     for definition in sections:
+        if definition.is_protected:
+            # "affects" (PLAIN_FIELDS, above) is the only protected section
+            # today — it's stored on Finding directly, not as a generic
+            # FindingSection.
+            continue
         content = form.section_content(definition.slug)
         ciphertext = encrypt_bytes(
             content.encode("utf-8"), project_key,
@@ -207,7 +212,10 @@ def finding_create(request, engagement_id):
 @engagement_access_required
 def finding_detail(request, engagement_id, pk):
     finding = get_object_or_404(Finding, pk=pk, engagement=request.engagement)
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    # "Affects" is shown separately, near the finding's other metadata badges
+    # (see templates/findings/detail.html) — excluded here, same as the
+    # client portal's equivalent detail view.
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     existing_sections = {fs.definition_id: fs for fs in finding.sections.all()}
     section_values = {}
     for definition in sections:

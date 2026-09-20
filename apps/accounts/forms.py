@@ -4,6 +4,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
+from apps.findings.forms import RichTextField
+
 from . import security
 from .models import Role
 
@@ -142,35 +144,31 @@ class NotificationPreferencesForm(forms.ModelForm):
 
 
 class ProfileForm(forms.ModelForm):
+    qualifications = RichTextField(
+        required=False, label="Qualifications / certifications",
+        help_text="Shown as a bulleted list in the report's Assessment team section.",
+    )
+    background = RichTextField(
+        required=False, help_text="A short professional bio — shown under your name in the same section.",
+    )
+
     class Meta:
         model = User
         fields = ["qualifications", "background"]
-        widgets = {
-            "qualifications": forms.Textarea(attrs={"rows": 4}),
-            "background": forms.Textarea(attrs={"rows": 4}),
-        }
-        labels = {"qualifications": "Qualifications / certifications"}
-        help_texts = {
-            "qualifications": "One per line, e.g. \"OSCP\" — shown as a bulleted list in the "
-            "report's Assessment team section.",
-            "background": "A short professional bio — shown under your name in the same section.",
-        }
 
 
 class LocalUserEditForm(forms.ModelForm):
+    qualifications = RichTextField(
+        required=False, label="Qualifications / certifications",
+        help_text="Shown as a bulleted list in the report's Assessment team section.",
+    )
+    background = RichTextField(
+        required=False, help_text="A short professional bio — shown under their name in the same section.",
+    )
+
     class Meta:
         model = User
         fields = ["email", "first_name", "last_name", "role", "qualifications", "background"]
-        widgets = {
-            "qualifications": forms.Textarea(attrs={"rows": 4}),
-            "background": forms.Textarea(attrs={"rows": 4}),
-        }
-        labels = {"qualifications": "Qualifications / certifications"}
-        help_texts = {
-            "qualifications": "One per line, e.g. \"OSCP\" — shown as a bulleted list in the "
-            "report's Assessment team section.",
-            "background": "A short professional bio — shown under their name in the same section.",
-        }
 
     def __init__(self, *args, requesting_user=None, **kwargs):
         super().__init__(*args, **kwargs)

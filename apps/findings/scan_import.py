@@ -33,7 +33,7 @@ def import_scan(*, engagement, project_key, raw, fmt: str, imported_by, filename
 
     imported = parser(raw)
 
-    import_target = ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).first()
+    import_target = ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).narrative().first()
 
     count = 0
     for item in imported:

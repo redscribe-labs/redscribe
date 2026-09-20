@@ -88,6 +88,10 @@ def content_section_delete(request, pk):
     require_permission(request.user, "field_visibility.manage", "manage content sections")
     section = get_object_or_404(ContentSectionDefinition, pk=pk)
 
+    if section.is_protected:
+        messages.error(request, f"'{section.label}' is built-in finding metadata and can't be deleted.")
+        return redirect("field_visibility:edit")
+
     if request.method == "POST":
         label = section.label
         deleted_threads = CommentThread.objects.filter(field_name=section.slug).count()

@@ -48,6 +48,24 @@ _PRINT_CSS_TEMPLATE = """
 .report-table {{ break-inside: auto; }}
 .report-table tr {{ break-inside: avoid; }}
 .report-page-break {{ break-before: page; }}
+/* WeasyPrint's own default stylesheet (not anything RedScribe sets) gives
+   every heading break-after: avoid + break-inside: avoid, and every list
+   break-before: avoid — both meant to stop a heading/list from being
+   orphaned alone at the bottom of a page. For a report whose sections
+   scale with data, this causes exactly the whole-box-relocation problem
+   described above: when the content right after a heading (or a list)
+   doesn't fit the remaining page, the renderer has no way to honor "don't
+   break here" except by pushing the heading itself — and everything after
+   it — onto a fresh page, which reads as an unexplained jump right at that
+   heading. Per policy (breaks come only from an explicit
+   page_break_before / Document Structure, plus the Table of Contents),
+   headings and lists must not influence pagination on their own — this
+   overrides WeasyPrint's default back to ordinary, unconstrained flow.
+   The tradeoff is the one this ruled out on the other side: a heading can
+   now end up alone at the bottom of a page with its content starting on
+   the next one. */
+h1, h2, h3, h4, h5, h6 {{ break-after: auto; break-inside: auto; }}
+ol, ul {{ break-before: auto; }}
 /* Fills the @page front content box (A4 25.7cm tall minus its own 2.2cm
    top+bottom margin) so .report-cover-page's flex centering (see
    _PREVIEW_CSS_BASE) actually centers within a full physical page,

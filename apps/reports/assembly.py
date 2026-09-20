@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from html import escape
 
 from apps.checklist.models import ChecklistItem
-from apps.engagements.access import users_with_access
 from apps.findings.display_id import assign_display_ids
 from apps.findings.models import ContentSectionDefinition, Finding
 from apps.findings.scan_import import FORMAT_LABELS
@@ -339,21 +338,21 @@ def _finding_section(
     finding: Finding, rendered, is_remediation_report: bool, profile: ReportProfile,
     sections: list, *, page_break_before: bool = False,
 ) -> Section:
-    # "Affects" is synthesized from finding.affects_list rather than a
-    # configurable ContentSectionDefinition, so it has no "order" value of
-    # its own to slot into the loop below by. It goes right after whichever
-    # configured section is labeled/slugged "Business impact" — matched
-    # loosely (slug OR label) since ContentSectionDefinition rows are fully
-    # admin-defined per deployment, not seeded with fixed slugs (see
-    # apps.findings.migrations.0018_seed_content_sections). Falls back to
-    # last if no such section is configured on this deployment at all.
-    affects_section = Section(key=f"finding:{finding.id}:affects", title=get_label(profile, "affects"),
-            numbered=False, blocks=[ListBlock(items=rendered.affects_list)])
+    # "Affects" is backed by finding.affects_list rather than generic
+    # FindingSection content, but its ContentSectionDefinition row (slug
+    # "affects", is_protected=True — see migration 0021) carries a real
+    # "order" like any other section, so it slots into the loop below at
+    # whatever position the admin configured on the Finding Structure page.
     children = []
-    affects_inserted = False
 
     for definition in sections:
         if definition.include_in_remediation_report_only and not is_remediation_report:
+            continue
+        if definition.slug == "affects":
+            children.append(Section(
+                key=f"finding:{finding.id}:affects", title=definition.label,
+                numbered=False, blocks=[ListBlock(items=rendered.affects_list)],
+            ))
             continue
         html = rendered.section_html.get(definition.slug)
         if not html:
@@ -362,15 +361,6 @@ def _finding_section(
             key=f"finding:{finding.id}:{definition.slug}", title=definition.label,
             numbered=False, blocks=[RichTextBlock(html)],
         ))
-        if not affects_inserted and (
-            definition.slug.replace("_", "-") == "business-impact"
-            or definition.label.strip().lower() == "business impact"
-        ):
-            children.append(affects_section)
-            affects_inserted = True
-
-    if not affects_inserted:
-        children.append(affects_section)
 
     if is_remediation_report and rendered.retest_records:
         remediation_children = [
@@ -404,12 +394,22 @@ def _finding_section(
 
 
 def _assessment_team_data(engagement) -> list[dict]:
+    # Sourced from actual EngagementMembership records — not
+    # apps.engagements.access.users_with_access, which answers "who may
+    # view this engagement" (all superadmins, plus anyone with the blanket
+    # engagements.view_all permission) rather than "who worked on it". Using
+    # that access helper here leaked management-only accounts (e.g.
+    # superadmin) into the report even though they were never assigned.
+    members = (
+        engagement.memberships.select_related("user", "user__role").order_by("user__username")
+    )
     return [
         {
-            "member": member, "role_name": member.role.name,
-            "background": member.background, "qualifications_list": member.qualifications_list,
+            "member": membership.user, "role_name": membership.user.role.name,
+            "background": membership.user.background,
+            "qualifications": membership.user.qualifications,
         }
-        for member in users_with_access(engagement)
+        for membership in members
     ]
 
 
@@ -422,10 +422,12 @@ def _assessment_team_section(engagement, profile: ReportProfile) -> Section | No
     for entry in data:
         member = entry["member"]
         blocks = []
-        if entry["background"]:
-            blocks.append(RichTextBlock(f"<p>{escape(entry['background'])}</p>"))
-        if entry["qualifications_list"]:
-            blocks.append(ListBlock(items=entry["qualifications_list"]))
+        background_html = tiptap_to_html(entry["background"])
+        if background_html:
+            blocks.append(RichTextBlock(background_html))
+        qualifications_html = tiptap_to_html(entry["qualifications"])
+        if qualifications_html:
+            blocks.append(RichTextBlock(qualifications_html))
         children.append(Section(
             key=f"team:{member.uuid}", title=f"{member} — {entry['role_name']}",
             numbered=False, blocks=blocks,

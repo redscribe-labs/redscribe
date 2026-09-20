@@ -126,7 +126,7 @@ def _decrypt_retest_notes(finding: Finding, project_key) -> list[dict]:
 
 
 def _render_finding(finding: Finding, project_key, image_resolver, sections=None, text_transform=None) -> RenderedFinding:
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True)) if sections is None else sections
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative()) if sections is None else sections
     section_json = _decrypt_finding_sections(finding, project_key, sections)
     section_html = {
         slug: tiptap_to_html(content, image_resolver=image_resolver, text_transform=text_transform)

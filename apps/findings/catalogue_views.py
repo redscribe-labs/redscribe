@@ -171,7 +171,7 @@ def template_import(request):
 @login_required
 def template_detail(request, pk):
     template = get_object_or_404(VulnerabilityTemplate, pk=pk)
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     values = {ts.definition.slug: ts.content for ts in template.sections.select_related("definition")}
     approved_version = getattr(template, "approved_version", None)
     return render(
@@ -207,7 +207,7 @@ def template_create(request):
     if not can_create_catalogue_entry(request.user):
         raise PermissionDenied("You must be signed in to add to the vulnerability catalogue.")
 
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     if request.method == "POST":
         form = VulnerabilityTemplateForm(request.POST, sections=sections)
         classification_rows = parse_classification_rows(request.POST)
@@ -243,7 +243,7 @@ def template_edit(request, pk):
     if not can_edit_catalogue_entry(request.user, template):
         raise PermissionDenied("You don't have permission to edit this catalogue entry.")
 
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True))
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     if request.method == "POST":
         form = VulnerabilityTemplateForm(request.POST, sections=sections)
         classification_rows = parse_classification_rows(request.POST)

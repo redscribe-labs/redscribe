@@ -38,11 +38,4 @@
     <div class="pt-4 border-t border-slate-200">
         {% include "base/_classifications_field.html" %}
     </div>
-
-    <div class="pt-4 border-t border-slate-200">
-        <label for="{{ form.affects.id_for_label }}" class="field-label">{{ form.affects.label|default:"Affects" }}</label>
-        {{ form.affects|add_class:"field-input" }}
-        {% if form.affects.help_text %}<p class="field-help">{{ form.affects.help_text }}</p>{% endif %}
-        {% for error in form.affects.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-    </div>
 </div>

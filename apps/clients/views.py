@@ -17,7 +17,14 @@ _SEVERITY_RANK = {severity: rank for rank, (severity, _label) in enumerate(Findi
 
 
 def _severity_breakdown(findings_qs):
-    counts = {row["severity"]: row["n"] for row in findings_qs.values("severity").annotate(n=Count("id"))}
+    # Clear any inherited ordering/annotations first — an incoming queryset
+    # already .order_by()'d (e.g. by a display-ordering annotation) would
+    # otherwise drag those extra fields into the GROUP BY here, splitting
+    # each severity into one group per finding instead of one group total.
+    counts = {
+        row["severity"]: row["n"]
+        for row in findings_qs.order_by().values("severity").annotate(n=Count("id"))
+    }
     return [
         {"value": severity, "label": label, "count": counts[severity]}
         for severity, label in Finding.Severity.choices
@@ -93,7 +100,7 @@ def portal_finding_detail(request, engagement_id, pk):
     if request.user.is_client_role:
         record_client_finding_view(finding, request.user)
 
-    sections = list(ContentSectionDefinition.objects.filter(is_active=True, portal_visible=True))
+    sections = list(ContentSectionDefinition.objects.filter(is_active=True, portal_visible=True).narrative())
     existing_sections = {fs.definition_id: fs for fs in finding.sections.all()}
     section_values = {}
     for definition in sections:

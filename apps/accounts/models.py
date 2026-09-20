@@ -91,6 +91,9 @@ class User(AbstractUser):
         "clients.Client", null=True, blank=True, on_delete=models.PROTECT, related_name="portal_users",
     )
 
+    # Tiptap doc JSON strings (same storage shape as e.g. TemplateSection.content),
+    # not freeform text — see reports.tiptap_render.tiptap_to_html /
+    # reports.tiptap_docx.tiptap_to_subdoc for rendering.
     qualifications = models.TextField(blank=True, default="")
     background = models.TextField(blank=True, default="")
 
@@ -99,10 +102,6 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.get_full_name() or self.username
-
-    @property
-    def qualifications_list(self) -> list[str]:
-        return [line.strip() for line in self.qualifications.splitlines() if line.strip()]
 
     @property
     def is_superadmin_role(self):

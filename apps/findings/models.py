@@ -38,6 +38,15 @@ def document_sections(definitions, values, *, encrypted=False, label_overrides=N
     return sections
 
 
+class ContentSectionDefinitionQuerySet(models.QuerySet):
+    def narrative(self):
+        """Excludes protected metadata slots (currently just "affects") from
+        the generic FindingSection/TemplateSection content pipeline — those
+        are backed by a dedicated Finding field instead, and have no content
+        of the kind this queryset's callers read/write."""
+        return self.exclude(is_protected=True)
+
+
 class ContentSectionDefinition(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     slug = models.SlugField(max_length=64, unique=True)
@@ -53,12 +62,20 @@ class ContentSectionDefinition(models.Model):
 
     is_import_target = models.BooleanField(default=False)
 
+    # A permanent, non-deletable slot (currently only "affects") — admins can
+    # still reposition and rename it like any other section, but its content
+    # comes from a dedicated Finding field rather than generic
+    # FindingSection/TemplateSection storage, and it can never be deleted.
+    is_protected = models.BooleanField(default=False)
+
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="content_section_updates",
     )
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ContentSectionDefinitionQuerySet.as_manager()
 
     class Meta:
         ordering = ["order", "created_at"]

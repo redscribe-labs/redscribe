@@ -39,10 +39,10 @@ block, finding section, or anywhere else — only in the Document body itself.
 | Tag | What it renders | Notes |
 |---|---|---|
 | `{{ breakdown_of_findings }}` | Severity/status bar chart (with a table fallback) plus a vulnerabilities summary table (ID, severity, title, status) | |
-| `{{ finding_details }}` | The full write-up for every included finding — metadata table, affected assets, each active finding section (see [Finding sections](#finding-sections-inside-finding_details) below), and (on a remediation report) retest history | This is the main body of the report — almost always required |
+| `{{ finding_details }}` | The full write-up for every included finding — metadata table, then each active finding section in its configured order (see [Finding sections](#finding-sections-inside-finding_details) below, which includes Affected Assets), and (on a remediation report) retest history | This is the main body of the report — almost always required |
 | `{{ observations }}` | Free-form dynamic entries configured per-engagement (title + rich content), each as its own subsection | Empty/omitted entirely if none are configured — no placeholder text shown |
 | `{{ testing_phases }}` | Same pattern as observations — free-form per-engagement phase entries | Empty/omitted if none are configured |
-| `{{ assessment_team }}` | One subsection per engagement member with access, showing their bio and qualifications | Omitted entirely if the engagement has no members |
+| `{{ assessment_team }}` | One subsection per user actually assigned to the engagement, showing their bio and qualifications | Omitted entirely if no one is assigned. Superadmins and anyone else with blanket instance-wide access are excluded unless they're specifically assigned to this engagement |
 | `{{ checklist_coverage }}` | The engagement's checklist run(s), grouped by category, showing item status and any linked findings | Shows a graceful "No checklist runs have been recorded for this engagement." message if none exist — never errors |
 | `{{ scan_imports }}` | A table documenting each scanner import on this engagement (tool, filename, date, imported by, findings produced) | Metadata only — the original uploaded scan file itself is never stored, only this record of the import. Shows a graceful "No scanner imports have been recorded for this engagement." message if none exist |
 
@@ -65,6 +65,12 @@ As of this writing, the active sections are:
 These are managed from the Finding Structure admin screen, not the Document editor — adding,
 reordering, or deactivating one changes what `{{ finding_details }}` includes for every
 profile, immediately.
+
+Every deployment also always has an **Affected Assets** entry in this same ordered list
+(slug `affects`), wherever it's currently positioned. Unlike the sections above, it isn't rich
+text and isn't backed by `FindingSection` content — it renders the finding's own **Affects**
+field (`Finding.affects`) as a plain list — and it can be repositioned/renamed but never
+deleted (`ContentSectionDefinition.is_protected`).
 
 ## 3. Custom text-block tags (author-defined prose)
 

@@ -53,12 +53,22 @@ class FindingForm(forms.Form):
             else list(ContentSectionDefinition.objects.filter(is_active=True))
         )
         for section in self.sections:
+            # "affects" is the plain `affects` field above, not a generic
+            # rich-text content section — it only appears in self.sections
+            # so content_bound_fields() can position it inline at its
+            # configured order, alongside the real content sections.
+            if section.slug == "affects":
+                self.fields["affects"].label = section.label
+                continue
             self.fields[_section_field_name(section.slug)] = RichTextField(
                 required=False, label=section.label,
             )
 
     def content_bound_fields(self):
-        return [(section, self[_section_field_name(section.slug)]) for section in self.sections]
+        return [
+            (section, self["affects"] if section.slug == "affects" else self[_section_field_name(section.slug)])
+            for section in self.sections
+        ]
 
     def section_content(self, slug: str) -> str:
         return self.cleaned_data.get(_section_field_name(slug), "")
@@ -122,9 +132,11 @@ class VulnerabilityTemplateForm(forms.Form):
 
     def __init__(self, *args, sections=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # Catalogue templates have no per-engagement asset list — "affects"
+        # (protected, backed by Finding.affects) never applies here.
         self.sections = (
             list(sections) if sections is not None
-            else list(ContentSectionDefinition.objects.filter(is_active=True))
+            else list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
         )
         for section in self.sections:
             self.fields[_section_field_name(section.slug)] = RichTextField(

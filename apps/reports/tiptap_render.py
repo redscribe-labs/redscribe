@@ -109,8 +109,14 @@ def _render_node(node, image_resolver, text_transform, depth=0) -> str:
         # numbering, no section nesting, and no table-of-contents entry
         # (see assembly._parse_template, which only ever looks at
         # node["type"] == "heading" to build sections at all).
+        # An empty paragraph (Enter pressed with no content) is dropped
+        # entirely rather than rendered as "<p><br></p>" — that used to be
+        # truthy, so callers' `if html:` guards let it through as a visible
+        # blank line in the printed report.
+        if not children_html:
+            return ""
         css_class = ' class="report-lead"' if attrs.get("lead") else ""
-        return f"<p{css_class}>{children_html}</p>" if children_html else "<p><br></p>"
+        return f"<p{css_class}>{children_html}</p>"
     if node_type == "heading":
         level = attrs.get("level")
         level = level if level in (1, 2, 3, 4, 5, 6) else 3

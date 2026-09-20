@@ -98,6 +98,6 @@ def _finding_attr(slug: str) -> str:
 def available_finding_rich_tags(profile) -> list[tuple[str, str]]:
     section_tags = [
         (_finding_attr(definition.slug), f"{definition.label} (rich text)")
-        for definition in ContentSectionDefinition.objects.filter(is_active=True).order_by("order", "label")
+        for definition in ContentSectionDefinition.objects.filter(is_active=True).narrative().order_by("order", "label")
     ]
     return section_tags + list(_FINDING_RICH_TAGS)

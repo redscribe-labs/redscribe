@@ -54,6 +54,9 @@
                 <div>
                     <label class="field-label md:hidden">Label</label>
                     {{ form.label|add_class:"field-input" }}
+                    {% if form.instance.is_protected %}
+                    <p class="text-xs text-slate-400 mt-1">Built-in finding metadata — can be renamed and reordered, but not deleted.</p>
+                    {% endif %}
                 </div>
                 <div class="flex items-center gap-2 md:justify-center md:border-l md:border-slate-100 dark:md:border-slate-200 md:pl-3">
                     {{ form.is_active }}
@@ -76,7 +79,7 @@
                     <label class="md:hidden text-sm text-slate-700">Scan import target</label>
                 </div>
                 <div class="md:text-right">
-                    {% if form.instance.pk %}
+                    {% if form.instance.pk and not form.instance.is_protected %}
                     <a href="{% url 'field_visibility:delete' form.instance.pk %}" class="text-red-600 hover:underline text-xs">Delete</a>
                     {% endif %}
                 </div>

@@ -1,9 +1,10 @@
 {% extends "base/base.html" %}
 {% load redscribe_extras %}
 {% block title %}Edit {{ target.username }} — RedScribe{% endblock %}
+{% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto">
+<div class="max-w-2xl mx-auto">
     <div class="card">
         <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ target.username }}</h1>
         <p class="text-sm text-slate-500 mb-5">Username and account type can't be changed here.</p>
@@ -33,16 +34,12 @@
                 {% for error in form.role.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
             </div>
             <div class="mt-4">
-                <label for="{{ form.qualifications.id_for_label }}" class="field-label">{{ form.qualifications.label }}</label>
-                {{ form.qualifications|add_class:"field-input" }}
+                {% include "catalogue/_form_field_rte.html" with field=form.qualifications field_name="qualifications" label=form.qualifications.label %}
                 <p class="field-help">{{ form.qualifications.help_text }}</p>
-                {% for error in form.qualifications.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
             </div>
             <div class="mt-4 mb-5">
-                <label for="{{ form.background.id_for_label }}" class="field-label">{{ form.background.label }}</label>
-                {{ form.background|add_class:"field-input" }}
+                {% include "catalogue/_form_field_rte.html" with field=form.background field_name="background" label=form.background.label %}
                 <p class="field-help">{{ form.background.help_text }}</p>
-                {% for error in form.background.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
             </div>
             {% if form.non_field_errors %}
                 {% for error in form.non_field_errors %}
@@ -56,3 +53,4 @@
     {% include "base/_back_link.html" with url=back_url label="Back" %}
 </div>
 {% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}
