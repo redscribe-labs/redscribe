@@ -207,9 +207,10 @@ def _breakdown_counts(findings: list[Finding], profile: ReportProfile, options: 
         open_count = sum(1 for f in filtered if f.severity == severity and f.status == Finding.Status.OPEN)
         closed_count = sum(1 for f in filtered if f.severity == severity and f.status == Finding.Status.CLOSED)
         defaults = _DEFAULT_SEVERITY_COLORS[severity]
-        # A bar can't be left uncolored the way a table cell can, so a
-        # blanked color field here (see _severity_status_color) still
-        # falls back to the built-in default rather than an empty string.
+        # Same "unconfigured falls back to the built-in default" contract
+        # as _severity_status_color (via colors.severity_rgba) — a report
+        # profile that's never touched severity_colors still gets sensible
+        # per-severity colors here, not an empty/neutral one.
         open_color = (colors.get(severity) or {}).get("open") or defaults["open"]
         closed_color = (colors.get(severity) or {}).get("closed") or defaults["closed"]
         rows.append({
@@ -299,10 +300,10 @@ def _breakdown_section(
 
 
 def _severity_status_color(finding: Finding, profile: ReportProfile) -> str:
-    colors = profile.severity_colors or {}
+    from .colors import severity_rgba
+
     variant = "open" if finding.status == Finding.Status.OPEN else "closed"
-    configured = (colors.get(finding.severity) or {}).get(variant)
-    return configured or profile.empty_cell_background_color or "rgba(237,238,238,1)"
+    return severity_rgba(finding.severity, variant, profile)
 
 
 def _finding_metadata_table(finding: Finding, profile: ReportProfile) -> TableBlock | ListBlock:

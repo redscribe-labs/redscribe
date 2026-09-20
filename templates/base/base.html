@@ -46,7 +46,15 @@
         {% if user.is_authenticated %}
         {% if user|mfa_satisfied:feature_flags %}
         <div class="lg:hidden flex items-center justify-between h-14 px-4 twilight-surface shadow-md">
-            <a href="{% url 'accounts:dashboard' %}" class="font-mono font-semibold tracking-tight text-lg text-white">Red<span class="text-mist-300">Scribe</span></a>
+            <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
+                {% if branding.has_logo %}
+                <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="h-7 max-w-[9rem] object-contain">
+                {% elif branding.firm_name %}
+                <span class="truncate">{{ branding.firm_name }}</span>
+                {% else %}
+                <span class="flex items-baseline gap-0.5">Red<span class="text-mist-300">Scribe</span></span>
+                {% endif %}
+            </a>
             <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-white/80 hover:bg-white/10 hover:text-white" aria-expanded="false" aria-controls="sidebar">
                 <span class="sr-only">Open main menu</span>
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -59,7 +67,7 @@
         <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full transition-transform duration-200
                                     lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0 lg:w-64 lg:shrink-0
                                     flex flex-col twilight-surface shadow-md">
-            <div class="sidebar-header hidden lg:flex items-center justify-between gap-1 px-4 py-3.5 border-b border-white/15">
+            <div class="sidebar-header flex items-center justify-between gap-1 px-4 py-3.5 border-b border-white/15">
                 <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-2 font-mono font-semibold tracking-tight text-lg text-white min-w-0">
                     {% if branding.has_logo %}
                     <img src="{% url 'branding:logo' %}" alt="{{ branding.display_name }}" class="sidebar-logo-image h-7 max-w-[9rem] object-contain">
@@ -77,7 +85,7 @@
                     {% endif %}
                 </a>
                 <button type="button" id="sidebar-desktop-toggle"
-                        class="inline-flex items-center justify-center h-7 w-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                        class="hidden lg:inline-flex items-center justify-center h-7 w-7 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors shrink-0"
                         aria-expanded="true" aria-controls="sidebar" title="Collapse sidebar">
                     <span class="sr-only">Toggle sidebar</span>
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

@@ -67,9 +67,10 @@ _PRINT_CSS_TEMPLATE = """
 h1, h2, h3, h4, h5, h6 {{ break-after: auto; break-inside: auto; }}
 ol, ul {{ break-before: auto; }}
 /* Fills the @page front content box (A4 25.7cm tall minus its own 2.2cm
-   top+bottom margin) so .report-cover-page's flex centering (see
-   _PREVIEW_CSS_BASE) actually centers within a full physical page,
-   not just within however tall its own content happens to be. */
+   top+bottom margin) so .report-cover-page's title-block layout (see
+   _PREVIEW_CSS_BASE) spans a full physical page — its content is anchored
+   top/bottom within that height, not just packed to its own content's
+   height. */
 .report-cover-page {{ min-height: 25.3cm; }}
 /* Word-style TOC line: title, a dotted leader filling the rest of the
    line, and the page number flush right — PDF-only, the live preview
@@ -105,7 +106,7 @@ def build_pdf(document: ReportDocument) -> bytes:
     header_text = meta.client_name
     if meta.test_type_label:
         header_text += f" — {meta.test_type_label}"
-    footer_text = meta.project_id
+    footer_text = f"{meta.firm_name} — {meta.project_id}" if meta.firm_name else meta.project_id
 
     print_css = _PRINT_CSS_TEMPLATE.format(
         header_text=_css_content_escape(header_text),

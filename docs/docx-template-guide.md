@@ -185,6 +185,7 @@ other paragraph.)
 | Tag | Renders |
 |---|---|
 | `{{p finding['<slug>'] }}` | One finding's content for that content section (see below) |
+| `{{p finding.details_table }}` | A ready-made table of severity, ID, CVSS score/vector, CVE ID, classifications, and status — the severity and status rows' value cell (e.g. "Critical", not the "Severity rating" label next to it) is shaded using the profile's configured severity colors, open/closed variant included. Prefer this over hand-rolling `{{ finding.severity }}`/`{{ finding.status }}` yourself if you want that coloring |
 | `{{p finding.retest_history }}` | A date/tested-by/result table of retest records — remediation reports only, empty otherwise |
 
 #### Content sections are dynamic
@@ -325,8 +326,7 @@ Heading 2:                         {{ o.title }}
 Heading 1: Detailed Findings
                                     {%p for finding in findings %}
 [bold]                             {{ finding.id }} — {{ finding.title }}
-                                    Severity: {{ finding.severity }}   Status: {{ finding.status }}
-                                    CVSS: {{ finding.cvss_score }} ({{ finding.cvss_vector }})   CVE: {{ finding.cve_id }}
+                                    {{p finding.details_table }}
 
 Heading 2: Description
                                     {{p finding['vulnerability-description'] }}

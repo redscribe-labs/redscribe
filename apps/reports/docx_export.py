@@ -22,11 +22,10 @@ from apps.findings.display_id import assign_display_ids
 from apps.findings.models import ContentSectionDefinition, Finding
 
 from . import assembly, services, tiptap_docx
+from .colors import composite_on_white, parse_rgba
 from .labels import get_label, get_severity_label, get_status_label
 from .models import ReportSettings
 from .placeholders import build_placeholder_context, render_placeholders
-
-_RGBA_RE = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*[\d.]+\s*)?\)")
 
 
 def sandboxed_jinja_env() -> SandboxedEnvironment:
@@ -66,10 +65,17 @@ def _rgba_to_hex(value: str) -> str | None:
         return None
     if re.fullmatch(r"[0-9A-Fa-f]{6}", value):
         return value.upper()
-    match = _RGBA_RE.match(value.strip())
-    if not match:
+    parsed = parse_rgba(value)
+    if not parsed:
         return None
-    r, g, b = (max(0, min(255, round(float(match.group(i))))) for i in (1, 2, 3))
+    r, g, b, alpha = parsed
+    # Composited onto white before hex-encoding — the "closed" severity
+    # variant is typically the same hue at low alpha (meant to look washed
+    # out once composited), same as the HTML/PDF path already does via
+    # colors.contrasting_text_rgb. Dropping the alpha channel instead of
+    # compositing it (the previous behavior here) made "closed" render at
+    # full saturation, identical to "open".
+    r, g, b = composite_on_white(r, g, b, alpha)
     return f"{r:02X}{g:02X}{b:02X}"
 
 
@@ -91,11 +97,28 @@ def _apply_cell_style(cell, style_name):
         _set_style_attr(paragraph, style_name)
 
 
-def _build_table(container, columns, rows, *, styles, shaded_cells=None):
-    table = container.add_table(rows=len(rows) + 1, cols=len(columns))
-    _set_style_attr(table, styles.get("table_normal"))
+def _build_table(container, columns, rows, *, styles, shaded_cells=None, header_column=False):
+    """header_column=True builds a label/value table with no separate
+    column-header row (mirroring report_ir.TableBlock.header_column) —
+    every row's own first cell is the row label, styled like a header cell.
+    shaded_cells is always keyed by data-row index (0 = first row of
+    `rows`), regardless of header_column."""
     header_style = styles.get("table_header_cell_text")
     body_style = styles.get("body_paragraph")
+    if header_column:
+        table = container.add_table(rows=len(rows), cols=len(columns))
+        _set_style_attr(table, styles.get("table_normal"))
+        for r, row in enumerate(rows):
+            for c, value in enumerate(row):
+                cell = table.cell(r, c)
+                cell.text = str(value)
+                _apply_cell_style(cell, header_style if c == 0 else body_style)
+                if shaded_cells and (r, c) in shaded_cells:
+                    _set_cell_background(cell, shaded_cells[(r, c)])
+        return table
+
+    table = container.add_table(rows=len(rows) + 1, cols=len(columns))
+    _set_style_attr(table, styles.get("table_normal"))
     for c, col in enumerate(columns):
         cell = table.cell(0, c)
         cell.text = str(col)
@@ -238,6 +261,35 @@ def _breakdown_table_subdoc(tpl, findings, profile, options, styles):
     return subdoc
 
 
+def _finding_details_table_subdoc(tpl, finding, profile, styles):
+    """Mirrors assembly._finding_metadata_table()'s row set/order exactly,
+    with the Severity and Status rows' VALUE cell (not the row-label cell)
+    shaded per the profile's configured severity colors (open/closed
+    variant) — the DOCX equivalent of that IR-based table, for report
+    authors who add {{p finding.details_table }} instead of hand-drawing
+    their own."""
+    color = assembly._severity_status_color(finding, profile)
+    rows = [
+        [get_label(profile, "finding_severity_rating"), get_severity_label(profile, finding.severity)],
+        [get_label(profile, "finding_id_row"), finding.display_id],
+        [get_label(profile, "finding_cvss_score"), finding.cvss_score or "—"],
+        [get_label(profile, "finding_cvss_vector"), finding.cvss_vector or "—"],
+        [get_label(profile, "finding_cve_id"), finding.cve_id or "—"],
+    ]
+    tags = list(finding.classifications.all())
+    if tags:
+        rows += [[tag.taxonomy, tag.value] for tag in tags]
+    else:
+        rows.append([get_label(profile, "finding_classification"), "—"])
+    rows.append([get_label(profile, "finding_status"), get_status_label(profile, finding.status)])
+
+    last = len(rows) - 1
+    shaded = {(0, 1): color, (last, 1): color}
+    subdoc = tpl.new_subdoc()
+    _build_table(subdoc, ["", ""], rows, styles=styles, shaded_cells=shaded, header_column=True)
+    return subdoc
+
+
 def _assessment_team_subdoc(tpl, engagement, profile, styles):
     subdoc = tpl.new_subdoc()
     data = assembly._assessment_team_data(engagement)
@@ -323,6 +375,7 @@ def _finding_context(
         "cve_id": finding.cve_id or "—",
         "classifications": [str(tag) for tag in finding.classifications.all()],
         "affects": list(finding.affects_list),
+        "details_table": _finding_details_table_subdoc(tpl, finding, profile, styles),
     }
     for definition in active_sections:
         if definition.include_in_remediation_report_only and not is_remediation_report:
@@ -514,7 +567,7 @@ def build_dummy_context(profile):
     dummy_finding = {
         "id": "F001", "title": "Example finding", "severity": "High", "status": "Open",
         "cvss_score": "7.5", "cvss_vector": "—", "cve_id": "—", "classifications": [], "affects": [],
-        "retest_history": tpl.new_subdoc(),
+        "retest_history": tpl.new_subdoc(), "details_table": tpl.new_subdoc(),
     }
     for definition in active_sections:
         dummy_finding[definition.slug] = tpl.new_subdoc()

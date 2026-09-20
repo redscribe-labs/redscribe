@@ -12,7 +12,7 @@ def parse_rgba(value: str) -> tuple[int, int, int, float] | None:
     return (r, g, b, a)
 
 
-def _composite_on_white(r: int, g: int, b: int, alpha: float) -> tuple[int, int, int]:
+def composite_on_white(r: int, g: int, b: int, alpha: float) -> tuple[int, int, int]:
     return (
         round(alpha * r + (1 - alpha) * 255),
         round(alpha * g + (1 - alpha) * 255),
@@ -25,7 +25,7 @@ def contrasting_text_rgb(background_rgba: str, default: tuple[int, int, int] = (
     if not parsed:
         return default
     r, g, b, alpha = parsed
-    cr, cg, cb = _composite_on_white(r, g, b, alpha)
+    cr, cg, cb = composite_on_white(r, g, b, alpha)
     luminance = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb
     return (255, 255, 255) if luminance < 140 else (15, 23, 42)
 
@@ -35,7 +35,7 @@ def mix_with_white(rgba: str, amount: float, default: str = "rgba(241,245,249,1)
     if not parsed:
         return default
     r, g, b, alpha = parsed
-    cr, cg, cb = _composite_on_white(r, g, b, alpha)
+    cr, cg, cb = composite_on_white(r, g, b, alpha)
     mixed = tuple(round(c + (255 - c) * amount) for c in (cr, cg, cb))
     return f"rgba({mixed[0]},{mixed[1]},{mixed[2]},1)"
 
@@ -45,7 +45,7 @@ def darken(rgba: str, amount: float, default: str = "rgba(148,163,184,1)") -> st
     if not parsed:
         return default
     r, g, b, alpha = parsed
-    cr, cg, cb = _composite_on_white(r, g, b, alpha)
+    cr, cg, cb = composite_on_white(r, g, b, alpha)
     mixed = tuple(round(c * (1 - amount)) for c in (cr, cg, cb))
     return f"rgba({mixed[0]},{mixed[1]},{mixed[2]},1)"
 

@@ -53,20 +53,47 @@ _PREVIEW_CSS_BASE = """
    assembly.py). Body color, not the h3 accent color, so it's never
    mistaken for an actual entry title. */
 .report-lead {{ font-size: 1.05rem; font-weight: 700; line-height: 1.35; margin: .9rem 0 .5rem; color: inherit; }}
-/* The whole first page — cover meta block, and disclaimers (if any) right
-   below it — vertically AND horizontally centered as one group. In the
-   PDF this fills the actual @page front content box (pdf_export.py sets
-   its min-height there); in the live preview it just centers within
-   whatever height the pane happens to have, which is close enough for
-   "does this read as a real cover page" purposes. */
-.report-cover-page {{ display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 2rem 1rem; }}
-.report-cover-logo {{ max-height: 3.5rem; max-width: 60%; margin: 0 auto .75rem; display: block; }}
-.report-cover-firm {{ color: #475569; font-size: .8rem; font-weight: 600; margin-bottom: .5rem; }}
-.report-classification {{ font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: #b91c1c; font-weight: 600; }}
-.report-cover-title {{ color: #475569; font-size: 1rem; font-weight: 600; margin: 1rem 0 .25rem; }}
-.report-cover-meta, .report-cover-date {{ color: #64748b; font-size: .8rem; }}
-.report-cover-flag {{ color: #b45309; font-weight: 600; font-size: .75rem; margin-top: .5rem; }}
-.report-cover-page .report-section {{ text-align: left; margin-top: 2rem; max-width: 32rem; }}
+/* Cover page: a title-block layout (firm branding top, client name as the
+   dominant element anchored toward the lower half, a document-metadata row
+   at the very bottom) rather than one centered stack, with a full-height
+   "spine" in the report's own theme color as the one deliberate accent —
+   everything else stays quiet. In the PDF this fills the actual @page
+   front content box (pdf_export.py sets .report-cover-page's min-height);
+   in the live preview it just fills whatever height the pane happens to
+   have, which is close enough for "does this read as a real cover page"
+   purposes. */
+.report-cover-page {{ display: flex; padding: 0; }}
+.report-cover-spine {{ width: .9cm; background: {theme_color}; flex-shrink: 0; }}
+.report-cover-content {{
+    flex: 1; display: flex; flex-direction: column;
+    padding: 2.4rem 3rem 3.2rem; box-sizing: border-box; position: relative;
+}}
+.report-cover-brand {{ display: flex; align-items: center; gap: .6rem; }}
+.report-cover-logo {{ max-height: 2.4rem; max-width: 10rem; display: block; }}
+.report-cover-firm {{ color: #475569; font-size: .8rem; font-weight: 600; }}
+.report-classification {{
+    position: absolute; top: 2.4rem; right: 3rem;
+    font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+    color: #b91c1c; border: 1px solid #b91c1c; border-radius: .25rem; padding: .3rem .6rem;
+}}
+/* Centered in whatever space is left between the brand row (if any) above
+   and the metadata row below — so the title reads as anchored in the
+   page's open space rather than jammed against either edge, with or
+   without a firm logo/name to share the top with. */
+.report-cover-title-block {{ text-align: left; margin: auto 0; }}
+.report-cover-title {{
+    color: #64748b; font-size: .85rem; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; margin: 0 0 .5rem;
+}}
+.report-cover-title-block h1 {{ font-size: 2.75rem; line-height: 1.1; margin: 0; color: #0f172a; }}
+.report-cover-flag {{
+    display: inline-block; margin-top: .85rem; color: #b45309; background: #fef3c7;
+    border-radius: .25rem; padding: .25rem .6rem; font-weight: 600; font-size: .75rem;
+}}
+.report-cover-meta-row {{ display: flex; gap: 2.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
+.report-cover-meta-item {{ display: flex; flex-direction: column; gap: .2rem; }}
+.report-cover-meta-label {{ font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }}
+.report-cover-meta-value {{ font-size: .85rem; color: #1e293b; font-weight: 600; }}
 /* Horizontal row separators only — no vertical cell borders and no
    border-collapse at all. A full grid (border on all four sides of every
    cell, collapsed) read as a harsh, spreadsheet-y "Table" rather than
@@ -307,28 +334,50 @@ def render_toc(document: ReportDocument) -> str:
 
 
 def render_cover_html(meta) -> str:
-    branding_html = ""
+    brand_html = ""
     if meta.firm_logo_data_uri:
-        branding_html = f'<img class="report-cover-logo" src="{_escape(meta.firm_logo_data_uri)}" alt="{_escape(meta.firm_name)}">'
-    elif meta.firm_name:
-        branding_html = f'<p class="report-cover-firm">{_escape(meta.firm_name)}</p>'
+        brand_html += f'<img class="report-cover-logo" src="{_escape(meta.firm_logo_data_uri)}" alt="{_escape(meta.firm_name)}">'
+    if meta.firm_name:
+        brand_html += f'<span class="report-cover-firm">{_escape(meta.firm_name)}</span>'
+
+    # A document-metadata row (label above value, like a document-control
+    # record) rather than one middle-dot-joined sentence — reads as a real
+    # report's title-page metadata block, and each field degrades cleanly
+    # on its own (e.g. no test type configured just means two columns
+    # instead of three).
+    meta_fields = [("Project", meta.project_id)]
+    if meta.test_type_label:
+        meta_fields.append(("Engagement type", meta.test_type_label))
+    meta_fields.append(("Date", meta.report_date))
+    meta_html = "".join(
+        f'<div class="report-cover-meta-item">'
+        f'<span class="report-cover-meta-label">{_escape(label)}</span>'
+        f'<span class="report-cover-meta-value">{_escape(value)}</span>'
+        f'</div>'
+        for label, value in meta_fields
+    )
 
     cover_block = (
-        branding_html
+        (f'<div class="report-cover-brand">{brand_html}</div>' if brand_html else "")
         + f'<div class="report-classification">{_escape(meta.classification_label)}</div>'
+        + '<div class="report-cover-title-block">'
         + (f'<p class="report-cover-title">{_escape(meta.cover_title)}</p>' if meta.cover_title else "")
         + f'<h1>{_escape(meta.client_name)}</h1>'
-        f'<p class="report-cover-meta">Project {_escape(meta.project_id)}'
-        + (f" &middot; {_escape(meta.test_type_label)}" if meta.test_type_label else "")
-        + f'</p><p class="report-cover-date">{_escape(meta.report_date)}</p>'
-        + ('<p class="report-cover-flag">Remediation Report</p>' if meta.is_remediation_report else "")
+        + ('<span class="report-cover-flag">Remediation Report</span>' if meta.is_remediation_report else "")
+        + '</div>'
+        + f'<div class="report-cover-meta-row">{meta_html}</div>'
     )
     # pdf-front switches this subtree to the cover's own @page context (no
     # header/footer/page-number, its own margins) — see pdf_export.py. The
     # page-context change alone forces a break on entry and on exit, so
     # whatever follows resumes the ambient page context automatically,
     # wherever in the document this block actually sits.
-    return f'<section class="report-cover-page pdf-front">{cover_block}</section>'
+    return (
+        '<section class="report-cover-page pdf-front">'
+        '<div class="report-cover-spine"></div>'
+        f'<div class="report-cover-content">{cover_block}</div>'
+        '</section>'
+    )
 
 
 def _render_block(block, document: ReportDocument) -> str:

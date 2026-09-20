@@ -1049,15 +1049,14 @@ class FindingMetadataClassificationTests(TestCase):
 
     def test_severity_and_status_names_are_overridable_per_profile(self):
         from .assembly import _finding_metadata_table
-        from .report_ir import StyledText
 
         finding = make_finding(
             self.engagement, self.author, severity=Finding.Severity.CRITICAL, status=Finding.Status.OPEN,
         )
         default_profile = ReportProfile.objects.get(is_default=True)
         default_rows = {row[0]: row[1] for row in _finding_metadata_table(finding, default_profile).rows}
-        self.assertEqual(default_rows["Severity rating"], StyledText("Critical", background_rgba=default_rows["Severity rating"].background_rgba))
-        self.assertEqual(default_rows["Status"], StyledText("Open", background_rgba=default_rows["Status"].background_rgba))
+        self.assertEqual(default_rows["Severity rating"].text, "Critical")
+        self.assertEqual(default_rows["Status"].text, "Open")
 
         localized_profile = ReportProfile.objects.create(
             name="French labels", labels={"severity_critical": "Critique", "status_open": "Ouverte"},
@@ -1065,6 +1064,54 @@ class FindingMetadataClassificationTests(TestCase):
         localized_rows = {row[0]: row[1] for row in _finding_metadata_table(finding, localized_profile).rows}
         self.assertEqual(localized_rows["Severity rating"].text, "Critique")
         self.assertEqual(localized_rows["Status"].text, "Ouverte")
+
+    def test_severity_and_status_value_cells_shaded_not_labels(self):
+        from .assembly import _finding_metadata_table
+        from .report_ir import StyledText
+
+        open_finding = make_finding(
+            self.engagement, self.author, severity=Finding.Severity.CRITICAL, status=Finding.Status.OPEN,
+        )
+        closed_finding = make_finding(
+            self.engagement, self.author, severity=Finding.Severity.CRITICAL, status=Finding.Status.CLOSED,
+        )
+        profile = ReportProfile.objects.get(is_default=True)
+        profile.severity_colors = {
+            Finding.Severity.CRITICAL: {"open": "rgba(183,28,28,1)", "closed": "rgba(183,28,28,0.35)"},
+        }
+        profile.save()
+
+        for finding in (open_finding, closed_finding):
+            table = _finding_metadata_table(finding, profile)
+            rows = {row[0]: row for row in table.rows}
+            for label in ("Severity rating", "Status"):
+                label_cell, value_cell = rows[label]
+                # The row-label cell ("Severity rating"/"Status" itself)
+                # must stay a plain string — only the value cell (the
+                # actual severity/status word) is colored.
+                self.assertNotIsInstance(label_cell, StyledText)
+                self.assertIsInstance(value_cell, StyledText)
+                self.assertTrue(value_cell.background_rgba)
+
+        open_rows = {row[0]: row[1] for row in _finding_metadata_table(open_finding, profile).rows}
+        closed_rows = {row[0]: row[1] for row in _finding_metadata_table(closed_finding, profile).rows}
+        self.assertNotEqual(open_rows["Severity rating"].background_rgba, closed_rows["Severity rating"].background_rgba)
+
+    def test_severity_color_falls_back_to_builtin_default_when_unconfigured(self):
+        """A report profile that has never touched severity_colors (the
+        common/default case) must still show real per-severity colors on
+        the metadata table, matching what the breakdown-of-findings chart
+        already shows — not a flat neutral gray."""
+        from .assembly import _DEFAULT_SEVERITY_COLORS, _finding_metadata_table
+
+        finding = make_finding(
+            self.engagement, self.author, severity=Finding.Severity.HIGH, status=Finding.Status.OPEN,
+        )
+        profile = ReportProfile.objects.get(is_default=True)
+        self.assertFalse(profile.severity_colors)
+
+        rows = {row[0]: row[1] for row in _finding_metadata_table(finding, profile).rows}
+        self.assertEqual(rows["Severity rating"].background_rgba, _DEFAULT_SEVERITY_COLORS[Finding.Severity.HIGH]["open"])
 
     def test_affects_position_is_admin_configurable(self):
         from .assembly import build_report_document, get_draft_config
@@ -1171,7 +1218,7 @@ class ReportCoverBrandingTests(TestCase):
         self.assertIn("Acme Security", cover_html)
         self.assertIn("report-cover-firm", cover_html)
 
-    def test_logo_takes_priority_over_name(self):
+    def test_logo_and_name_both_shown_together(self):
         settings_obj = ReportSettings.get_solo()
         settings_obj.firm_name = "Acme Security"
         settings_obj.firm_logo = _make_test_png()
@@ -1181,7 +1228,8 @@ class ReportCoverBrandingTests(TestCase):
         document, cover_html = self._build_document()
         self.assertIn("report-cover-logo", cover_html)
         self.assertIn("data:image/png;base64,", cover_html)
-        self.assertNotIn("report-cover-firm", cover_html)
+        self.assertIn("report-cover-firm", cover_html)
+        self.assertIn("Acme Security", cover_html)
         self.assertEqual(document.meta.firm_name, "Acme Security")
 
 
@@ -1389,6 +1437,24 @@ class ExportViewTests(TestCase):
         self.assertEqual(PdfReader(BytesIO(resp.content)).decrypt("wrong password"), 0)
         self.assertNotEqual(reader.decrypt("correct horse battery staple"), 0)
         self.assertIn("Acme", reader.pages[0].extract_text())
+
+    def test_pdf_footer_includes_firm_name_when_set(self):
+        from pypdf import PdfReader
+
+        settings_obj = ReportSettings.get_solo()
+        settings_obj.firm_name = "Acme Security"
+        settings_obj.save()
+
+        client = Client()
+        login(client, self.author)
+        resp = client.post(reverse("reports:download", args=[self.engagement.pk, "pdf"]))
+        self.assertEqual(resp.status_code, 200)
+
+        reader = PdfReader(BytesIO(resp.content))
+        # Page 0 is the cover (own @page context, no running footer) — a
+        # body page is where the footer with the firm name actually lands.
+        body_text = "".join(page.extract_text() for page in reader.pages[1:])
+        self.assertIn("Acme Security", body_text)
 
     def test_encrypt_pdf_uses_aes256(self):
         from unittest.mock import patch
@@ -1802,6 +1868,7 @@ class ReportProfileViewTests(TestCase):
 
     def test_saving_profile_untouched_keeps_severity_colors_blank(self):
         from . import assembly, ir_render
+        from .assembly import _DEFAULT_SEVERITY_COLORS
         from apps.crypto.services import get_data_key
         from apps.findings.models import Finding
 
@@ -1838,7 +1905,13 @@ class ReportProfileViewTests(TestCase):
             config=config, engagement=self.engagement, project_key=project_key, user=None,
         )
         html = ir_render.render_document_html(document)
-        self.assertIn("rgba(11,22,33,1)", html)
+        # A profile that's never configured a severity color still shows the
+        # built-in per-severity default (matching the breakdown chart),
+        # not the generic empty_cell_background_color fallback — that
+        # fallback still applies to genuinely uncolored cells elsewhere,
+        # just not this one.
+        self.assertIn(_DEFAULT_SEVERITY_COLORS[Finding.Severity.HIGH]["open"], html)
+        self.assertNotIn("rgba(11,22,33,1)", html)
 
     def test_saving_profile_untouched_keeps_labels_at_shipped_defaults(self):
         # Same "blank means inherit" pattern as severity colors — an
@@ -2484,6 +2557,7 @@ def _valid_test_template_bytes() -> bytes:
         doc.add_paragraph("{%p for finding in findings %}")
         doc.add_paragraph("{{ finding.id }} - {{ finding.title }} ({{ finding.severity }}) [{{ finding.cve_id }}]")
         doc.add_paragraph("{{p finding['technical-details'] }}")
+        doc.add_paragraph("{{p finding.details_table }}")
         doc.add_paragraph("{{p finding.retest_history }}")
         doc.add_paragraph("{%p endfor %}")
 
@@ -3075,7 +3149,7 @@ class DocxExportViewTests(TestCase):
         document = Document(BytesIO(resp.content))
         # observations/testing_phases resolve to empty lists when no entries are
         # configured — the {%p for %} loop body simply never runs, no error either.
-        self.assertEqual(len(document.tables), 2)  # document_control + breakdown_table only
+        self.assertEqual(len(document.tables), 3)  # document_control + breakdown_table + one finding's details_table
 
     def test_docx_export_breakdown_includes_chart_image(self):
         make_finding(
@@ -3126,6 +3200,137 @@ class DocxExportViewTests(TestCase):
         self.assertIn("Critique", all_text)
         self.assertIn("Ouverte", all_text)
         self.assertNotIn("Critical", all_text)
+
+    def test_docx_details_table_shades_severity_and_status_value_cells_only(self):
+        from io import BytesIO
+
+        from docx import Document
+
+        make_finding(
+            self.engagement, self.author, title="Critical open finding",
+            workflow_status=Finding.WorkflowStatus.QA_APPROVED,
+            severity=Finding.Severity.CRITICAL, status=Finding.Status.OPEN,
+        )
+        self.profile.severity_colors = {
+            Finding.Severity.CRITICAL: {"open": "rgba(183,28,28,1)", "closed": "rgba(183,28,28,0.35)"},
+        }
+        self.profile.save(update_fields=["severity_colors"])
+
+        client = Client()
+        login(client, self.author)
+        resp = client.post(reverse("reports:download", args=[self.engagement.pk, "docx"]))
+        self.assertEqual(resp.status_code, 200)
+
+        document = Document(BytesIO(resp.content))
+
+        def shd_fill(cell):
+            shd = cell._tc.get_or_add_tcPr().find(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}shd"
+            )
+            return shd.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill") if shd is not None else None
+
+        details_table = next(
+            t for t in document.tables if any(row.cells[0].text == "Severity rating" for row in t.rows)
+        )
+        rows_by_label = {row.cells[0].text: row for row in details_table.rows}
+
+        severity_row = rows_by_label["Severity rating"]
+        status_row = rows_by_label["Status"]
+        # Only the value cell is shaded — the row-label cell (which just
+        # says "Severity rating"/"Status") stays unshaded.
+        self.assertIsNone(shd_fill(severity_row.cells[0]))
+        self.assertEqual(shd_fill(severity_row.cells[1]), "B71C1C")
+        self.assertIsNone(shd_fill(status_row.cells[0]))
+        self.assertEqual(shd_fill(status_row.cells[1]), "B71C1C")
+
+        # Unaffected rows stay unshaded.
+        cvss_row = rows_by_label["CVSS score"]
+        self.assertIsNone(shd_fill(cvss_row.cells[0]))
+        self.assertIsNone(shd_fill(cvss_row.cells[1]))
+
+    def test_docx_closed_severity_color_is_lighter_than_open_not_identical(self):
+        """Regression test for the alpha-compositing bug: _rgba_to_hex used
+        to discard the alpha channel entirely, so a "closed" severity color
+        (same hue at low alpha, meant to look washed out once composited)
+        rendered at full saturation — identical to "open"."""
+        from io import BytesIO
+
+        from docx import Document
+
+        make_finding(
+            self.engagement, self.author, title="Critical closed finding",
+            workflow_status=Finding.WorkflowStatus.QA_APPROVED,
+            severity=Finding.Severity.CRITICAL, status=Finding.Status.CLOSED,
+        )
+        self.profile.severity_colors = {
+            Finding.Severity.CRITICAL: {"open": "rgba(183,28,28,1)", "closed": "rgba(183,28,28,0.35)"},
+        }
+        self.profile.save(update_fields=["severity_colors"])
+
+        client = Client()
+        login(client, self.author)
+        resp = client.post(reverse("reports:download", args=[self.engagement.pk, "docx"]))
+        self.assertEqual(resp.status_code, 200)
+
+        document = Document(BytesIO(resp.content))
+
+        def shd_fill(cell):
+            shd = cell._tc.get_or_add_tcPr().find(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}shd"
+            )
+            return shd.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill") if shd is not None else None
+
+        details_table = next(
+            t for t in document.tables if any(row.cells[0].text == "Severity rating" for row in t.rows)
+        )
+        severity_value_cell = next(row.cells[1] for row in details_table.rows if row.cells[0].text == "Severity rating")
+        # rgba(183,28,28,0.35) composited onto white (colors.composite_on_white):
+        #   r = round(0.35*183 + 0.65*255) = 230 = 0xE6
+        #   g = b = round(0.35*28  + 0.65*255) = 176 = 0xB0
+        # i.e. "E6B0B0" — a light, washed-out red, not the pre-fix bug's
+        # full-saturation "B71C1C" (identical to the "open" color).
+        self.assertEqual(shd_fill(severity_value_cell), "E6B0B0")
+
+    def test_docx_details_table_uses_builtin_default_color_when_unconfigured(self):
+        """A report profile with no severity_colors configured (the common
+        case) still shades the details table using the built-in default
+        colors, same as HTML/PDF and the breakdown-of-findings table —
+        rather than leaving the cell unshaded."""
+        from io import BytesIO
+
+        from docx import Document
+
+        from .assembly import _DEFAULT_SEVERITY_COLORS
+        from .docx_export import _rgba_to_hex
+
+        make_finding(
+            self.engagement, self.author, title="High open finding, default colors",
+            workflow_status=Finding.WorkflowStatus.QA_APPROVED,
+            severity=Finding.Severity.HIGH, status=Finding.Status.OPEN,
+        )
+        self.assertFalse(self.profile.severity_colors)
+
+        client = Client()
+        login(client, self.author)
+        resp = client.post(reverse("reports:download", args=[self.engagement.pk, "docx"]))
+        self.assertEqual(resp.status_code, 200)
+
+        document = Document(BytesIO(resp.content))
+
+        def shd_fill(cell):
+            shd = cell._tc.get_or_add_tcPr().find(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}shd"
+            )
+            return shd.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill") if shd is not None else None
+
+        details_table = next(
+            t for t in document.tables
+            if any(row.cells[0].text == "Severity rating" for row in t.rows)
+            and any(row.cells[1].text == "High" for row in t.rows)
+        )
+        severity_value_cell = next(row.cells[1] for row in details_table.rows if row.cells[0].text == "Severity rating")
+        expected_hex = _rgba_to_hex(_DEFAULT_SEVERITY_COLORS[Finding.Severity.HIGH]["open"])
+        self.assertEqual(shd_fill(severity_value_cell), expected_hex)
 
     def test_docx_export_scan_imports_empty_state(self):
         client = Client()
