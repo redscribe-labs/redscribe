@@ -13,6 +13,26 @@ def env(name, default=None, required=False):
     return val
 
 
+def env_secret(name, default=None, required=False):
+    # Same Docker-secret convention as REDSCRIBE_ROOT_KEY (apps/crypto/root_key.py):
+    # a file named by <NAME>_FILE beats the plain env var, since an env var is
+    # readable via `docker inspect`/`/proc/<pid>/environ` by any root/same-UID
+    # process on the host, while a mounted secret file's access is controlled
+    # by the mount itself. The plain var remains a supported fallback for
+    # non-Docker/bare-metal deployments and CI, where there's no secret to mount.
+    file_path = os.environ.get(f"{name}_FILE")
+    if file_path and os.path.isfile(file_path):
+        with open(file_path) as f:
+            val = f.read().strip()
+    else:
+        val = os.environ.get(name, default)
+    if required and val in (None, ""):
+        raise RuntimeError(
+            f"Required secret {name} is not set (checked {name}_FILE, then {name})"
+        )
+    return val
+
+
 def env_bool(name, default=False):
     val = os.environ.get(name)
     if val is None:
@@ -25,7 +45,7 @@ def env_list(name, default=""):
     return [item.strip() for item in val.split(",") if item.strip()]
 
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", required=True)
+SECRET_KEY = env_secret("DJANGO_SECRET_KEY", required=True)
 
 DEBUG = env_bool("DJANGO_DEBUG", False)
 
@@ -73,7 +93,7 @@ if OAUTH_PROVIDER == "google":
             "APPS": [
                 {
                     "client_id": env("GOOGLE_OAUTH_CLIENT_ID", required=True),
-                    "secret": env("GOOGLE_OAUTH_CLIENT_SECRET", required=True),
+                    "secret": env_secret("GOOGLE_OAUTH_CLIENT_SECRET", required=True),
                     "key": "",
                 }
             ],
@@ -93,7 +113,7 @@ elif OAUTH_PROVIDER == "microsoft":
             "APPS": [
                 {
                     "client_id": env("MICROSOFT_OAUTH_CLIENT_ID", required=True),
-                    "secret": env("MICROSOFT_OAUTH_CLIENT_SECRET", required=True),
+                    "secret": env_secret("MICROSOFT_OAUTH_CLIENT_SECRET", required=True),
                     "key": "",
                 }
             ],
@@ -157,7 +177,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("POSTGRES_DB", "redscribe"),
         "USER": env("POSTGRES_USER", "redscribe"),
-        "PASSWORD": env("POSTGRES_PASSWORD", ""),
+        "PASSWORD": env_secret("POSTGRES_PASSWORD", ""),
         "HOST": env("POSTGRES_HOST", "localhost"),
         "PORT": env("POSTGRES_PORT", "5432"),
         # Default "prefer" matches psycopg's own default and is fine for the
@@ -254,7 +274,7 @@ CACHES = {
 EMAIL_HOST = env("EMAIL_HOST", "")
 EMAIL_PORT = int(env("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_HOST_PASSWORD = env_secret("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "RedScribe <no-reply@redscribe.local>")
 

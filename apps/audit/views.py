@@ -144,10 +144,11 @@ def purge_all_view(request):
         messages.error(request, "Confirmation phrase didn't match — nothing was deleted.")
         return redirect(reverse("audit:purge_all_confirm"))
 
-    # A full purge is the one action that can undo this feature's own
-    # tamper-evidence guarantee (an insider covering their tracks), so it's
-    # the one action here that isn't left to a single permission holder --
-    # a second, genuinely different Superadmin has to authenticate to it too.
+    # A full purge is the one action that erases audit history outright
+    # (an insider covering their tracks could otherwise just clear the log),
+    # so it's the one action here that isn't left to a single permission
+    # holder — a second, genuinely different Superadmin has to authenticate
+    # to it too.
     approver_username = request.POST.get("approver_username", "").strip()
     approver_password = request.POST.get("approver_password", "")
     approver = authenticate(request, username=approver_username, password=approver_password)

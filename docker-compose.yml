@@ -5,7 +5,14 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-redscribe}
       POSTGRES_USER: ${POSTGRES_USER:-redscribe}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # File-based (Postgres's own official `_FILE` convention), not a plain
+      # env var — matches how web's copy of the same password is delivered
+      # below. An env var is readable via `docker inspect`/`/proc/<pid>/environ`
+      # by any root/same-UID process on the host; this file's access is
+      # controlled by the mount itself. See secrets/README.md.
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -17,6 +24,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Defaults sized for the "Small firm" tier in the docs' Requirements &
+    # sizing table — raise for a bigger tier, or drop the two lines entirely
+    # to run uncapped. See /getting-started/requirements/ on docs.redscribe.app.
+    mem_limit: ${DB_MEM_LIMIT:-2g}
+    cpus: ${DB_CPUS:-1.5}
 
   web:
     build: .
@@ -24,8 +36,14 @@ services:
     env_file: .env
     environment:
       POSTGRES_HOST: db
+      # Same file-based delivery as the db service above, and as
+      # REDSCRIBE_ROOT_KEY below — see secrets/README.md.
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets:
       - redscribe_root_key
+      - django_secret_key
+      - postgres_password
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +67,10 @@ services:
       # below — Docker's own volume storage path is needless indirection
       # for something you're meant to sync off-box yourself.
       - ./backups:/app/backups
+    # Same sizing note as db above — this is the service report exports
+    # (WeasyPrint/docxtpl) run inside, so it gets the larger share.
+    mem_limit: ${WEB_MEM_LIMIT:-5g}
+    cpus: ${WEB_CPUS:-3}
 
   nginx:
     image: nginx:1.27-alpine
@@ -56,6 +78,8 @@ services:
     depends_on:
       web:
         condition: service_healthy
+    mem_limit: ${NGINX_MEM_LIMIT:-256m}
+    cpus: ${NGINX_CPUS:-0.5}
     # Host network namespace instead of a published-port mapping: nginx
     # binds host ports 80/443 directly, so it sees the real client TCP
     # connection with no Docker NAT/port-forwarding layer in between.
@@ -128,8 +152,13 @@ volumes:
   pgdata:
 
 secrets:
-  # File-based Docker secret, not an env var — see apps/crypto/root_key.py
-  # and secrets/README.md for why. Compose (no swarm needed) mounts this
-  # read-only at /run/secrets/redscribe_root_key inside the container.
+  # File-based Docker secrets, not env vars — see apps/crypto/root_key.py
+  # and secrets/README.md for why. Compose (no swarm needed) mounts each of
+  # these read-only at /run/secrets/<name> inside the container(s) that
+  # reference it above.
   redscribe_root_key:
     file: ./secrets/root_key.txt
+  django_secret_key:
+    file: ./secrets/django_secret_key.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt

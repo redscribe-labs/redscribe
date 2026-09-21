@@ -16,8 +16,8 @@ class Command(BaseCommand):
         "Reset a local account's password and, optionally, clear its TOTP device, for when the "
         "normal in-app tools aren't usable (e.g. the only Superadmin is themselves locked out). "
         "Unlike a raw `manage.py shell`/`changepassword` session, this writes an entry to "
-        "RedScribe's own tamper-evident audit log, so the one access path that bypasses every "
-        "other control doesn't also bypass the record of it happening."
+        "RedScribe's own audit log, so the one access path that bypasses every other control "
+        "doesn't also bypass the record of it happening."
     )
 
     def add_arguments(self, parser):

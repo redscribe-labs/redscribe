@@ -6,7 +6,6 @@ from .integrity import append_with_chain
 _SAFE_METHODS = {"HEAD", "OPTIONS"}
 
 _EXCLUDED_VIEW_NAMES = {
-    "reports:preview",
     "health",
     "csp_report",
 }

@@ -134,10 +134,14 @@ class AuditLogViewTests(TestCase):
         results = resp.context["page_obj"].object_list
         self.assertTrue(any(e.method == "GET" and e.action == "audit:list" for e in results))
 
-    def test_reports_preview_stays_excluded_even_though_gets_are_logged_now(self):
+    def test_reports_preview_is_no_longer_excluded(self):
+        # Was excluded to avoid flooding the log on every keystroke of report
+        # configuration. That traded away a trail for the one endpoint that
+        # serves fully-assembled decrypted report content, so it's logged
+        # like every other view now — see CHANGELOG.md.
         from .middleware import _EXCLUDED_VIEW_NAMES
 
-        self.assertIn("reports:preview", _EXCLUDED_VIEW_NAMES)
+        self.assertNotIn("reports:preview", _EXCLUDED_VIEW_NAMES)
 
     def test_health_check_endpoint_is_not_logged(self):
         from .models import AuditLogEntry

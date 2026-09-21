@@ -12,8 +12,8 @@ deployment (network placement, access control, backups, TLS, MFA
 enforcement) is the operator's responsibility. See the README's
 Installation and Configuration sections for the hardening this project
 already builds in — per-engagement AES-256-GCM encryption at rest, a
-hash-chained tamper-evident audit log, TOTP MFA, and secure session/cookie
-defaults, among others.
+hash-chained audit log, TOTP MFA, and secure session/cookie defaults,
+among others.
 
 Also out of scope: gaps already tracked publicly as known limitations —
 see the [Alpha status & versioning](https://docs.redscribe.app/start/alpha-status/#known-limitations)

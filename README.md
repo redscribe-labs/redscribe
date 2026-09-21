@@ -1,9 +1,9 @@
 # RedScribe
 
-**`0.1.0-alpha.1`** — self-hosted engagement, finding, checklist, and report
+**`0.2.0-alpha.1`** — self-hosted engagement, finding, checklist, and report
 management for a small penetration testing team.
 
-![version](https://img.shields.io/badge/version-0.1.0--alpha.1-blue)
+![version](https://img.shields.io/badge/version-0.2.0--alpha.1-blue)
 ![license](https://img.shields.io/badge/license-source--available-orange)
 
 [Documentation](https://docs.redscribe.app) ·
@@ -66,7 +66,7 @@ complete feature set.
   source — DOCX fills in your own uploaded Word template rather than
   generating from scratch.
 - Per-engagement AES-256-GCM encryption at rest, dynamic RBAC, TOTP MFA,
-  and an append-only, hash-chained audit log with tamper detection.
+  and an append-only, hash-chained audit log.
 - A read-only client portal, checklist runs (OWASP WSTG and your own
   templates) with Nmap/Burp Suite/Nuclei scanner import, and
   cross-engagement trend reporting.
@@ -79,7 +79,9 @@ The fastest way to try it locally — no TLS, no domain:
 
 ```
 cp .env.example .env
-# set DJANGO_SECRET_KEY and POSTGRES_PASSWORD in .env
+touch secrets/root_key.txt  # filled in below, after the app is up
+python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(50)))" > secrets/django_secret_key.txt
+openssl rand -base64 32 > secrets/postgres_password.txt
 docker compose up -d --build
 docker compose exec web python manage.py generate_root_key
 # copy the printed value into secrets/root_key.txt, then:
@@ -124,7 +126,7 @@ normal during alpha, not a mistake.
 
 ## Alpha status
 
-RedScribe is early alpha (`0.1.0-alpha.1`) — expect rough edges and
+RedScribe is early alpha (`0.2.0-alpha.1`) — expect rough edges and
 breaking changes between releases. Two things worth knowing before
 relying on it for a real engagement (full list in the docs):
 

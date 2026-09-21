@@ -254,6 +254,90 @@ class ImageSrcSanitizerTests(TestCase):
         self.assertEqual(sanitize_tiptap_image_srcs("not json"), "not json")
 
 
+class LinkHrefSanitizerTests(TestCase):
+
+    def _doc_with_link(self, href):
+        return json.dumps({
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": "click here", "marks": [{"type": "link", "attrs": {"href": href}}]},
+                ]},
+            ],
+        })
+
+    def _link_marks(self, result):
+        text_node = result["content"][0]["content"][0]
+        return [m for m in text_node.get("marks", []) if m.get("type") == "link"]
+
+    def test_https_link_kept(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        result = json.loads(sanitize_tiptap_link_hrefs(self._doc_with_link("https://example.com/report")))
+        self.assertEqual(len(self._link_marks(result)), 1)
+
+    def test_mailto_link_kept(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        result = json.loads(sanitize_tiptap_link_hrefs(self._doc_with_link("mailto:someone@example.com")))
+        self.assertEqual(len(self._link_marks(result)), 1)
+
+    def test_javascript_link_stripped(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        result = json.loads(
+            sanitize_tiptap_link_hrefs(self._doc_with_link("javascript:alert(document.cookie)"))
+        )
+        self.assertEqual(self._link_marks(result), [])
+        # The text itself survives — only the link mark is removed, not the node.
+        self.assertEqual(result["content"][0]["content"][0]["text"], "click here")
+
+    def test_data_uri_link_stripped(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        result = json.loads(
+            sanitize_tiptap_link_hrefs(self._doc_with_link("data:text/html,<script>alert(1)</script>"))
+        )
+        self.assertEqual(self._link_marks(result), [])
+
+    def test_link_nested_inside_other_nodes_is_still_stripped(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        nested = json.dumps({
+            "type": "doc",
+            "content": [{"type": "blockquote", "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": "x", "marks": [{"type": "link", "attrs": {"href": "javascript:evil()"}}]},
+                ]},
+            ]}],
+        })
+        result = json.loads(sanitize_tiptap_link_hrefs(nested))
+        text_node = result["content"][0]["content"][0]["content"][0]
+        self.assertEqual([m for m in text_node.get("marks", []) if m.get("type") == "link"], [])
+
+    def test_other_marks_on_a_stripped_link_are_kept(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        doc = json.dumps({
+            "type": "doc",
+            "content": [{"type": "paragraph", "content": [
+                {"type": "text", "text": "x", "marks": [
+                    {"type": "bold"},
+                    {"type": "link", "attrs": {"href": "javascript:evil()"}},
+                ]},
+            ]}],
+        })
+        result = json.loads(sanitize_tiptap_link_hrefs(doc))
+        marks = result["content"][0]["content"][0]["marks"]
+        self.assertEqual([m["type"] for m in marks], ["bold"])
+
+    def test_blank_and_malformed_input_pass_through_unchanged(self):
+        from .validators import sanitize_tiptap_link_hrefs
+
+        self.assertEqual(sanitize_tiptap_link_hrefs(""), "")
+        self.assertEqual(sanitize_tiptap_link_hrefs("not json"), "not json")
+
+
 class FindingViewTests(TestCase):
     def setUp(self):
         self.engagement = Engagement.objects.create(client_name="Acme")

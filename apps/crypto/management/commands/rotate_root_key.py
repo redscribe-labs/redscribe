@@ -1,4 +1,5 @@
 import base64
+import getpass
 import os
 
 from cryptography.exceptions import InvalidTag
@@ -32,8 +33,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--new-key",
-            required=True,
-            help="Base64-encoded 32-byte AES key, e.g. from `generate_root_key`.",
+            help="Base64-encoded 32-byte AES key, e.g. from `generate_root_key`. Prompted "
+            "interactively (not echoed, never in argv) if omitted, which is the safer default "
+            "on any shared host: a CLI argument is visible to other local users/processes via "
+            "`ps`/`/proc/<pid>/cmdline` for as long as this process runs, and lands in shell "
+            "history if typed interactively. Pass it explicitly only for scripted/unattended use.",
         )
         parser.add_argument(
             "--dry-run",
@@ -42,8 +46,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        new_key_b64 = options["new_key"] or getpass.getpass("New root key (base64): ")
         try:
-            new_key = base64.b64decode(options["new_key"], validate=True)
+            new_key = base64.b64decode(new_key_b64, validate=True)
         except Exception as exc:
             raise CommandError(f"--new-key is not valid base64: {exc}") from exc
         if len(new_key) != KEY_LENGTH_BYTES:

@@ -139,6 +139,48 @@ def sanitize_tiptap_image_srcs(value: str, *, allow_own_blobs: bool = True) -> s
     return json.dumps(parsed)
 
 
+# Same allowlist the read-only renderer applies (apps/reports/tiptap_render.py,
+# _ALLOWED_LINK_PROTOCOLS) — kept here as an independent server-side check
+# rather than importing that module, so a link mark is stripped at write time
+# regardless of which renderer eventually displays it, and regardless of
+# whether a submission went through the Tiptap editor at all (a form POST
+# built by hand skips the editor's own client-side protocol allowlist).
+_ALLOWED_LINK_HREF_RE = re.compile(r"^(?:https?://|mailto:)", re.IGNORECASE)
+
+
+def _strip_disallowed_links(node, depth: int = 0):
+    if depth > _MAX_SANITIZE_DEPTH or not isinstance(node, dict):
+        return node
+    marks = node.get("marks")
+    if isinstance(marks, list):
+        kept_marks = []
+        for mark in marks:
+            if isinstance(mark, dict) and mark.get("type") == "link":
+                href = (mark.get("attrs") or {}).get("href")
+                if not isinstance(href, str) or not _ALLOWED_LINK_HREF_RE.match(href.strip()):
+                    continue
+            kept_marks.append(mark)
+        node["marks"] = kept_marks
+    content = node.get("content")
+    if isinstance(content, list):
+        node["content"] = [_strip_disallowed_links(child, depth=depth + 1) for child in content]
+    return node
+
+
+def sanitize_tiptap_link_hrefs(value: str) -> str:
+    value = (value or "").strip()
+    if not value:
+        return value
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError, RecursionError):
+        return value
+    if not isinstance(parsed, dict):
+        return value
+    _strip_disallowed_links(parsed)
+    return json.dumps(parsed)
+
+
 def validate_cve_id(value: str) -> None:
     value = (value or "").strip()
     if not value:

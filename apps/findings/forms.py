@@ -3,6 +3,7 @@ from django import forms
 from .models import ContentSectionDefinition, Finding, TemplateSection, VulnerabilityTemplate
 from .validators import (
     sanitize_tiptap_image_srcs,
+    sanitize_tiptap_link_hrefs,
     validate_cve_id,
     validate_cvss_vector,
     validate_tiptap_doc_json,
@@ -18,7 +19,8 @@ class RichTextField(forms.CharField):
 
     def clean(self, value):
         value = super().clean(value)
-        return sanitize_tiptap_image_srcs(value, allow_own_blobs=self.allow_own_blob_images)
+        value = sanitize_tiptap_image_srcs(value, allow_own_blobs=self.allow_own_blob_images)
+        return sanitize_tiptap_link_hrefs(value)
 
 
 def _section_field_name(slug: str) -> str:

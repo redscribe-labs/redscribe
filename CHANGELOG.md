@@ -10,6 +10,8 @@ suffixes before the first `1.0.0`. See the "Versioning" section of
 
 ## [Unreleased]
 
+## [0.2.0-alpha.1] - 2026-09-22
+
 ### Security
 
 - `mfa_required` now defaults to **on** instead of off. Every local account
@@ -66,6 +68,56 @@ suffixes before the first `1.0.0`. See the "Versioning" section of
   `POSTGRES_SSLMODE`/`POSTGRES_SSLROOTCERT`) instead of relying on
   psycopg's undocumented default — matters once `POSTGRES_HOST` points at
   a separate host.
+- **Fixed a stored-XSS path in rich text link marks.** Finding and
+  checklist rich text fields already stripped image `src` values down to
+  an allowlist (own encrypted blobs, or nothing); the equivalent check was
+  missing for link `href` values, so a `content_json` payload POSTed
+  directly (bypassing the Tiptap editor's own client-side protocol
+  allowlist) could carry a `javascript:` link that survived to a
+  higher-privileged reviewer or the client portal. `RichTextField` now
+  strips any link whose `href` isn't `http://`, `https://`, or `mailto:`,
+  the same allowlist the read-only renderer already enforces.
+- `reports:preview` (the live report-preview endpoint, which serves
+  fully-assembled decrypted report content) is no longer excluded from the
+  audit log. It was originally excluded to avoid flooding the log on every
+  keystroke of report configuration; that traded away a record of the one
+  endpoint that serves decrypted report content on demand, so it's logged
+  like every other view now.
+- `rotate_root_key` no longer requires `--new-key` on the command line.
+  Omitting it now prompts interactively via `getpass` (not echoed, never
+  in argv or shell history), matching `restore_backup`'s existing pattern
+  for the same class of secret.
+- `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD` are now delivered the same
+  way `REDSCRIBE_ROOT_KEY` already was under Docker Compose: as file-based
+  Docker secrets (`secrets/django_secret_key.txt`,
+  `secrets/postgres_password.txt`) rather than plain `.env` values, via a
+  new `env_secret()` settings helper (`<NAME>_FILE` beats `<NAME>`, same
+  convention `RootKeyProvider` already used). The same mechanism is now
+  also available for `GOOGLE_OAUTH_CLIENT_SECRET`,
+  `MICROSOFT_OAUTH_CLIENT_SECRET`, and `EMAIL_HOST_PASSWORD`, though
+  Compose doesn't mount a secret for those by default since they're
+  opt-in features. **Existing `.env`-only deployments upgrading to this
+  release need to create `secrets/django_secret_key.txt` and
+  `secrets/postgres_password.txt`** — see `secrets/README.md`. The plain
+  env vars remain a supported fallback for non-Docker/bare-metal
+  deployments and CI.
+- `docker-compose.yml` now caps memory/CPU per service (`WEB_MEM_LIMIT`/
+  `WEB_CPUS`, `DB_MEM_LIMIT`/`DB_CPUS`, `NGINX_MEM_LIMIT`/`NGINX_CPUS`),
+  defaulting to the "Small firm" tier from the docs' Requirements &
+  sizing table. Previously unbounded, which on a host without its own
+  container-level limits meant a single large report export (or a burst
+  of them) had no ceiling on how much of the box it could consume.
+  Existing deployments sized for a bigger tier should raise these
+  explicitly in `.env`.
+- Corrected "tamper detection"/"tamper-evident" language describing the
+  audit log in the README, `SECURITY.md`, and the docs site. The hash
+  chain reliably detects an edit to a row that's still in the table, but
+  does **not** protect against someone with direct database write access
+  deleting the newest entries, or an already-purged prefix being extended
+  further than a legitimate retention purge would — both leave the chain
+  verifying as intact. See [Audit trail &
+  integrity](https://docs.redscribe.app/security/audit-trail/) for the
+  full scope of what the hash chain does and doesn't catch.
 
 ## [0.1.0-alpha.1] - 2026-09-17
 
