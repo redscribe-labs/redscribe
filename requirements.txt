@@ -71,3 +71,11 @@ docxcompose==2.2.0
 # instead of processing them. Tiny, single-purpose, the de facto standard
 # fix for this exact class of issue.
 defusedxml==0.7.1
+
+# Loads .env into the process environment for bare-metal/CI runs (manage.py)
+# — the equivalent of what Compose's own `env_file: .env` already does
+# automatically for the web container under Methods 1-3. Never overrides a
+# variable that's already set in the real environment (default `override`
+# is False), so it changes nothing under Docker/CI where the value is set
+# some other way.
+python-dotenv==1.2.3

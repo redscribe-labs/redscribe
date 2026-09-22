@@ -43,11 +43,41 @@ python manage.py collectstatic --noinput
 # which means a single-process app never uses more than one CPU core no
 # matter how many the host actually has. Auto-size to the standard
 # (2 * cores) + 1 gunicorn-recommended formula unless the operator set
-# GUNICORN_WORKERS explicitly in .env. nproc reflects cgroup CPU limits
-# when the container has any (e.g. `docker run --cpus`), not just the
-# host's total core count.
+# GUNICORN_WORKERS explicitly in .env.
+#
+# Deliberately NOT `nproc` here: it reports the number of cores the
+# scheduler could put this process on (sched_getaffinity), which a
+# Compose `cpus:` limit never changes -- that key sets a CFS quota
+# (time-sliced throttling), not a cpuset restriction, so `nproc` still
+# reports the HOST's full core count even under a small `WEB_CPUS`
+# share. Confirmed empirically: `WEB_CPUS=1` on a 2-core host still gave
+# `nproc` == 2, over-provisioning to 5 workers instead of the 3 that
+# quota can actually run. Read the cgroup's own quota/period directly
+# instead, so this tracks the real limit regardless of host size.
+cpu_count() {
+    if [ -r /sys/fs/cgroup/cpu.max ]; then
+        # cgroup v2: "<quota> <period>", or "max <period>" if unlimited.
+        set -- $(cat /sys/fs/cgroup/cpu.max)
+        quota=$1; period=$2
+    elif [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ] && [ -r /sys/fs/cgroup/cpu/cpu.cfs_period_us ]; then
+        # cgroup v1: quota -1 means unlimited.
+        quota=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
+        period=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+        [ "$quota" = "-1" ] && quota="max"
+    else
+        quota="max"
+    fi
+    if [ "$quota" = "max" ] || [ -z "$quota" ] || [ -z "$period" ]; then
+        nproc
+    else
+        # Ceiling division so a fractional quota (e.g. 0.5 CPUs) still
+        # sizes for at least 1 whole core's worth of workers, never 0.
+        echo $(( (quota + period - 1) / period ))
+    fi
+}
+
 if [ -z "$GUNICORN_WORKERS" ]; then
-    export GUNICORN_WORKERS=$(( $(nproc) * 2 + 1 ))
+    export GUNICORN_WORKERS=$(( $(cpu_count) * 2 + 1 ))
 fi
 
 exec "$@"
