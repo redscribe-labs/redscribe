@@ -24,11 +24,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    # Defaults sized for the "Small firm" tier in the docs' Requirements &
-    # sizing table — raise for a bigger tier, or drop the two lines entirely
-    # to run uncapped. See /getting-started/requirements/ on docs.redscribe.app.
+    # Defaults sized for the "Solo" tier in the docs' Requirements & sizing
+    # table -- the documented floor for "just trying it out" (docker's own
+    # `cpus:` refuses to start a container at all if the value exceeds the
+    # host's actual CPU count, so this has to default low enough to run
+    # unmodified on that floor, not just on a beefier host). Raise for a
+    # bigger tier, or drop the two lines entirely to run uncapped. See
+    # /getting-started/requirements/ on docs.redscribe.app.
     mem_limit: ${DB_MEM_LIMIT:-2g}
-    cpus: ${DB_CPUS:-1.5}
+    cpus: ${DB_CPUS:-0.5}
 
   web:
     build: .
@@ -70,7 +74,7 @@ services:
     # Same sizing note as db above — this is the service report exports
     # (WeasyPrint/docxtpl) run inside, so it gets the larger share.
     mem_limit: ${WEB_MEM_LIMIT:-5g}
-    cpus: ${WEB_CPUS:-3}
+    cpus: ${WEB_CPUS:-1}
 
   nginx:
     image: nginx:1.27-alpine
@@ -141,7 +145,16 @@ services:
       db:
         condition: service_healthy
     environment:
-      TS_CERT_DOMAIN: ${NGINX_SERVER_NAME:?set NGINX_SERVER_NAME to your tailnet hostname to use the tailscale profile}
+      # No `:?` here on purpose -- Compose interpolates every service's
+      # environment block at parse time for the whole file, regardless of
+      # which --profile was passed, so a required-var error here would
+      # break every `docker compose up`/`down` invocation (Methods 2 and
+      # 3, and any plain `docker compose down`) even though this service
+      # never starts outside the tailscale profile. The equivalent check
+      # already exists at the right time/place instead: scripts/
+      # tailscale-cert-loop.sh's own `: "${TS_CERT_DOMAIN:?...}"`, which
+      # only runs when this container actually starts.
+      TS_CERT_DOMAIN: ${NGINX_SERVER_NAME:-}
     volumes:
       - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
       - ./certs:/certs
