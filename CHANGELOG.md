@@ -10,6 +10,27 @@ suffixes before the first `1.0.0`. See the "Versioning" section of
 
 ## [Unreleased]
 
+### Fixed
+
+- `docker compose` no longer fails with a `NGINX_SERVER_NAME` interpolation
+  error on any invocation without `--profile tailscale` (Methods 2, 3, and
+  plain `down`).
+- `config.settings.prod` (Methods 1-2) no longer crashes on first boot —
+  `DJANGO_DEBUG` now defaults to `false` in `.env.example`.
+- Bare-metal/CI `manage.py` commands (Method 4) now load `.env`
+  automatically, via new `python-dotenv` dependency.
+- `docker compose up` no longer fails with a CPU-range error on a 1 vCPU
+  host. `WEB_CPUS`/`DB_CPUS` defaults lowered to match the documented
+  "Solo" tier floor; raise them in `.env` for a bigger tier.
+- Gunicorn worker count now sizes off the container's actual `WEB_CPUS`
+  quota instead of `nproc`, which reported the host's full core count
+  regardless of that quota.
+
+### Security
+
+- `BACKUP_ENCRYPTION_PASSPHRASE` now uses the same `_FILE`-first secret
+  convention (`env_secret()`) as every other real secret.
+
 ## [0.2.0-alpha.1] - 2026-09-22
 
 ### Security

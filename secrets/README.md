@@ -71,9 +71,10 @@ convention; `web` picks up the same file via `env_secret()`.
 
 `env_secret()` applies the identical `<NAME>_FILE`-beats-`<NAME>` pattern
 to every secret-shaped setting RedScribe reads — currently also
-`GOOGLE_OAUTH_CLIENT_SECRET`, `MICROSOFT_OAUTH_CLIENT_SECRET`, and
-`EMAIL_HOST_PASSWORD`. These are optional features (OAuth sign-in, SMTP),
-so `docker-compose.yml` doesn't mount a Docker secret for them by default —
+`GOOGLE_OAUTH_CLIENT_SECRET`, `MICROSOFT_OAUTH_CLIENT_SECRET`,
+`EMAIL_HOST_PASSWORD`, and `BACKUP_ENCRYPTION_PASSPHRASE`. These are
+optional features (OAuth sign-in, SMTP, host-cron backups), so
+`docker-compose.yml` doesn't mount a Docker secret for them by default —
 plain `.env` values still work. If you want file-based delivery for one of
 these too, set e.g. `GOOGLE_OAUTH_CLIENT_SECRET_FILE=/run/secrets/google_oauth_client_secret`
 in `.env` and add the matching `secrets:` entry (and mount) to your own
