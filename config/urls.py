@@ -1,6 +1,8 @@
 from django.http import Http404
 from django.urls import include, path
 
+from apps.reports.font_views import report_font_file
+
 from .csp import csp_report_view
 from .health import health
 
@@ -39,6 +41,7 @@ _BLOCKED_ALLAUTH_URLS = [
 urlpatterns = [
     path("health/", health, name="health"),
     path("csp-report/", csp_report_view, name="csp_report"),
+    path("report-fonts/<str:family>/<str:weight>/<str:style>/", report_font_file, name="report_font_file"),
     *(path(pattern, _blocked_allauth_view, name=name) for pattern, name in _BLOCKED_ALLAUTH_URLS),
     path("accounts/social/", include("allauth.urls")),
     path("engagements/", include("apps.engagements.urls")),

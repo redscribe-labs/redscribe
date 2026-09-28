@@ -561,11 +561,58 @@ class ReportFontThemeStyleTagTests(TestCase):
         default_profile.body_font = "Roboto Slab"
         default_profile.monospace_font = "Fira Code"
         default_profile.save()
+        CachedGoogleFont.objects.create(family="Roboto Slab", weight="400", style="normal", font_data=b"wOF2")
         css = report_font_theme_style()
         self.assertIn("--font-sans:", css)
         self.assertIn("Roboto Slab", css)
         self.assertIn("--font-mono:", css)
         self.assertIn("Fira Code", css)
+        # Served under the app's `font-src 'self'` CSP, so must reference the
+        # same-origin font view, never a data: URI the CSP would block.
+        self.assertIn(reverse("report_font_file", args=["Roboto Slab", "400", "normal"]), css)
+        self.assertNotIn("data:", css)
+
+
+class ReportFontFileViewTests(TestCase):
+    def test_serves_cached_variant_without_login(self):
+        variant = CachedGoogleFont.objects.get(family="Plus Jakarta Sans", weight="400", style="normal")
+        response = Client().get(reverse("report_font_file", args=["Plus Jakarta Sans", "400", "normal"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "font/woff2")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+        self.assertIn("immutable", response["Cache-Control"])
+        self.assertEqual(response.content, bytes(variant.font_data))
+
+    def test_content_type_never_taken_from_stored_upstream_header(self):
+        CachedGoogleFont.objects.create(
+            family="Evil Font", weight="400", style="normal", font_format="woff2",
+            content_type="text/html", font_data=b"<script>alert(1)</script>",
+        )
+        response = Client().get(reverse("report_font_file", args=["Evil Font", "400", "normal"]))
+        self.assertEqual(response["Content-Type"], "font/woff2")
+
+    def test_unknown_font_format_is_404(self):
+        CachedGoogleFont.objects.create(
+            family="Odd Font", weight="400", style="normal", font_format="html", font_data=b"x",
+        )
+        response = Client().get(reverse("report_font_file", args=["Odd Font", "400", "normal"]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_unknown_variant_is_404(self):
+        response = Client().get(reverse("report_font_file", args=["Plus Jakarta Sans", "900", "italic"]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_invalid_family_is_404(self):
+        response = Client().get(reverse("report_font_file", args=["<script>", "400", "normal"]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_build_preview_css_embeds_by_default_and_links_when_asked(self):
+        from . import ir_render
+
+        self.assertIn("data:font/", ir_render.build_preview_css(None))
+        linked = ir_render.build_preview_css(None, embed_fonts=False)
+        self.assertNotIn("data:", linked)
+        self.assertIn(reverse("report_font_file", args=["Plus Jakarta Sans", "400", "normal"]), linked)
 
     def test_non_default_profile_is_ignored(self):
         from .templatetags.report_fonts import report_font_theme_style

@@ -16,6 +16,7 @@ _CLIENT_EXEMPT_URL_NAMES = {
     "accounts:mfa_enroll",
     "accounts:mfa_verify",
     "csp_report",
+    "report_font_file",
 }
 
 _CLIENT_PORTAL_URL_PREFIX = "clients_portal:"

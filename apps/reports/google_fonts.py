@@ -4,6 +4,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from django.urls import reverse
+
 from .models import CachedGoogleFont
 
 _CSS_ENDPOINT = "https://fonts.googleapis.com/css2"
@@ -33,24 +35,35 @@ def _css_string_escape(text: str) -> str:
     )
 
 
-def font_face_css(family: str) -> str:
-    """Emit @font-face rules embedding every cached weight/style of `family` as base64 data-URIs.
+def font_face_css(family: str, *, embed: bool = True) -> str:
+    """Emit @font-face rules for every cached weight/style of `family`.
+
+    embed=True inlines each font as a base64 data-URI — for self-contained
+    exports (PDF, standalone HTML). embed=False points at the same-origin
+    report_font_file view instead — for pages served under the app's CSP,
+    whose `font-src 'self'` blocks data: fonts.
 
     DB-read-only — never fetches over the network. Callers needing a family that
     isn't cached yet (report generation's admin-facing save path) go through
     fetch_and_cache_font() explicitly first; this only reads what's already there.
     """
     variants = CachedGoogleFont.objects.filter(family=family)
+    if not embed:
+        variants = variants.defer("font_data")
     if not variants:
         return ""
     rules = []
     for variant in variants:
-        data_uri = f"data:{variant.content_type};base64,{base64.b64encode(bytes(variant.font_data)).decode('ascii')}"
+        if embed:
+            src = f"data:{variant.content_type};base64,{base64.b64encode(bytes(variant.font_data)).decode('ascii')}"
+        else:
+            path = reverse("report_font_file", args=[family, variant.weight, variant.style])
+            src = f'"{path}?v={int(variant.fetched_at.timestamp())}"'
         rules.append(
             "@font-face {{ font-family: \"{family}\"; font-weight: {weight}; font-style: {style}; "
-            "src: url({data_uri}) format(\"{fmt}\"); font-display: swap; }}".format(
+            "src: url({src}) format(\"{fmt}\"); font-display: swap; }}".format(
                 family=_css_string_escape(family), weight=variant.weight, style=variant.style,
-                data_uri=data_uri, fmt=variant.font_format,
+                src=src, fmt=variant.font_format,
             )
         )
     return "".join(rules)

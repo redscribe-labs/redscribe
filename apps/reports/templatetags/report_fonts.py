@@ -33,10 +33,10 @@ def report_font_theme_style():
     faces = []
     overrides = []
     if body_font != _FALLBACK_SANS:
-        faces.append(font_face_css(body_font))
+        faces.append(font_face_css(body_font, embed=False))
         overrides.append(f'--font-sans: "{_css_string_escape(body_font)}", "{_FALLBACK_SANS}", {_SANS_TAIL};')
     if monospace_font != _FALLBACK_MONO:
-        faces.append(font_face_css(monospace_font))
+        faces.append(font_face_css(monospace_font, embed=False))
         overrides.append(f'--font-mono: "{_css_string_escape(monospace_font)}", "{_FALLBACK_MONO}", {_MONO_TAIL};')
 
     if not overrides:

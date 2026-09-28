@@ -374,6 +374,16 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         resp = self.http.get(reverse("accounts:logout"))
         self.assertNotEqual(resp.status_code, 403)
 
+    def test_report_font_file_allowed_for_client_when_enabled(self):
+        # portal_base.html emits @font-face rules pointing at this view.
+        flags = FeatureFlags.get_solo()
+        flags.client_portal_enabled = True
+        flags.save()
+        login(self.http, self.client_user)
+
+        resp = self.http.get(reverse("report_font_file", args=["Plus Jakarta Sans", "400", "normal"]))
+        self.assertEqual(resp.status_code, 200)
+
     def test_authenticated_client_session_logged_out_when_flag_off(self):
         flags = FeatureFlags.get_solo()
         flags.client_portal_enabled = True

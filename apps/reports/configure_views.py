@@ -92,7 +92,7 @@ def report_configure(request, engagement_id):
                 for block in assembly.visible_dynamic_blocks(effective_profile)
             ],
             "preview_html": preview_html,
-            "preview_css": ir_render.build_preview_css(document.meta),
+            "preview_css": ir_render.build_preview_css(document.meta, embed_fonts=False),
             "preview_url": reverse("reports:preview", args=[engagement.pk]),
             "breadcrumbs": engagement_crumbs(engagement) + [{"label": "Configure report"}],
         },

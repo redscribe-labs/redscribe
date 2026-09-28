@@ -217,13 +217,15 @@ def _css_string_escape(text: str) -> str:
     )
 
 
-def build_preview_css(meta=None) -> str:
+def build_preview_css(meta=None, *, embed_fonts=True) -> str:
     from .colors import contrasting_text_rgb, darken, mix_with_white
     from .google_fonts import font_face_css
 
     body_font = (meta and meta.body_font) or "Plus Jakarta Sans"
     monospace_font = (meta and meta.monospace_font) or "JetBrains Mono"
-    font_faces = font_face_css(body_font) + (font_face_css(monospace_font) if monospace_font != body_font else "")
+    font_faces = font_face_css(body_font, embed=embed_fonts) + (
+        font_face_css(monospace_font, embed=embed_fonts) if monospace_font != body_font else ""
+    )
     table_header_color = (meta and meta.table_header_color) or "rgba(248,250,252,1)"
     empty_cell_background_color = (meta and meta.empty_cell_background_color) or "transparent"
     text_rgb = contrasting_text_rgb(table_header_color)
