@@ -6,7 +6,10 @@
 <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
     <div>
         <h1 class="page-title">User management</h1>
-        <p class="text-sm text-slate-500 mt-1">{{ page_obj.paginator.count }} account{{ page_obj.paginator.count|pluralize }} on this instance.</p>
+        <p class="text-sm text-slate-500 mt-1">{{ page_obj.paginator.count }} staff account{{ page_obj.paginator.count|pluralize }} on this instance.</p>
+        {% if user|has_permission:"clients.manage" %}
+        <p class="text-sm text-slate-500 mt-1" data-testid="client-users-pointer">Client portal users are managed per client under <a href="{% url 'clients:list' %}" class="text-brand-600 hover:underline">Manage Clients</a>.</p>
+        {% endif %}
     </div>
     <a href="{% url 'user_management:create' %}" class="btn-primary">New user</a>
 </div>

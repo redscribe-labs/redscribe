@@ -624,6 +624,36 @@ class UserManagementListSearchPaginationTests(TestCase):
         resp_page2 = self.client.get(reverse("user_management:list"), {"page": 2})
         self.assertEqual(len(resp_page2.context["page_obj"].object_list), 6)
 
+    def test_client_portal_users_are_not_listed(self):
+        # Client users live under Manage Clients; user_detail 404s for them,
+        # so listing them here produced rows that couldn't be opened.
+        from apps.clients.models import Client as ClientCompany
+
+        company = ClientCompany.objects.create(name="Acme Corp")
+        client_user = make_user(role="client", username="findme-client", client=company)
+        make_user(role=User.Role.CONSULTANT, username="findme-staff")
+
+        for params in ({}, {"q": "findme"}):
+            resp = self.client.get(reverse("user_management:list"), params)
+            usernames = {u.username for u in resp.context["page_obj"].object_list}
+            self.assertIn("findme-staff", usernames)
+            self.assertNotIn("findme-client", usernames)
+        self.assertEqual(
+            self.client.get(reverse("user_management:detail", args=[client_user.uuid])).status_code, 404,
+        )
+
+    def test_manage_clients_pointer_shown_only_with_clients_manage(self):
+        resp = self.client.get(reverse("user_management:list"))
+        self.assertContains(resp, 'data-testid="client-users-pointer"')
+        self.assertContains(resp, reverse("clients:list"))
+
+        users_only = make_user(role=_make_role_with_permissions("users.manage").slug)
+        other = Client()
+        login(other, users_only)
+        resp = other.get(reverse("user_management:list"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'data-testid="client-users-pointer"')
+
 
 class UserManagementCRUDTests(TestCase):
     def setUp(self):

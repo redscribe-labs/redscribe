@@ -24,15 +24,22 @@ def _require_users_manage(user):
     require_permission(user, "users.manage", "manage users")
 
 
+def _staff_users():
+    # Client-portal users are managed per client under Manage Clients
+    # (apps.clients), never here — the list and every per-user view share
+    # this so a listed row can't 404 when opened.
+    return User.objects.exclude(role__slug="client")
+
+
 def _get_staff_target(user_uuid, **extra):
-    return get_object_or_404(User.objects.exclude(role__slug="client"), uuid=user_uuid, **extra)
+    return get_object_or_404(_staff_users(), uuid=user_uuid, **extra)
 
 
 @login_required
 def user_list(request):
     _require_users_manage(request.user)
     query = request.GET.get("q", "").strip()
-    users = User.objects.all()
+    users = _staff_users()
     if query:
         users = users.filter(
             Q(username__icontains=query)
