@@ -10,8 +10,21 @@ suffixes before the first `1.0.0`. See the "Versioning" section of
 
 ## [Unreleased]
 
+## [0.2.0-alpha.2] - 2026-09-29
+
 ### Fixed
 
+- The default Report Profile's fonts now actually apply to the web app UI
+  and the Configure report preview. They were embedded as `data:` URIs,
+  which the app's own CSP (`font-src 'self'`) blocks — the UI silently fell
+  back to Plus Jakarta Sans and every page sent `font-src` CSP violation
+  reports. Cached fonts are now served same-origin from `/report-fonts/`
+  (browser-cached, no third-party requests); PDF and standalone HTML
+  exports still embed them. Google Fonts is only contacted once,
+  server-side, when an admin saves a profile with an uncached font.
+- User Management no longer lists client-portal users, which 404'd when
+  opened. They're managed per client under Manage Clients, which the list
+  now links to.
 - `docker compose` no longer fails with a `NGINX_SERVER_NAME` interpolation
   error on any invocation without `--profile tailscale` (Methods 2, 3, and
   plain `down`).

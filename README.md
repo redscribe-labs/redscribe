@@ -1,9 +1,9 @@
 # RedScribe
 
-**`0.2.0-alpha.1`** — self-hosted engagement, finding, checklist, and report
+**`0.2.0-alpha.2`** — self-hosted engagement, finding, checklist, and report
 management for a small penetration testing team.
 
-![version](https://img.shields.io/badge/version-0.2.0--alpha.1-blue)
+![version](https://img.shields.io/badge/version-0.2.0--alpha.2-blue)
 ![license](https://img.shields.io/badge/license-source--available-orange)
 
 [Documentation](https://docs.redscribe.app) ·
@@ -126,7 +126,7 @@ normal during alpha, not a mistake.
 
 ## Alpha status
 
-RedScribe is early alpha (`0.2.0-alpha.1`) — expect rough edges and
+RedScribe is early alpha (`0.2.0-alpha.2`) — expect rough edges and
 breaking changes between releases. Two things worth knowing before
 relying on it for a real engagement (full list in the docs):
 
