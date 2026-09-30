@@ -10,10 +10,10 @@ client_max_body_size 100m;  # report exports / scan-import uploads can be sizeab
 # Drops the version number from the Server response header and from any
 # nginx-generated error page (e.g. a raw 497/400 before Django is ever
 # reached) — an attacker fingerprinting for a version-specific nginx CVE
-# gets "nginx", not "nginx/1.27.x". This is the standard, no-rebuild fix;
+# gets "nginx", not "nginx/1.30.x". This is the standard, no-rebuild fix;
 # it does NOT remove the header/"nginx" token entirely — that needs the
 # third-party headers-more-nginx-module compiled into a custom image,
-# which the stock nginx:1.27-alpine base here doesn't include.
+# which the stock nginx:1.30-alpine base here doesn't include.
 server_tokens off;
 
 server {
@@ -127,10 +127,15 @@ server {
 
     # config.settings.prod's SECURE_HSTS_* already makes Django emit this
     # same header (identical value) — hidden here so the client only ever
-    # sees one copy, with nginx as the single source of truth. Applies to
-    # every response from this server block, static or not: one year
+    # sees one copy, with nginx as the single source of truth: one year
     # (the standard "eligible for browser HSTS preload lists" minimum),
     # subdomains included.
+    #
+    # nginx only inherits add_header and proxy_hide_header into a location
+    # that sets none of its own. `location /` below sets both (for
+    # Cache-Control), so it repeats these two lines itself; without that,
+    # nginx-generated responses there (502/504/413 error pages) would go
+    # out with no HSTS header at all.
     proxy_hide_header Strict-Transport-Security;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
@@ -164,5 +169,11 @@ server {
         # any of it.
         proxy_hide_header Cache-Control;
         add_header Cache-Control "no-store" always;
+
+        # Repeated from the server block: setting any add_header /
+        # proxy_hide_header here stops nginx inheriting the server-level
+        # ones (see the HSTS comment above).
+        proxy_hide_header Strict-Transport-Security;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
     }
 }

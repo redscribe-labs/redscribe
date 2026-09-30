@@ -3,10 +3,10 @@ Django==5.2.17
 
 # Auth: single-provider, single-domain OAuth (Google/Microsoft) alongside
 # local username/password
-django-allauth==65.19.2
+django-allauth==65.19.5
 # Required by allauth's Google provider to verify the id_token JWT it gets
 # back from the token endpoint.
-PyJWT==2.13.0
+PyJWT==2.15.1
 # Required by allauth's Google (and OAuth2 base) provider for the
 # token-exchange HTTP calls to the provider's endpoints.
 requests==2.34.2
@@ -28,7 +28,7 @@ argon2-cffi==25.1.0
 cryptography==50.0.1
 
 # Postgres driver
-psycopg[binary]==3.3.5
+psycopg[binary]==3.3.6
 
 # Local dev/prod env
 gunicorn==26.2.0
@@ -45,7 +45,7 @@ weasyprint==70.0
 # (apps.reports.pdf_export.encrypt_pdf) — WeasyPrint/pydyf have no
 # encryption support at all, so this is a separate pass over the finished
 # bytes, not part of rendering. Pure Python, no system dependency.
-pypdf==6.18.0
+pypdf==6.19.0
 
 # DOCX report export (apps.reports.docx_export / tiptap_docx / docx_styles).
 # docxtpl (Jinja2 templating over python-docx) fills {{ tag }} placeholders
