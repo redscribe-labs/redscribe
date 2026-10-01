@@ -381,6 +381,44 @@
       for (const [btn, isActive] of activeButtons) btn.classList.toggle("rte-toolbar-btn-active", isActive());
     }
 
+    // The menu is position: fixed at z-index 55, so clamping it to the
+    // viewport alone left it floating over the sticky chrome — the page
+    // header, this field's own toolbar, the bottom Cancel/Back bar — once the
+    // selection scrolled underneath. Clamp to the region between them (and
+    // inside any scrolling ancestor, e.g. the report preview pane) instead,
+    // and hide the menu while the selection is outside it.
+    const ownToolbar = fieldContainer.previousElementSibling?.classList.contains("rte-toolbar-sticky")
+      ? fieldContainer.previousElementSibling
+      : null;
+
+    function visibleBounds() {
+      let top = 0;
+      let bottom = window.innerHeight;
+      for (const el of [document.getElementById("page-sticky-header"), ownToolbar]) {
+        if (el) top = Math.max(top, el.getBoundingClientRect().bottom);
+      }
+      // A bottom bar still in normal flow below the fold has top > bottom
+      // and is skipped; one stuck to the viewport edge cuts the region.
+      for (const bar of document.querySelectorAll(".sticky.bottom-0")) {
+        const rect = bar.getBoundingClientRect();
+        if (rect.height && rect.top < bottom) bottom = rect.top;
+      }
+      for (let node = fieldContainer.parentElement; node && node !== document.body; node = node.parentElement) {
+        const overflowY = getComputedStyle(node).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll") {
+          const rect = node.getBoundingClientRect();
+          top = Math.max(top, rect.top);
+          bottom = Math.min(bottom, rect.bottom);
+        }
+      }
+      return { top, bottom };
+    }
+
+    // Whether the menu should be showing at all (non-empty selection, or the
+    // link popover open) — separate from menu.hidden, which also goes true
+    // while the selection is merely scrolled out of view.
+    let active = false;
+
     function position() {
       const { from, to } = editor.state.selection;
       const start = editor.view.coordsAtPos(from);
@@ -390,23 +428,30 @@
       const selTop = Math.min(start.top, end.top);
       const selBottom = Math.max(start.bottom, end.bottom);
 
+      const bounds = visibleBounds();
+      if (selBottom <= bounds.top || selTop >= bounds.bottom) {
+        menu.hidden = true;
+        return;
+      }
+
       menu.hidden = false;
       const menuRect = menu.getBoundingClientRect();
       let left = (selLeft + selRight) / 2 - menuRect.width / 2;
       left = Math.max(8, Math.min(left, window.innerWidth - menuRect.width - 8));
       let top = selTop - menuRect.height - 8;
-      if (top < 8) top = selBottom + 8;
+      if (top < bounds.top + 8) top = selBottom + 8;
       // Flipping below the selection when there's no room above still isn't
-      // enough near the bottom of a tall viewport (or inside the preview
-      // pane's own scroll area) — clamp against the bottom edge too, same
-      // as left/right above, so the menu is never pushed off-screen.
-      top = Math.max(8, Math.min(top, window.innerHeight - menuRect.height - 8));
+      // enough near the bottom of the visible region — clamp against the
+      // bottom edge too, same as left/right above, so the menu never covers
+      // the bottom bar or gets pushed off-screen.
+      top = Math.max(bounds.top + 8, Math.min(top, bounds.bottom - menuRect.height - 8));
       menu.style.left = `${left}px`;
       menu.style.top = `${top}px`;
     }
 
     function hide() {
       if (linkPopover.isOpen()) return;
+      active = false;
       menu.hidden = true;
     }
 
@@ -415,6 +460,7 @@
         hide();
         return;
       }
+      active = true;
       position();
       refreshActiveStates();
     });
@@ -425,10 +471,10 @@
       }, 0);
     });
     window.addEventListener("scroll", () => {
-      if (!menu.hidden) position();
+      if (active) position();
     }, true);
     window.addEventListener("resize", () => {
-      if (!menu.hidden) position();
+      if (active) position();
     });
 
     return menu;
