@@ -31,7 +31,7 @@ for penetration testing teams.
 </picture>
 
 > [!WARNING]
-> **This is alpha software** (`0.2.0-alpha.3`), not yet production-ready.
+> **This is alpha software** (`0.2.0-alpha.4`), not yet production-ready.
 > Expect rough edges and breaking changes between releases; see
 > [Alpha status](#alpha-status) before relying on it for a real engagement.
 
@@ -223,7 +223,7 @@ normal during alpha, not a mistake.
 
 ## Alpha status
 
-RedScribe is early alpha (`0.2.0-alpha.3`). Expect rough edges and
+RedScribe is early alpha (`0.2.0-alpha.4`). Expect rough edges and
 breaking changes between releases. Worth knowing before relying on it for a
 real engagement (full list in the
 [docs](https://docs.redscribe.app/start/alpha-status/)):

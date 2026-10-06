@@ -7,6 +7,24 @@ release carries an `-alpha.N` suffix and may include breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0-alpha.4] - 2026-10-06
+
+A small maintenance release. When you upgrade, follow the updated upgrade
+steps so your containers also pick up the latest OS security fixes.
+
+### Fixed
+
+- The sidebar collapse button now appears on large screens.
+- The editor's floating menu and toolbar no longer cover the Cancel and Back
+  buttons.
+
+### Security
+
+- The upgrade steps now refresh the PostgreSQL, nginx, and Python base
+  images, so OS and library security fixes, such as OpenSSL updates, reach
+  existing installs.
+- Updated a build-time dependency to fix a known vulnerability.
+
 ## [0.2.0-alpha.3] - 2026-09-30
 
 A security and maintenance update. Upgrading is recommended for everyone.
