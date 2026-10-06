@@ -6,6 +6,7 @@ app_name = "report_profiles"
 
 urlpatterns = [
     path("", profile_views.report_profile_list, name="list"),
+    path("google-fonts/", profile_views.google_font_suggestions, name="google_fonts"),
     path("<uuid:pk>/edit/", profile_views.report_profile_edit, name="edit"),
     path("<uuid:pk>/delete/", profile_views.report_profile_delete, name="delete"),
     path("<uuid:pk>/set-default/", profile_views.report_profile_set_default, name="set_default"),

@@ -120,6 +120,8 @@
                         {{ form.monospace_font|add_class:"field-input" }}
                         {% for error in form.monospace_font.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
                     </div>
+                    <datalist id="google-fonts-body" data-google-fonts-url="{% url 'report_profiles:google_fonts' %}"></datalist>
+                    <datalist id="google-fonts-monospace"></datalist>
                     <div>
                         <label for="{{ form.bullet_character.id_for_label }}" class="field-label">{{ form.bullet_character.label }}</label>
                         {{ form.bullet_character|add_class:"field-input" }}
@@ -253,6 +255,33 @@
   var hashMatchesPanel = panels.some(function (panel) { return panel.id === hashId; });
   var initial = (panelWithError && panelWithError.id) || (hashMatchesPanel && hashId) || panels[0].id;
   selectTab(initial);
+})();
+
+(function () {
+  var bodyList = document.getElementById("google-fonts-body");
+  var monoList = document.getElementById("google-fonts-monospace");
+  if (!bodyList || !monoList) return;
+
+  function fill(list, families) {
+    var fragment = document.createDocumentFragment();
+    families.forEach(function (family) {
+      var option = document.createElement("option");
+      option.value = family;
+      fragment.appendChild(option);
+    });
+    list.replaceChildren(fragment);
+  }
+
+  // Suggestions only — if Google Fonts can't be reached, the fields stay
+  // plain text inputs and the server-side check falls back accordingly.
+  fetch(bodyList.getAttribute("data-google-fonts-url"), { credentials: "same-origin" })
+    .then(function (response) { return response.ok ? response.json() : null; })
+    .then(function (data) {
+      if (!data) return;
+      fill(bodyList, data.body);
+      fill(monoList, data.monospace);
+    })
+    .catch(function () {});
 })();
 </script>
 {% endblock %}

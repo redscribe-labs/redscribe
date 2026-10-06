@@ -2,6 +2,7 @@ from django import forms
 
 from apps.findings.forms import RichTextField
 
+from .google_fonts import canonical_google_font, google_font_catalog, similar_google_fonts
 from .models import ReportProfile, ReportTextBlockDefinition
 from .validators import validate_font_name, validate_no_markup_chars, validate_rgba
 
@@ -32,18 +33,17 @@ class ReportProfileTemplateForm(forms.Form):
 
     body_font = forms.CharField(
         max_length=100, required=False, validators=[validate_font_name], label="Body font",
-        help_text="Used for all report text in preview and PDF export. Any Google Font name works "
-                   "(e.g. \"Roboto Slab\") — it's fetched once on save and self-hosted from then on, so nothing "
-                   "external is contacted again. A non-Google font name (e.g. \"Helvetica\") just uses whatever's "
-                   "installed wherever the report is viewed, same as before. Letters, digits, spaces, and "
-                   "hyphens only. If this is the instance's default Report Profile, this also becomes the font "
-                   "used across the RedScribe web app itself (both the internal app and the client portal), "
-                   "not just this report.",
+        help_text="Used for all report text in preview and PDF export. Start typing and pick a Google Font from "
+                   "the list (e.g. \"Roboto Slab\") — it's fetched once on save and self-hosted from then on, so "
+                   "nothing external is contacted again. Leave blank for the default (Plus Jakarta Sans). If this "
+                   "is the instance's default Report Profile, this also becomes the font used across the RedScribe "
+                   "web app itself (both the internal app and the client portal), not just this report.",
     )
     monospace_font = forms.CharField(
         max_length=100, required=False, validators=[validate_font_name], label="Monospace font",
-        help_text="Used for code blocks and inline code. Same Google Fonts support as Body font above — and, "
-                   "for the default profile, same effect on the live web app UI.",
+        help_text="Used for code blocks and inline code. The list suggests Google's monospace fonts, but any "
+                   "Google Font is accepted. Leave blank for the default (JetBrains Mono). For the default "
+                   "profile, same effect on the live web app UI as Body font above.",
     )
     bullet_character = forms.CharField(
         max_length=8, required=False, validators=[validate_no_markup_chars], label="Bullet character",
@@ -76,6 +76,12 @@ class ReportProfileTemplateForm(forms.Form):
         from apps.findings.models import Finding
 
         from .assembly import _DEFAULT_SEVERITY_COLORS
+
+        self.profile = profile
+        # Options are filled in client-side from report_profiles:google_fonts,
+        # so the page never waits on Google to render.
+        for field_name, list_id in (("body_font", "google-fonts-body"), ("monospace_font", "google-fonts-monospace")):
+            self.fields[field_name].widget.attrs.update(list=list_id, autocomplete="off", spellcheck="false")
 
         self.text_blocks = (
             list(ReportTextBlockDefinition.objects.filter(profile=profile, is_active=True))
@@ -116,6 +122,34 @@ class ReportProfileTemplateForm(forms.Form):
                 initial=configured_labels.get(key, ""),
                 widget=forms.TextInput(attrs={"placeholder": f"Default: {default_text}"}),
             )
+
+
+    def _clean_font(self, field_name):
+        value = (self.cleaned_data.get(field_name) or "").strip()
+        if not value:
+            return ""
+        # Unchanged values pass as-is: saving another tab shouldn't depend on
+        # reaching Google, and a profile saved before fonts were checked
+        # against the catalog may hold a local font name (e.g. "Helvetica").
+        if self.profile is not None and value == getattr(self.profile, field_name):
+            return value
+        catalog = google_font_catalog()
+        if catalog is None:
+            # Google unreachable — fall back to the save path's own
+            # fetch_and_cache_font(), which warns if the family doesn't exist.
+            return value
+        canonical = canonical_google_font(value, catalog)
+        if canonical:
+            return canonical
+        close = " / ".join(f'"{name}"' for name in similar_google_fonts(value, catalog))
+        hint = f" Did you mean {close}?" if close else ""
+        raise forms.ValidationError(f'"{value}" isn\'t a Google Font — pick one from the list.{hint}')
+
+    def clean_body_font(self):
+        return self._clean_font("body_font")
+
+    def clean_monospace_font(self):
+        return self._clean_font("monospace_font")
 
 
 class ReportTextBlockCreateForm(forms.ModelForm):

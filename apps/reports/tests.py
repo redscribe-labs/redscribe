@@ -678,6 +678,103 @@ def _make_test_png() -> bytes:
     return buf.getvalue()
 
 
+_TEST_FONT_CATALOG = [
+    ("Open Sans", "Sans Serif"), ("Roboto Slab", "Serif"), ("JetBrains Mono", "Monospace"), ("Fira Code", "Monospace"),
+]
+
+
+class ReportProfileGoogleFontPickerTests(TestCase):
+
+    def setUp(self):
+        from unittest.mock import patch
+
+        from django.core.cache import cache
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+        patcher = patch("apps.reports.google_fonts._fetch_catalog", return_value=list(_TEST_FONT_CATALOG))
+        self.mock_fetch_catalog = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.profile = ReportProfile.objects.create(name="SMOKE TEST font picker profile")
+        self.url = reverse("report_profiles:edit", args=[self.profile.pk])
+        self.client = Client()
+        login(self.client, make_user(User.Role.SUPERADMIN))
+        # Pre-cached so saving never reaches out to Google during tests.
+        CachedGoogleFont.objects.create(family="Roboto Slab", weight="400", style="normal", font_data=b"wOF2")
+
+    def _post(self, **fonts):
+        return self.client.post(self.url, {"cover_title": "My Report", "template": "", **fonts})
+
+    def test_edit_page_wires_fields_to_suggestion_lists(self):
+        resp = self.client.get(self.url)
+        self.assertContains(resp, 'list="google-fonts-body"')
+        self.assertContains(resp, 'list="google-fonts-monospace"')
+        self.assertContains(resp, reverse("report_profiles:google_fonts"))
+        self.mock_fetch_catalog.assert_not_called()
+
+    def test_suggestions_endpoint_returns_catalog(self):
+        resp = self.client.get(reverse("report_profiles:google_fonts"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["body"], [family for family, _ in _TEST_FONT_CATALOG])
+        self.assertEqual(resp.json()["monospace"], ["JetBrains Mono", "Fira Code"])
+
+    def test_suggestions_endpoint_requires_profile_permission(self):
+        client = Client()
+        login(client, make_user(User.Role.CONSULTANT))
+        self.assertEqual(client.get(reverse("report_profiles:google_fonts")).status_code, 403)
+
+    def test_catalog_is_fetched_once_then_cached(self):
+        self.client.get(reverse("report_profiles:google_fonts"))
+        self.client.get(reverse("report_profiles:google_fonts"))
+        self._post(body_font="Roboto Slab")
+        self.assertEqual(self.mock_fetch_catalog.call_count, 1)
+
+    def test_catalog_font_is_saved_with_canonical_spelling(self):
+        resp = self._post(body_font="  roboto   SLAB ")
+        self.assertEqual(resp.status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.body_font, "Roboto Slab")
+
+    def test_misspelled_font_is_rejected_with_suggestion(self):
+        resp = self._post(body_font="Robto Slab")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "isn&#x27;t a Google Font")
+        self.assertContains(resp, "Roboto Slab")
+        self.profile.refresh_from_db()
+        self.assertNotEqual(self.profile.body_font, "Robto Slab")
+
+    def test_non_catalog_font_rejected_for_monospace_too(self):
+        resp = self._post(monospace_font="Consolas")
+        self.assertEqual(resp.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertNotEqual(self.profile.monospace_font, "Consolas")
+
+    def test_previously_saved_font_saves_unchanged_without_fetching_catalog(self):
+        ReportProfile.objects.filter(pk=self.profile.pk).update(body_font="Helvetica")
+        resp = self._post(body_font="Helvetica", monospace_font=self.profile.monospace_font)
+        self.assertEqual(resp.status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.body_font, "Helvetica")
+        self.mock_fetch_catalog.assert_not_called()
+
+    def test_blank_font_is_allowed(self):
+        resp = self._post(body_font="", monospace_font="")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_google_unreachable_falls_back_to_plain_save(self):
+        from .google_fonts import GoogleFontFetchError
+
+        self.mock_fetch_catalog.side_effect = GoogleFontFetchError("offline")
+        self.assertEqual(self.client.get(reverse("report_profiles:google_fonts")).status_code, 503)
+        resp = self._post(body_font="Roboto Slab")
+        self.assertEqual(resp.status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.body_font, "Roboto Slab")
+        # The failure is remembered briefly, so the save didn't retry Google.
+        self.assertEqual(self.mock_fetch_catalog.call_count, 1)
+
+
 class FirmBrandingViewTests(TestCase):
     def setUp(self):
         self.edit_url = reverse("branding:edit")

@@ -12,7 +12,7 @@ from django.utils.text import get_valid_filename, slugify
 from apps.accounts.permissions import require_permission
 from apps.findings.models import Finding
 
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
 from .block_registry import BLOCK_REGISTRY
@@ -28,7 +28,7 @@ from .docx_styles import discover_styles
 from .docx_style_roles import STYLE_ROLES
 from .docx_template_validation import DocxTemplateValidationError, dry_run_render, validate_docx_template
 from .forms import ExportLimitsForm
-from .google_fonts import GoogleFontFetchError, fetch_and_cache_font
+from .google_fonts import GoogleFontFetchError, fetch_and_cache_font, google_font_catalog
 from .labels import LABEL_GROUPS
 from .models import CachedGoogleFont, PLACEHOLDER_HELP, ReportProfile, ReportSettings, ReportTextBlockDefinition
 from .profile_forms import (
@@ -178,6 +178,21 @@ def report_profile_delete(request, pk):
             {"label": "Report Profiles", "url": reverse("report_profiles:list")}, {"label": f"Delete {profile.name}"},
         ]},
     )
+
+
+@login_required
+def google_font_suggestions(request):
+    """Font-family suggestions for the profile edit page's font fields. Served
+    from our own origin since the CSP's connect-src blocks calling Google from
+    the browser; google_font_catalog() caches the upstream list for a day."""
+    _require(request)
+    catalog = google_font_catalog()
+    if catalog is None:
+        return JsonResponse({"error": "Google Fonts is unreachable."}, status=503)
+    return JsonResponse({
+        "body": [family for family, _category in catalog],
+        "monospace": [family for family, category in catalog if category == "Monospace"],
+    })
 
 
 @login_required
