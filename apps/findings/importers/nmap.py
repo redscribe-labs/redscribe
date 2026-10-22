@@ -13,7 +13,10 @@ def parse(raw) -> list[ImportedFinding]:
     try:
         root = ET.fromstring(raw)
     except (ET.ParseError, DefusedXmlException) as exc:
-        raise ValueError(f"Invalid Nmap XML: {exc}") from exc
+        raise ValueError(
+            "This file isn't valid, well-formed XML, so it can't be read as an Nmap report. "
+            "Export your scan with nmap -oX and upload that file."
+        ) from exc
     if root.tag != "nmaprun":
         raise ValueError("Not an Nmap XML report (root element must be <nmaprun> — use nmap -oX).")
 

@@ -669,6 +669,28 @@
     modal.addEventListener("click", function (e) {
       if (e.target === modal) modal.close();
     });
+
+    // Typing or pasting a complete vector straight into the field — without
+    // opening the calculator — fills in the score (and severity) too, so the
+    // two never drift apart. Partial/unrecognised vectors are left alone.
+    function fillScoreFromVector() {
+      var str = (vectorInput.value || "").trim();
+      if (!str) return;
+      for (var key in calc) {
+        if (!Object.prototype.hasOwnProperty.call(calc, key)) continue;
+        var parsed = calc[key].parse(str);
+        if (!parsed) continue;
+        var result = calc[key].compute(parsed);
+        if (result && result.score !== null && String(scoreInput.value) !== String(result.score)) {
+          scoreInput.value = result.score;
+          scoreInput.dispatchEvent(new Event("input", { bubbles: true }));
+          applySeverity(result.score);
+        }
+        return;
+      }
+    }
+    vectorInput.addEventListener("input", fillScoreFromVector);
+    vectorInput.addEventListener("change", fillScoreFromVector);
   }
 
   document.addEventListener("DOMContentLoaded", setupCalculator);

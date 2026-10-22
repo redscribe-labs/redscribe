@@ -37,6 +37,11 @@ def export_options(request, engagement_id):
     content = assembly.seeded_content(engagement, config)
     included_count = len(assembly._select_findings(engagement, content.get("findings", {})))
     excluded_count = engagement.findings.exclude(workflow_status__in=PUBLISHABLE_STATUSES).count()
+    publishable_count = engagement.findings.filter(workflow_status__in=PUBLISHABLE_STATUSES).count()
+    # Findings that are signed off (QA Approved) but left out of this report by
+    # the saved builder selection — e.g. approved after the config was last
+    # saved, so they were never added to it. Easy to miss, so call it out.
+    omitted_count = max(publishable_count - included_count, 0)
     profile = assembly.get_effective_profile(config)
     return render(
         request, "reports/export_options.html",
@@ -44,6 +49,7 @@ def export_options(request, engagement_id):
             "engagement": engagement,
             "included_count": included_count,
             "excluded_count": excluded_count,
+            "omitted_count": omitted_count,
             "export_logs": engagement.report_export_logs.select_related("exported_by")[:20],
             "docx_available": bool(profile and profile.docx_template),
             "breadcrumbs": engagement_crumbs(engagement) + [{"label": "Export report"}],

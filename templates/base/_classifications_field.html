@@ -1,3 +1,4 @@
+{% load redscribe_extras %}
 <div>
     <label class="field-label">Classifications</label>
 
@@ -34,5 +35,5 @@
     <datalist id="classification-taxonomies">
         {% for taxonomy in classification_suggestions.keys %}<option value="{{ taxonomy }}">{% endfor %}
     </datalist>
-    {{ classification_suggestions|json_script:"classification-suggestions-data" }}
+    {% json_script_csp classification_suggestions "classification-suggestions-data" %}
 </div>

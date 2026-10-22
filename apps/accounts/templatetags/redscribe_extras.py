@@ -1,4 +1,6 @@
 from django import template
+from django.utils.html import json_script as _json_script
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -153,3 +155,19 @@ def status_stages(engagement):
 @register.filter(name="dict_get")
 def dict_get(mapping, key):
     return (mapping or {}).get(key)
+
+
+@register.simple_tag(takes_context=True)
+def json_script_csp(context, value, element_id):
+    """Like Django's ``json_script`` filter, but carries the per-request CSP
+    nonce on the emitted ``<script type="application/json">`` tag. Django's
+    builtin can't take a nonce, so under our nonce-based CSP (no
+    ``'unsafe-inline'``) those data blocks are reported as script-src-elem
+    violations in strict browsers. The JSON escaping is still Django's; we only
+    insert the nonce attribute, whose value is URL-safe and so HTML-inert."""
+    html = _json_script(value, element_id)
+    request = context.get("request")
+    nonce = getattr(request, "csp_nonce", "") if request is not None else ""
+    if nonce:
+        html = mark_safe(html.replace("<script", f'<script nonce="{nonce}"', 1))
+    return html

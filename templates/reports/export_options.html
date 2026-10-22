@@ -22,6 +22,16 @@
             <span class="font-medium">{{ included_count }}</span> finding{{ included_count|pluralize }}
             {% if included_count %}(QA Approved){% endif %} will be included in the report.
         </p>
+        {% if omitted_count %}
+        <p class="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-md px-3 py-2 mt-3">
+            <strong>{{ omitted_count }} QA-approved finding{{ omitted_count|pluralize }}
+            {{ omitted_count|pluralize:"is,are" }} signed off but not in this report.</strong>
+            This usually happens when the report was configured before those findings were approved —
+            newly approved findings aren't added automatically. Open
+            <a href="{% url 'reports:configure' engagement.pk %}" class="underline font-medium">Configure &amp; preview</a>
+            to add them before exporting.
+        </p>
+        {% endif %}
         {% if excluded_count %}
         <p class="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-md px-3 py-2 mt-3">
             {{ excluded_count }} other finding{{ excluded_count|pluralize }} — still Draft or awaiting
@@ -119,4 +129,17 @@
     {% url 'engagements:detail' engagement.pk as back_url %}
     {% include "base/_back_link.html" with url=back_url label="Back to engagement" %}
 </div>
+{% if included_count == 0 %}
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var form = document.getElementById("export-form");
+        if (!form) return;
+        form.addEventListener("submit", function (event) {
+            if (!window.confirm("This report won't contain any findings. Export anyway?")) {
+                event.preventDefault();
+            }
+        });
+    })();
+</script>
+{% endif %}
 {% endblock %}

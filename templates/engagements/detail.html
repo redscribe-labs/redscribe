@@ -274,7 +274,7 @@
 </div>
 
 {% if transition_options %}
-{{ transition_options|json_script:"transition-options-data" }}
+{% json_script_csp transition_options "transition-options-data" %}
 <style>
     #transition-modal[open] {
         position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0;

@@ -36,7 +36,10 @@ def parse(raw) -> list[ImportedFinding]:
     try:
         root = ET.fromstring(raw)
     except (ET.ParseError, DefusedXmlException) as exc:
-        raise ValueError(f"Invalid Burp Suite XML: {exc}") from exc
+        raise ValueError(
+            "This file isn't valid, well-formed XML, so it can't be read as a Burp Suite report. "
+            "Upload the XML file Burp produces via Report → Export."
+        ) from exc
     if root.tag != "issues":
         raise ValueError("Not a Burp Suite XML report (root element must be <issues>).")
 

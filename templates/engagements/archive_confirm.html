@@ -9,6 +9,12 @@
             membership-based access are revoked immediately — only a Superadmin will still be able to reach it
             (to unarchive it later, if needed).
         </p>
+        {% if not request.user.is_superadmin_role %}
+        <p class="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 rounded-md px-3 py-2 mb-3">
+            <strong>You won't be able to undo this yourself.</strong> As soon as it's archived you'll lose access
+            to this engagement, and only a Superadmin can unarchive it. Make sure that's what you want.
+        </p>
+        {% endif %}
         <p class="text-xs text-slate-500 mb-5">
             Every action here is kept in an append-only audit trail, so day-to-day removal is archival rather
             than deletion. A Superadmin can still permanently delete an already-archived engagement later, for

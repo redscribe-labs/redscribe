@@ -252,8 +252,8 @@
 
 {% block extra_body %}
 {% include "findings/_editor_scripts.html" %}
-{{ preview_url|json_script:"preview-url" }}
-{{ content|json_script:"content-seed" }}
+{% json_script_csp preview_url "preview-url" %}
+{% json_script_csp content "content-seed" %}
 <script nonce="{{ request.csp_nonce }}">
 (function () {
   var previewUrl = JSON.parse(document.getElementById("preview-url").textContent);
