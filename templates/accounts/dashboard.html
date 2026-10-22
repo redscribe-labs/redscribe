@@ -3,7 +3,7 @@
 {% block title %}Dashboard — RedScribe{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+<div class="flex flex-wrap items-start justify-between gap-4 mb-6">
     <div>
         <p class="page-eyebrow">{{ user.role.name }}</p>
         <h1 class="page-title">Welcome back, {{ user.first_name|default:user.username }}</h1>
@@ -13,91 +13,110 @@
 {% endblock %}
 
 {% block content %}
-
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <a href="{% url 'engagements:list' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
-        </span>
         <div class="min-w-0">
-            <span class="font-mono text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{{ engagement_count }}</span>
+            <span class="stat-tile-value">{{ engagement_count }}</span>
             <p class="text-xs text-slate-500 mt-0.5">Engagements{% if not user.is_superadmin_role %} you can access{% endif %}</p>
         </div>
     </a>
     <div class="stat-tile">
-        <span class="stat-tile-icon">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg>
-        </span>
         <div class="min-w-0">
-            <span class="font-mono text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">{{ my_finding_count }}</span>
+            <span class="stat-tile-value">{{ my_finding_count }}</span>
             <p class="text-xs text-slate-500 mt-0.5">Findings you've drafted</p>
         </div>
     </div>
-    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon {% if to_review_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% endif %}">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10s2.7-5 8-5 8 5 8 5-2.7 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg>
-        </span>
+    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:shadow-md {% if to_review_count %}!border-navy-200 dark:!border-navy-800{% endif %}">
         <div class="min-w-0">
-            <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if to_review_count %}text-amber-600 dark:text-amber-300{% else %}text-slate-900{% endif %}">{{ to_review_count }}</span>
-            <p class="text-xs text-slate-500 mt-0.5">Awaiting your review</p>
+            <span class="stat-tile-value {% if to_review_count %}!text-navy-700 dark:!text-navy-300{% endif %}">{{ to_review_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Waiting for your review</p>
         </div>
     </a>
-    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon {% if to_qa_count %}!bg-amber-50 !text-amber-600 dark:!bg-amber-950 dark:!text-amber-300{% endif %}">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M7 10l2 2 4-4"/></svg>
-        </span>
+    <a href="{% url 'queue:my_queue' %}" class="stat-tile hover:shadow-md {% if to_qa_count %}!border-mist-300 dark:!border-mist-800{% endif %}">
         <div class="min-w-0">
-            <span class="font-mono text-2xl font-semibold tracking-tight tabular-nums {% if to_qa_count %}text-amber-600 dark:text-amber-300{% else %}text-slate-900{% endif %}">{{ to_qa_count }}</span>
-            <p class="text-xs text-slate-500 mt-0.5">Awaiting your QA</p>
+            <span class="stat-tile-value {% if to_qa_count %}!text-mist-800 dark:!text-mist-200{% endif %}">{{ to_qa_count }}</span>
+            <p class="text-xs text-slate-500 mt-0.5">Waiting for your QA</p>
         </div>
     </a>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="card lg:col-span-1">
-        <div class="flex items-baseline justify-between mb-1">
-            <h2 class="font-semibold text-slate-900">My findings by severity</h2>
-            <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ my_finding_count }} total</span>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <section class="panel lg:col-span-2 self-start" aria-labelledby="needs-you-heading">
+        <div class="panel-header">
+            <h2 id="needs-you-heading" class="font-semibold text-slate-900">Needs you{% if needs_you_total %} <span class="font-mono text-xs font-normal text-slate-500">{{ needs_you_total }}</span>{% endif %}</h2>
+            <a href="{% url 'queue:my_queue' %}" class="text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">Open my queue</a>
         </div>
-        <div class="mt-3">
-            {% include "base/_bar_chart.html" with data=my_severity_chart %}
-        </div>
-    </div>
-    <div class="card lg:col-span-1">
-        <div class="flex items-baseline justify-between mb-1">
-            <h2 class="font-semibold text-slate-900">My findings by workflow status</h2>
-            <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ my_finding_count }} total</span>
-        </div>
-        <div class="mt-3">
-            {% include "base/_bar_chart.html" with data=my_status_chart %}
-        </div>
-    </div>
-
-    <div class="card lg:col-span-1">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="font-semibold text-slate-900">Recent engagements</h2>
-            <a href="{% url 'engagements:list' %}" class="text-xs text-brand-600 dark:text-brand-300 hover:underline">View all</a>
-        </div>
-        {% if recent_engagements %}
-        <ul class="divide-y divide-slate-100 dark:divide-slate-200 -mx-1">
-            {% for engagement in recent_engagements %}
-            <li class="flex items-center justify-between gap-2 px-1 py-2.5">
-                <div class="min-w-0">
-                    <a href="{% url 'engagements:detail' engagement.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300 truncate block">{{ engagement.client_name }}</a>
-                    <p class="text-xs text-slate-400 mt-0.5">Updated {{ engagement.updated_at|timesince }} ago</p>
+        {% if needs_you %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for item in needs_you %}
+            <li class="flex flex-wrap items-center gap-3 px-5 py-3">
+                <span class="{{ item.tone }} min-w-[5.5rem] justify-center">{{ item.kind }}</span>
+                <div class="min-w-0 flex-1 basis-56">
+                    <a href="{% url 'findings:detail' item.finding.engagement_id item.finding.pk %}" class="block truncate text-sm font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ item.finding.title }}</a>
+                    <p class="text-xs text-slate-500 truncate">{{ item.finding.engagement.client_name }}{% if item.finding.engagement.reference_number %} &middot; {{ item.finding.engagement.reference_number }}{% endif %}</p>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
-                    {% if engagement.archived %}<span class="badge-red">Archived</span>{% endif %}
-                </div>
+                <span class="badge-severity" style="{{ item.finding|severity_style }}">{{ item.finding.get_severity_display }}</span>
+                <span class="w-20 text-right text-xs text-slate-500">{{ item.finding.updated_at|timesince }}</span>
             </li>
             {% endfor %}
         </ul>
-        {% else %}
-        <p class="text-sm text-slate-400">No engagements yet.</p>
+        {% if needs_you_total > needs_you|length %}
+        <p class="px-5 py-3 border-t border-slate-100 dark:border-slate-200 text-xs text-slate-500">Showing the {{ needs_you|length }} that have waited longest. <a href="{% url 'queue:my_queue' %}" class="font-medium text-brand-700 dark:text-brand-300 hover:underline">See all {{ needs_you_total }}</a></p>
         {% endif %}
+        {% else %}
+        <p class="px-5 py-8 text-sm text-slate-500 text-center">Nothing is waiting on you right now.</p>
+        {% endif %}
+    </section>
+
+    <div class="space-y-6">
+        <section class="card !p-5">
+            <div class="flex items-baseline justify-between mb-1">
+                <h2 class="font-semibold text-slate-900">My findings by severity</h2>
+                <span class="text-xs text-slate-500 tabular-nums shrink-0">{{ my_finding_count }} total</span>
+            </div>
+            <div class="mt-3">{% include "base/_bar_chart.html" with data=my_severity_chart %}</div>
+        </section>
+        <section class="card !p-5">
+            <div class="flex items-baseline justify-between mb-1">
+                <h2 class="font-semibold text-slate-900">My findings by workflow status</h2>
+                <span class="text-xs text-slate-500 tabular-nums shrink-0">{{ my_finding_count }} total</span>
+            </div>
+            <div class="mt-3">{% include "base/_bar_chart.html" with data=my_status_chart %}</div>
+        </section>
     </div>
 </div>
+
+<section aria-labelledby="active-engagements-heading" class="mb-8">
+    <div class="flex items-baseline justify-between gap-3 mb-3">
+        <h2 id="active-engagements-heading" class="font-semibold text-slate-900">Active engagements</h2>
+        <a href="{% url 'engagements:list' %}" class="text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">All engagements</a>
+    </div>
+    {% if active_engagements %}
+    <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
+        {% for engagement in active_engagements %}
+        <a href="{% url 'engagements:detail' engagement.pk %}" class="card !p-5 flex flex-col gap-3 hover:border-brand-300 hover:shadow-md transition-shadow">
+            <div class="flex items-start gap-2">
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold text-slate-900 truncate">{{ engagement.client_name }}</p>
+                    <p class="text-xs text-slate-500 truncate">{{ engagement.get_test_type_display|default:"Engagement" }}{% if engagement.reference_number %} &middot; <span class="font-mono">{{ engagement.reference_number }}</span>{% endif %}</p>
+                </div>
+                <span class="{{ engagement.status|badge_class }} shrink-0">{{ engagement.get_status_display }}</span>
+            </div>
+            <div class="flex gap-0.5" role="img" aria-label="Stage: {{ engagement.get_status_display }}">
+                {% for state in engagement.stages %}<span class="h-1 flex-1 rounded-full {% if state == 'done' %}bg-brand-600{% elif state == 'current' %}bg-brand-400{% else %}bg-slate-200 dark:bg-slate-300{% endif %}"></span>{% endfor %}
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span><span class="font-mono font-semibold text-slate-900">{{ engagement.findings_total }}</span> findings</span>
+                <span><span class="font-mono font-semibold text-slate-900">{% if engagement.checklist_pct is not None %}{{ engagement.checklist_pct }}%{% else %}—{% endif %}</span> checklist</span>
+                {% if engagement.end_date %}<span class="ml-auto">Ends {{ engagement.end_date|date:"d/m/Y" }}</span>{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "base/_empty_state.html" with icon="folder" title="No active engagements" message="Engagements you can access appear here until they're closed." %}
+    {% endif %}
+</section>
 
 {% if is_manager_view %}
 <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-200">
@@ -111,7 +130,7 @@
         <div class="card lg:col-span-1">
             <div class="flex items-baseline justify-between mb-1">
                 <h3 class="font-semibold text-slate-900">All accessible findings by severity</h3>
-                <span class="text-xs text-slate-400 tabular-nums shrink-0">{{ org_finding_count }} total</span>
+                <span class="text-xs text-slate-500 tabular-nums shrink-0">{{ org_finding_count }} total</span>
             </div>
             <div class="mt-3">
                 {% include "base/_bar_chart.html" with data=org_severity_chart %}

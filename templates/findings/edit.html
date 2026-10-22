@@ -19,10 +19,11 @@
 <form method="post">
     {% csrf_token %}
     <input type="hidden" name="_version" value="{{ edit_version }}">
-    <div class="card mb-6 max-w-5xl">
+    <div class="card mb-6">
         <label for="{{ form.title.id_for_label }}" class="field-label">{{ form.title.label }}</label>
         {{ form.title|add_class:"field-input" }}
         {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        {% if finding.source_template %}<p class="field-help">Started from catalogue entry <a href="{% url 'catalogue:detail' finding.source_template.pk %}" class="text-brand-700 dark:text-brand-300 hover:underline">{{ finding.source_template.title }}</a>.</p>{% endif %}
     </div>
 
     <div class="flex flex-col xl:flex-row-reverse xl:items-start gap-8">

@@ -93,6 +93,36 @@ class EngagementCreateViewTests(TestCase):
             EngagementMembership.objects.filter(user=team_lead, engagement=engagement).exists()
         )
 
+    def test_create_can_start_a_checklist_run(self):
+        from apps.checklist.models import ChecklistTemplate, ChecklistTemplateItem
+
+        template = ChecklistTemplate.objects.create(name="Web app")
+        ChecklistTemplateItem.objects.create(template=template, category="Auth", code="A1", title="Lockout", order=1)
+        team_lead = make_user(User.Role.TEAM_LEAD)
+        acme = ClientCompany.objects.create(name="Acme Corp")
+        client = Client()
+        login(client, team_lead)
+
+        resp = client.post(reverse("engagements:create"), {
+            "client": acme.pk, "scope": "app.acme.com", "start_date": "", "end_date": "",
+            "checklist_template": template.pk,
+        })
+        self.assertEqual(resp.status_code, 302)
+        run = Engagement.objects.get(client=acme).checklist_runs.get()
+        self.assertEqual(run.template, template)
+        self.assertEqual(run.created_by, team_lead)
+        self.assertEqual(list(run.items.values_list("title", flat=True)), ["Lockout"])
+
+    def test_create_without_a_checklist_starts_none(self):
+        team_lead = make_user(User.Role.TEAM_LEAD)
+        acme = ClientCompany.objects.create(name="Acme Corp")
+        client = Client()
+        login(client, team_lead)
+        client.post(reverse("engagements:create"), {
+            "client": acme.pk, "scope": "", "start_date": "", "end_date": "", "checklist_template": "",
+        })
+        self.assertFalse(Engagement.objects.get(client=acme).checklist_runs.exists())
+
     def test_senior_cannot_create_engagement(self):
         senior = make_user(User.Role.SENIOR)
         client = Client()

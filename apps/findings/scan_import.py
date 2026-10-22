@@ -25,15 +25,46 @@ def _to_doc_json(text: str) -> str:
     return json.dumps({"type": "doc", "content": paragraphs})
 
 
-@transaction.atomic
-def import_scan(*, engagement, project_key, raw, fmt: str, imported_by, filename: str = "") -> int:
+def parse_scan(raw, fmt: str):
     parser = PARSERS.get(fmt)
     if parser is None:
         raise ValueError(f"Unsupported scan format: {fmt!r}")
+    return parser(raw)
 
-    imported = parser(raw)
 
-    import_target = ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).narrative().first()
+def preview_rows(engagement, imported) -> list[dict]:
+    """What import_scan would create, for the confirm step. Flags results that
+    look like a finding this engagement already has (same title and affects)."""
+    existing = set(engagement.findings.values_list("title", "affects"))
+    return [
+        {
+            "index": index,
+            "title": item.title[:255],
+            "severity": item.severity,
+            "severity_label": dict(Finding.Severity.choices).get(item.severity, item.severity),
+            "detail": " · ".join(part for part in [item.affects, item.cve_id] if part),
+            "duplicate": (item.title[:255], item.affects) in existing,
+        }
+        for index, item in enumerate(imported)
+    ]
+
+
+def import_target_section():
+    """The section a scan result's technical details are written into, or None
+    when no active section is ticked as the import target (the details are then
+    dropped — the import page warns about this up front)."""
+    return ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).narrative().first()
+
+
+@transaction.atomic
+def import_scan(*, engagement, project_key, raw, fmt: str, imported_by, filename: str = "", only=None) -> int:
+    """only: optional set of result indexes (from preview_rows) to import; the
+    rest are skipped."""
+    imported = parse_scan(raw, fmt)
+    if only is not None:
+        imported = [item for index, item in enumerate(imported) if index in only]
+
+    import_target = import_target_section()
 
     count = 0
     for item in imported:

@@ -1,3 +1,6 @@
+/* z-index 15: above the bottom action bar (10), below the engagement tabs
+   (#page-sticky-header, 16) and the topbar (20), so a toolbar scrolling out
+   slides under them. */
 .rte-toolbar-sticky {
     position: sticky; top: var(--rte-sticky-top, 0); z-index: 15;
     background: var(--color-slate-50, #fff); padding-top: 0.35rem; margin-top: -0.35rem;
@@ -211,10 +214,10 @@
 .dark .rte-comment-highlight { background: rgba(69, 26, 3, 0.5); border-bottom-color: #fbbf24; }
 .dark .rte-comment-highlight.rte-comment-resolved { background: #313435; border-bottom-color: #62676a; }
 
-.dark .rte-comments-empty { color: #7a8185; }
+.dark .rte-comments-empty { color: #7e8589; }
 .dark .rte-thread-card { border-color: #494d50; }
 .dark .rte-thread-card.rte-thread-focused { border-color: #fbbf24; }
 .dark .rte-thread-quote { border-left-color: #fbbf24; color: #959a9d; }
-.dark .rte-thread-time { color: #7a8185; }
+.dark .rte-thread-time { color: #7e8589; }
 
 .dark .rte-new-comment-box { border-color: #fbbf24; background: rgba(69, 26, 3, 0.5); }

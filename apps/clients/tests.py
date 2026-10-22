@@ -374,6 +374,23 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         resp = self.http.get(reverse("accounts:logout"))
         self.assertNotEqual(resp.status_code, 403)
 
+    def test_password_change_uses_portal_chrome_and_returns_to_portal(self):
+        flags = FeatureFlags.get_solo()
+        flags.client_portal_enabled = True
+        flags.save()
+        login(self.http, self.client_user)
+
+        resp = self.http.get(reverse("accounts:password_change"))
+        self.assertEqual(resp.status_code, 200)
+        # Staff navigation would only lead a client to 403s.
+        self.assertNotContains(resp, f'href="{reverse("engagements:list")}"')
+
+        new_password = "Correct-Horse-Battery-Staple-91"
+        resp = self.http.post(reverse("accounts:password_change"), {
+            "old_password": TEST_PASSWORD, "new_password1": new_password, "new_password2": new_password,
+        })
+        self.assertRedirects(resp, reverse("clients_portal:dashboard"), fetch_redirect_response=False)
+
     def test_report_font_file_allowed_for_client_when_enabled(self):
         # portal_base.html emits @font-face rules pointing at this view.
         flags = FeatureFlags.get_solo()

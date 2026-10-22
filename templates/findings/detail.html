@@ -24,7 +24,7 @@
                 </div>
                 <div class="pb-4 pt-0.5">
                     <p class="text-sm font-medium text-slate-800">Draft</p>
-                    <p class="text-xs text-slate-400">Authored by {{ finding.created_by|default:"—" }}</p>
+                    <p class="text-xs text-slate-500">Authored by {{ finding.created_by|default:"—" }}</p>
                 </div>
             </div>
             <div class="flex items-start gap-3">
@@ -42,8 +42,8 @@
                 <div class="pb-4 pt-0.5">
                     <p class="text-sm font-medium text-slate-800">Review</p>
                     {% if finding.assigned_reviewer %}
-                    <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>{{ finding.assigned_reviewer }}</p>
-                    {% else %}<p class="text-xs text-slate-400">Unassigned</p>{% endif %}
+                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>{{ finding.assigned_reviewer }}</p>
+                    {% else %}<p class="text-xs text-slate-500">Unassigned</p>{% endif %}
                 </div>
             </div>
             <div class="flex items-start gap-3">
@@ -61,8 +61,8 @@
                 <div class="pt-0.5">
                     <p class="text-sm font-medium text-slate-800">QA approval</p>
                     {% if finding.assigned_qa %}
-                    <p class="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>{{ finding.assigned_qa }}</p>
-                    {% else %}<p class="text-xs text-slate-400">Unassigned</p>{% endif %}
+                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>{{ finding.assigned_qa }}</p>
+                    {% else %}<p class="text-xs text-slate-500">Unassigned</p>{% endif %}
                 </div>
             </div>
         </div>
@@ -76,7 +76,8 @@
             {% if can_assign_reviewer %}
             <form method="post" action="{% url 'findings:assign_reviewer' engagement.pk finding.pk %}">
                 {% csrf_token %}
-                <select name="reviewer" class="field-input mb-2">
+                <label for="assign-reviewer" class="sr-only">Reviewer</label>
+                <select id="assign-reviewer" name="reviewer" class="field-input mb-2">
                     {% for candidate in reviewer_candidates %}
                     <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
                     {% endfor %}
@@ -96,7 +97,8 @@
             {% if can_assign_qa %}
             <form method="post" action="{% url 'findings:assign_qa' engagement.pk finding.pk %}">
                 {% csrf_token %}
-                <select name="qa_reviewer" class="field-input mb-2">
+                <label for="assign-qa" class="sr-only">QA reviewer</label>
+                <select id="assign-qa" name="qa_reviewer" class="field-input mb-2">
                     {% for candidate in qa_candidates %}
                     <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
                     {% endfor %}
@@ -131,13 +133,13 @@
             {% for item in linked_checklist_items %}
             <li class="py-2">
                 <a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">
-                    {% if item.code %}<span class="text-slate-400 font-mono text-xs mr-1">{{ item.code }}</span>{% endif %}{{ item.title }}
+                    {% if item.code %}<span class="text-slate-500 font-mono text-xs mr-1">{{ item.code }}</span>{% endif %}{{ item.title }}
                 </a>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-sm text-slate-400">No checklist items link to this finding yet — link one from the checklist item's detail page.</p>
+        <p class="text-sm text-slate-500">No checklist items link to this finding yet — link one from the checklist item's detail page.</p>
         {% endif %}
         <a href="{% url 'checklist:list' engagement.pk %}" class="block text-xs text-brand-600 dark:text-brand-300 hover:underline mt-3">View full checklist &rarr;</a>
     </div>
@@ -150,14 +152,14 @@
             {% for view in client_views %}
             <li class="py-2 text-sm text-slate-700">
                 {{ view.client_user }} ({{ view.client_user.client.name }})
-                <p class="text-xs text-slate-400">Last viewed {{ view.last_viewed_at|date:"d/m/Y H:i" }}</p>
+                <p class="text-xs text-slate-500">Last viewed {{ view.last_viewed_at|date:"d/m/Y H:i" }}</p>
             </li>
             {% endfor %}
         </ul>
         {% elif finding.workflow_status == "QA_APPROVED" %}
-        <p class="text-sm text-slate-400">Not yet viewed by the client.</p>
+        <p class="text-sm text-slate-500">Not yet viewed by the client.</p>
         {% else %}
-        <p class="text-sm text-slate-400">Not visible to the client until QA approved.</p>
+        <p class="text-sm text-slate-500">Not visible to the client until QA approved.</p>
         {% endif %}
     </div>
     {% endif %}
@@ -167,19 +169,19 @@
         <h2 class="font-semibold text-slate-900 text-sm mb-3">Possible recurrence</h2>
 
         {% if repeat_findings_for_client %}
-        <p class="text-xs text-slate-400 mb-1.5">Similar findings for {{ engagement.client_name }}</p>
+        <p class="text-xs text-slate-500 mb-1.5">Similar findings for {{ engagement.client_name }}</p>
         <ul class="divide-y divide-slate-100 dark:divide-slate-200 mb-4">
             {% for prior in repeat_findings_for_client %}
             <li class="py-2">
                 <a href="{% url 'findings:detail' prior.engagement_id prior.pk %}" class="text-sm text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">{{ prior.title }}</a>
-                <p class="text-xs text-slate-400">{{ prior.engagement.client_name }} &middot; {{ prior.created_at|date:"d/m/Y" }}</p>
+                <p class="text-xs text-slate-500">{{ prior.engagement.client_name }} &middot; {{ prior.created_at|date:"d/m/Y" }}</p>
             </li>
             {% endfor %}
         </ul>
         {% endif %}
 
         {% if similar_catalogue_entries %}
-        <p class="text-xs text-slate-400 mb-1.5">Similar catalogue entries</p>
+        <p class="text-xs text-slate-500 mb-1.5">Similar catalogue entries</p>
         <ul class="divide-y divide-slate-100 dark:divide-slate-200">
             {% for template in similar_catalogue_entries %}
             <li class="py-2">
@@ -197,7 +199,7 @@
 
 <div class="flex flex-wrap items-start justify-between gap-4 mb-3">
     <div class="rail-severity pl-4 min-w-0" style="{{ finding|severity_rail_style }}">
-        <p class="page-eyebrow !text-slate-400 dark:!text-slate-400 !mb-0.5">{{ engagement.client_name }}</p>
+        <p class="page-eyebrow !text-slate-500 dark:!text-slate-500 !mb-0.5">{{ engagement.client_name }}</p>
         <h1 class="text-3xl font-bold text-slate-900 leading-tight break-words">{{ finding.title }}</h1>
     </div>
     <div class="flex gap-2 shrink-0">
@@ -218,27 +220,30 @@
 <div class="flex flex-wrap items-center gap-x-6 gap-y-3 pb-6 mb-6 border-b border-slate-200">
     <span class="badge-severity text-sm px-3 py-1" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
     {% if finding.archived %}<span class="badge-red">Archived {{ finding.archived_at|date:"d/m/Y" }}</span>{% endif %}
+    {% if finding.source_template %}
+    <a href="{% url 'catalogue:detail' finding.source_template.pk %}" class="text-sm text-slate-500 hover:text-brand-700 dark:hover:text-brand-300">Started from catalogue entry <span class="font-medium text-slate-700">{{ finding.source_template.title }}</span></a>
+    {% endif %}
     <div class="flex items-center gap-1.5 text-sm">
-        <span class="text-slate-400">Status</span>
+        <span class="text-slate-500">Status</span>
         <span class="{{ finding.status|badge_class }}">{{ finding.get_status_display }}</span>
     </div>
     <div class="flex items-center gap-1.5 text-sm">
-        <span class="text-slate-400">Workflow</span>
+        <span class="text-slate-500">Workflow</span>
         <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
     </div>
     {% if finding.retest_status != "NOT_RETESTED" %}
     <div class="flex items-center gap-1.5 text-sm">
-        <span class="text-slate-400">Retest</span>
+        <span class="text-slate-500">Retest</span>
         <span class="{{ finding.retest_status|badge_class }}">{{ finding.get_retest_status_display }}</span>
     </div>
     {% endif %}
     <div class="flex items-baseline gap-1.5 text-sm">
-        <span class="text-slate-400">CVSS</span>
+        <span class="text-slate-500">CVSS</span>
         <span class="font-mono font-semibold text-slate-800">{{ finding.cvss_score|default:"—" }}</span>
     </div>
     {% if finding.cve_id %}
     <div class="flex items-baseline gap-1.5 text-sm">
-        <span class="text-slate-400">CVE</span>
+        <span class="text-slate-500">CVE</span>
         <span class="font-mono text-slate-700">{{ finding.cve_id }}</span>
     </div>
     {% endif %}
@@ -252,7 +257,7 @@
 
 {% if finding.affects_list %}
 <div class="flex flex-wrap items-center gap-2 mb-8 -mt-2">
-    <span class="text-xs uppercase tracking-wide text-slate-400">Affects</span>
+    <span class="text-xs uppercase tracking-wide text-slate-500">Affects</span>
     {% for item in finding.affects_list %}
     <code class="text-xs bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-300 border border-red-100 dark:border-red-900 rounded px-2 py-1 break-all">{{ item }}</code>
     {% endfor %}
@@ -275,7 +280,7 @@
 <div class="card text-center text-sm text-slate-500">
     No content sections have been filled in yet.
     {% if can_edit_content %}
-    <a href="{% url 'findings:edit' engagement.pk finding.pk %}" class="text-brand-600 hover:underline">Add some</a>.
+    <a href="{% url 'findings:edit' engagement.pk finding.pk %}" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200">Add some</a>.
     {% endif %}
 </div>
 {% endif %}
@@ -297,7 +302,7 @@
     <div class="space-y-4 divide-y divide-slate-100 dark:divide-slate-200 [&>*:not(:first-child)]:pt-4">
         {% for record in retest_records %}
         <div>
-            <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
                 <span class="{{ record.status|badge_class }}">{{ record.status_display }}</span>
                 <span>{{ record.tested_by|default:"Unknown" }}</span>
                 <span>&middot; {{ record.created_at|date:"d/m/Y H:i" }}</span>
@@ -309,7 +314,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-slate-400 mb-4">Not retested yet.</p>
+    <p class="text-sm text-slate-500 mb-4">Not retested yet.</p>
     {% endif %}
 
     {% if can_log_retest %}
@@ -333,7 +338,7 @@
 {% endif %}
 
 {% if can_archive or can_delete %}
-<p class="text-xs text-slate-400 mt-4">
+<p class="text-xs text-slate-500 mt-4">
     RedScribe doesn't offer permanent deletion of findings — actions here are kept in an append-only audit
     trail, so removal is archival (see the Archive button above) rather than deletion.
 </p>

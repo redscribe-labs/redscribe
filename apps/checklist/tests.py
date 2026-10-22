@@ -774,3 +774,432 @@ class SuggestedNextCheckTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         not_suggested.refresh_from_db()
         self.assertEqual(not_suggested.status, ChecklistItem.Status.NOT_APPLICABLE)
+
+
+class _ItemPostMixin:
+    """Signed-in member with one checklist item, plus post() to save its form."""
+
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.consultant = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=self.consultant, engagement=self.engagement)
+        make_default_template()
+        instantiate_checklist(self.engagement)
+        self.item = ChecklistItem.objects.filter(run__engagement=self.engagement).first()
+        self.client = Client()
+        login(self.client, self.consultant)
+        self.url = reverse("checklist:item_detail", args=[self.engagement.pk, self.item.pk])
+
+    def post(self, status, reason=""):
+        return self.client.post(self.url, {
+            "save_item": "stay", "status": status, "blocked_reason": reason,
+            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+        })
+
+
+class BlockedOutcomeTests(_ItemPostMixin, TestCase):
+    def test_blocked_requires_a_reason(self):
+        resp = self.post(ChecklistItem.Status.BLOCKED)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Say why this check couldn")
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.NOT_TESTED)
+
+    def test_blocked_reason_is_encrypted_at_rest(self):
+        resp = self.post(ChecklistItem.Status.BLOCKED, "Staging XML endpoint down")
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.BLOCKED)
+        raw = bytes(self.item.blocked_reason_ciphertext)
+        self.assertNotIn(b"Staging", raw)
+        plaintext = decrypt_bytes(
+            raw, get_data_key(self.engagement),
+            associated_data=record_aad("checklistitem", self.item.pk, "blocked_reason"),
+        ).decode()
+        self.assertEqual(plaintext, "Staging XML endpoint down")
+
+    def test_leaving_blocked_clears_the_reason(self):
+        self.post(ChecklistItem.Status.BLOCKED, "Waiting for test account")
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING, "Waiting for test account")
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_NO_FINDING)
+        self.assertIsNone(self.item.blocked_reason_ciphertext)
+
+    def test_posture_page_lists_blocked_checks_with_reason(self):
+        self.post(ChecklistItem.Status.BLOCKED, "Waiting for test account")
+        resp = self.client.get(reverse("checklist:list", args=[self.engagement.pk]))
+        self.assertContains(resp, "Waiting for test account")
+        self.assertContains(resp, "posture-cell-blocked")
+
+    def test_report_coverage_shows_reason_only_with_the_key(self):
+        from apps.reports.assembly import _checklist_coverage_data
+
+        self.post(ChecklistItem.Status.BLOCKED, "Waiting for test account")
+        statuses = lambda data: [row[2] for run in data for cat in run["categories"] for row in cat["rows"]]
+        with_key = statuses(_checklist_coverage_data(self.engagement, {}, get_data_key(self.engagement)))
+        without_key = statuses(_checklist_coverage_data(self.engagement, {}))
+        self.assertIn("Blocked: Waiting for test account", with_key)
+        self.assertIn("Blocked", without_key)
+        self.assertNotIn("Blocked: Waiting for test account", without_key)
+
+    def test_export_includes_blocked_reason(self):
+        self.post(ChecklistItem.Status.BLOCKED, "Waiting for test account")
+        resp = self.client.get(reverse("checklist:export", args=[self.engagement.pk]))
+        payload = json.loads(resp.content)
+        reasons = [i["blocked_reason"] for run in payload.get("runs", []) for cat in run.get("categories", [run]) for i in cat.get("items", [])]
+        self.assertIn("Waiting for test account", reasons)
+
+
+class TestedByTests(_ItemPostMixin, TestCase):
+    def test_outcome_change_records_who_and_when(self):
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.tested_by, self.consultant)
+        self.assertIsNotNone(self.item.tested_at)
+
+    def test_resaving_the_same_outcome_keeps_the_original_time(self):
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING)
+        self.item.refresh_from_db()
+        first = self.item.tested_at
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.tested_at, first)
+
+    def test_back_to_not_tested_clears_it(self):
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING)
+        self.post(ChecklistItem.Status.NOT_TESTED)
+        self.item.refresh_from_db()
+        self.assertIsNone(self.item.tested_by)
+        self.assertIsNone(self.item.tested_at)
+
+    def test_item_page_shows_who_marked_it(self):
+        self.post(ChecklistItem.Status.TESTED_NO_FINDING)
+        resp = self.client.get(self.url)
+        self.assertContains(resp, f"by {self.consultant}")
+
+
+class AssigneeTests(_ItemPostMixin, TestCase):
+    def post_with(self, **extra):
+        data = {
+            "save_item": "stay", "status": ChecklistItem.Status.NOT_TESTED, "blocked_reason": "",
+            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+        }
+        data.update(extra)
+        return self.client.post(self.url, data)
+
+    def test_member_can_be_assigned(self):
+        resp = self.post_with(assignee=self.consultant.pk)
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.assignee, self.consultant)
+
+    def test_someone_without_access_cannot_be_assigned(self):
+        outsider = make_user(User.Role.CONSULTANT)
+        resp = self.post_with(assignee=outsider.pk)
+        self.assertEqual(resp.status_code, 200)
+        self.item.refresh_from_db()
+        self.assertIsNone(self.item.assignee)
+
+    def test_only_mine_filters_the_navigator(self):
+        other = ChecklistItem.objects.filter(run=self.item.run).exclude(pk=self.item.pk).first()
+        marker = f'data-nav-item="{other.pk}"'
+        other.assignee = self.consultant
+        other.save(update_fields=["assignee"])
+        self.assertContains(self.client.get(self.url + "?mine=1"), marker)
+
+        other.assignee = None
+        other.save(update_fields=["assignee"])
+        self.assertNotContains(self.client.get(self.url + "?mine=1"), marker)
+        self.assertContains(self.client.get(self.url), marker)
+
+
+class ScopeTestedTests(_ItemPostMixin, TestCase):
+    def test_scope_tested_is_encrypted_and_shown_again(self):
+        self.client.post(self.url, {
+            "save_item": "stay", "status": ChecklistItem.Status.TESTED_NO_FINDING, "blocked_reason": "",
+            "scope_tested": "GET /search?q\nPOST /api/orders", "reference_info": self.item.reference_info,
+            "test_results": "", "findings": [],
+        })
+        self.item.refresh_from_db()
+        self.assertNotIn(b"/search", bytes(self.item.scope_tested_ciphertext))
+        self.assertContains(self.client.get(self.url), "POST /api/orders")
+
+
+class CustomCheckTests(_ItemPostMixin, TestCase):
+    def add(self, **data):
+        return self.client.post(reverse("checklist:list", args=[self.engagement.pk]), {"add_custom_check": "1", **data})
+
+    def test_custom_check_is_added_to_the_end_of_the_run_only(self):
+        run = self.item.run
+        template_count = ChecklistTemplateItem.objects.count()
+        resp = self.add(run_id=run.pk, category="Business Logic", code="CUST-01", title="PDF export SSRF")
+        self.assertEqual(resp.status_code, 302)
+        added = run.items.get(title="PDF export SSRF")
+        self.assertEqual(added.order, max(i.order for i in run.items.all()))
+        self.assertEqual(added.category, "Business Logic")
+        self.assertEqual(ChecklistTemplateItem.objects.count(), template_count)
+
+    def test_title_is_required(self):
+        count = self.item.run.items.count()
+        self.add(run_id=self.item.run.pk, title="  ")
+        self.assertEqual(self.item.run.items.count(), count)
+
+    def test_cannot_add_to_another_engagements_run(self):
+        other = Engagement.objects.create(client_name="Other")
+        generate_project_key(other)
+        other_run = instantiate_checklist(other)
+        resp = self.add(run_id=other_run.pk, title="Sneaky")
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(other_run.items.filter(title="Sneaky").exists())
+
+
+class ActivityTests(_ItemPostMixin, TestCase):
+    def save(self, **extra):
+        data = {
+            "save_item": "stay", "status": ChecklistItem.Status.NOT_TESTED, "blocked_reason": "", "scope_tested": "",
+            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+        }
+        data.update(extra)
+        return self.client.post(self.url, data)
+
+    def kinds(self):
+        from .models import ChecklistItemEvent
+
+        return list(ChecklistItemEvent.objects.filter(item=self.item).values_list("kind", flat=True))
+
+    def test_outcome_and_assignee_changes_are_recorded(self):
+        self.save(status=ChecklistItem.Status.TESTED_NO_FINDING, assignee=self.consultant.pk)
+        self.assertCountEqual(self.kinds(), ["STATUS", "ASSIGNEE"])
+        resp = self.client.get(self.url)
+        self.assertContains(resp, "changed the outcome")
+
+    def test_resaving_without_changes_records_nothing(self):
+        self.save(status=ChecklistItem.Status.TESTED_NO_FINDING)
+        before = len(self.kinds())
+        self.save(status=ChecklistItem.Status.TESTED_NO_FINDING)
+        self.assertEqual(len(self.kinds()), before)
+
+    def test_encrypted_edits_are_noted_without_their_content(self):
+        from .models import ChecklistItemEvent
+
+        self.save(scope_tested="GET /secret-admin-path")
+        event = ChecklistItemEvent.objects.get(item=self.item, kind="SCOPE")
+        self.assertNotIn("secret", event.from_value + event.to_value)
+
+
+class AutosaveTests(_ItemPostMixin, TestCase):
+    def data(self, version, **extra):
+        data = {
+            "version": version, "status": ChecklistItem.Status.TESTED_NO_FINDING, "blocked_reason": "",
+            "scope_tested": "", "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+        }
+        data.update(extra)
+        return data
+
+    def version(self):
+        return self.client.get(self.url).context["version"]
+
+    def someone_else_saves(self):
+        self.item.refresh_from_db()
+        self.item.status = ChecklistItem.Status.NOT_APPLICABLE
+        self.item.save()
+
+    def autosave_url(self):
+        return reverse("checklist:item_autosave", args=[self.engagement.pk, self.item.pk])
+
+    def test_autosave_saves_and_returns_the_new_version(self):
+        old = self.version()
+        resp = self.client.post(self.autosave_url(), self.data(old))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["saved"])
+        self.assertNotEqual(body["version"], old)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_NO_FINDING)
+        # The returned version lets the next autosave through.
+        resp = self.client.post(self.autosave_url(), self.data(body["version"], scope_tested="/api"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_autosave_refuses_to_overwrite_a_newer_save(self):
+        old = self.version()
+        self.someone_else_saves()
+        resp = self.client.post(self.autosave_url(), self.data(old))
+        self.assertEqual(resp.status_code, 409)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.NOT_APPLICABLE)
+
+    def test_autosave_reports_invalid_input(self):
+        resp = self.client.post(self.autosave_url(), self.data(self.version(), status=ChecklistItem.Status.BLOCKED))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("blocked_reason", resp.json()["errors"])
+
+    def test_autosave_needs_engagement_access(self):
+        outsider = make_user(User.Role.CONSULTANT)
+        other = Client()
+        login(other, outsider)
+        resp = other.post(self.autosave_url(), self.data(""))
+        self.assertIn(resp.status_code, (302, 403, 404))
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.NOT_TESTED)
+
+    def test_stale_form_post_shows_the_conflict_and_keeps_input(self):
+        old = self.version()
+        self.someone_else_saves()
+        resp = self.client.post(self.url, self.data(old, save_item="next", scope_tested="GET /mine"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "saved this check after you opened it")
+        self.assertContains(resp, "GET /mine")
+        self.assertNotContains(resp, "data-autosave-url")
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.NOT_APPLICABLE)
+
+    def test_repeated_text_edits_show_as_one_entry(self):
+        old = self.version()
+        for n in range(3):
+            resp = self.client.post(self.autosave_url(), self.data(old, scope_tested=f"GET /v{n}"))
+            old = resp.json()["version"]
+        self.assertEqual(self.item.events.filter(kind="SCOPE").count(), 1)
+
+    def test_keep_my_changes_overwrites(self):
+        old = self.version()
+        self.someone_else_saves()
+        resp = self.client.post(self.url, self.data(old, save_item="overwrite"))
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_NO_FINDING)
+
+
+class RaiseFromCheckTests(_ItemPostMixin, TestCase):
+    def create_url(self):
+        return reverse("findings:create", args=[self.engagement.pk]) + f"?from_check={self.item.pk}"
+
+    def finding_data(self, **extra):
+        from apps.findings.models import ClassificationTag, Finding
+        from apps.findings.tests import doc_json, section_post_key
+
+        tag = ClassificationTag.objects.filter(taxonomy="OWASP Top 10 2021").first()
+        data = {
+            "title": "IDOR on invoices", "cvss_score": "", "cvss_vector": "", "severity": Finding.Severity.HIGH,
+            "cve_id": "", "status": Finding.Status.OPEN, "affects": "GET /api/invoices/{id}",
+            "classification_taxonomy": [tag.taxonomy], "classification_value": [tag.value],
+        }
+        for name in ["vulnerability_description", "business_impact", "testing_summary", "technical_details",
+                     "recommendations", "references"]:
+            data[section_post_key(name)] = doc_json("")
+        data[section_post_key("note")] = ""
+        data[section_post_key("remediation_testing")] = ""
+        data.update(extra)
+        return data
+
+    def test_form_is_prefilled_from_the_check(self):
+        from .services import encrypt_item_text
+
+        self.item.scope_tested_ciphertext = encrypt_item_text(
+            self.item, "scope_tested", "GET /api/invoices/{id}", get_data_key(self.engagement),
+        )
+        self.item.save()
+        resp = self.client.get(self.create_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["form"].initial["title"], self.item.title)
+        self.assertEqual(resp.context["form"].initial["affects"], "GET /api/invoices/{id}")
+        self.assertContains(resp, "Raising from checklist item")
+
+    def test_saving_links_the_finding_and_marks_the_check(self):
+        from apps.findings.models import Finding
+
+        resp = self.client.post(self.create_url(), self.finding_data())
+        self.assertEqual(resp.status_code, 302)
+        finding = Finding.objects.get(title="IDOR on invoices")
+        self.item.refresh_from_db()
+        self.assertEqual(list(self.item.findings.all()), [finding])
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_FINDING_RAISED)
+        self.assertEqual(self.item.tested_by, self.consultant)
+        kinds = set(self.item.events.values_list("kind", flat=True))
+        self.assertEqual(kinds, {"FINDINGS", "STATUS"})
+
+    def test_an_already_tested_check_keeps_its_outcome(self):
+        self.item.status = ChecklistItem.Status.BLOCKED
+        self.item.save()
+        self.client.post(self.create_url(), self.finding_data())
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.BLOCKED)
+        self.assertEqual(self.item.findings.count(), 1)
+
+    def test_a_check_from_another_engagement_is_refused(self):
+        other = Engagement.objects.create(client_name="Other")
+        generate_project_key(other)
+        EngagementMembership.objects.create(user=self.consultant, engagement=other)
+        url = reverse("findings:create", args=[other.pk]) + f"?from_check={self.item.pk}"
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.post(url, self.finding_data())
+        self.assertEqual(self.item.findings.count(), 0)
+
+    def test_item_page_links_to_raise(self):
+        resp = self.client.get(self.url)
+        self.assertContains(resp, f"?from_check={self.item.pk}")
+
+
+class BulkCategoryTests(_ItemPostMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.run = self.item.run
+        self.category = self.item.category
+        self.list_url = reverse("checklist:list", args=[self.engagement.pk])
+
+    def bulk(self, status, category=None):
+        return self.client.post(self.list_url, {
+            "bulk_category": "1", "run_id": self.run.pk, "category": category or self.category, "status": status,
+        })
+
+    def test_marks_only_untested_checks_in_the_category(self):
+        in_category = list(self.run.items.filter(category=self.category))
+        self.assertGreater(len(in_category), 0)
+        self.item.status = ChecklistItem.Status.TESTED_FINDING_RAISED
+        self.item.save()
+        other_categories = self.run.items.exclude(category=self.category)
+        untouched_before = list(other_categories.values_list("pk", "status"))
+
+        resp = self.bulk(ChecklistItem.Status.NOT_APPLICABLE)
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_FINDING_RAISED)
+        for other in self.run.items.filter(category=self.category).exclude(pk=self.item.pk):
+            self.assertEqual(other.status, ChecklistItem.Status.NOT_APPLICABLE)
+            self.assertEqual(other.tested_by, self.consultant)
+            self.assertEqual(other.events.get().kind, "STATUS")
+        self.assertEqual(list(other_categories.values_list("pk", "status")), untouched_before)
+
+    def test_blocked_cannot_be_applied_in_bulk(self):
+        self.bulk(ChecklistItem.Status.BLOCKED)
+        self.assertFalse(self.run.items.filter(status=ChecklistItem.Status.BLOCKED).exists())
+
+    def test_another_engagements_run_is_refused(self):
+        other = Engagement.objects.create(client_name="Other")
+        generate_project_key(other)
+        other_run = instantiate_checklist(other)
+        resp = self.client.post(self.list_url, {
+            "bulk_category": "1", "run_id": other_run.pk, "category": self.category,
+            "status": ChecklistItem.Status.NOT_APPLICABLE,
+        })
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(other_run.items.exclude(status=ChecklistItem.Status.NOT_TESTED).exists())
+
+    def test_list_offers_the_action_per_category(self):
+        resp = self.client.get(self.list_url)
+        self.assertContains(resp, 'name="bulk_category"')
+
+
+class ItemPageShortcutTests(_ItemPostMixin, TestCase):
+    def test_outcomes_navigation_and_save_have_shortcuts(self):
+        resp = self.client.get(self.url)
+        for n in range(1, len(ChecklistItem.Status.choices) + 1):
+            self.assertContains(resp, f'data-shortcut="{n}"')
+        self.assertContains(resp, 'data-shortcut="mod+enter"')
+        self.assertContains(resp, 'id="shortcuts-dialog"')
+
+    def test_item_page_is_a_focus_page(self):
+        resp = self.client.get(self.url)
+        self.assertContains(resp, '<html lang="en" class="h-full" data-focus-page>')
+        resp = self.client.get(reverse("checklist:list", args=[self.engagement.pk]))
+        self.assertNotContains(resp, "data-focus-page>")

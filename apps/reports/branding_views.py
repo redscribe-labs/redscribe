@@ -17,10 +17,11 @@ _PIL_FORMAT_TO_CONTENT_TYPE = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP":
 
 
 def _detect_image_content_type(plaintext):
+    # formats=: only these decoders may run (see apps/crypto/blob_views.py).
     try:
-        with Image.open(io.BytesIO(plaintext)) as probe:
+        with Image.open(io.BytesIO(plaintext), formats=list(_PIL_FORMAT_TO_CONTENT_TYPE)) as probe:
             probe.verify()
-        with Image.open(io.BytesIO(plaintext)) as probe:
+        with Image.open(io.BytesIO(plaintext), formats=list(_PIL_FORMAT_TO_CONTENT_TYPE)) as probe:
             return _PIL_FORMAT_TO_CONTENT_TYPE.get(probe.format)
     except (UnidentifiedImageError, OSError, ValueError):
         return None

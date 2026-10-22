@@ -1,0 +1,13 @@
+{% load redscribe_extras %}
+{% settings_pages user request.path as pages %}
+<nav aria-label="Settings" class="space-y-5">
+    {% regroup pages by group as page_groups %}
+    {% for group in page_groups %}
+    <div class="space-y-0.5">
+        <p class="settings-nav-label">{{ group.grouper }}</p>
+        {% for page in group.list %}
+        <a href="{{ page.url }}" class="{% if page.active %}settings-nav-link-active{% else %}settings-nav-link{% endif %}"{% if page.active %} aria-current="page"{% endif %}>{{ page.label }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</nav>

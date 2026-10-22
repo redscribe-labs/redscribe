@@ -50,7 +50,7 @@
     {% for engagement in engagements %}
     <li>
         <a href="{% url 'clients_portal:engagement_detail' engagement.pk %}"
-           class="group block rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+           class="group block rounded-lg border border-slate-200 bg-white dark:bg-slate-100
                   px-5 py-4 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all">
             <div class="flex items-start gap-4">
                 <span class="stat-tile-icon !h-10 !w-10 shrink-0">
@@ -70,7 +70,7 @@
                         {% for row in engagement.severity_breakdown %}
                         <span class="badge-severity" style="{{ row.value|severity_chip_style }}">{{ row.count }} {{ row.label }}</span>
                         {% empty %}
-                        <span class="text-xs text-slate-400">No findings published yet.</span>
+                        <span class="text-xs text-slate-500">No findings published yet.</span>
                         {% endfor %}
                     </div>
                 </div>
@@ -83,7 +83,7 @@
 {% else %}
 <div class="card text-center py-12">
     <p class="text-slate-500">No engagements are available to view yet.</p>
-    <p class="text-sm text-slate-400 mt-1">Once your assessment team publishes findings, they'll appear here.</p>
+    <p class="text-sm text-slate-500 mt-1">Once your assessment team publishes findings, they'll appear here.</p>
 </div>
 {% endif %}
 {% endblock %}

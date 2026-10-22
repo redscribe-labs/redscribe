@@ -1,0 +1,40 @@
+{% load redscribe_extras %}{% comment %}
+Confirm step for an import: what the uploaded file would create, one tickable
+row each. Rendered into the import form by redscribe-import-preview.js.
+rows: index, title, severity, severity_label, detail, duplicate.
+notices: optional warnings shown above the rows.
+{% endcomment %}{% if error %}
+<p class="field-error" role="alert">{{ error }}</p>
+{% elif not rows %}
+<p class="text-sm text-slate-500">The file is valid but has no {{ noun_plural }} to import.</p>
+{% else %}
+<input type="hidden" name="selection" value="1">
+{% for notice in notices %}
+<p class="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-3 py-2 mb-2 text-xs text-amber-800 dark:text-amber-300" role="note">{{ notice }}</p>
+{% endfor %}
+<div class="flex items-center justify-between gap-3 mb-2">
+    <p class="text-sm font-semibold text-slate-900" data-preview-count>{{ rows|length }} {% if rows|length == 1 %}{{ noun }}{% else %}{{ noun_plural }}{% endif %} found</p>
+    <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" data-preview-all checked> Select all</label>
+</div>
+<div class="relative max-h-96 overflow-y-auto rounded-lg border border-slate-200">
+    <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-slate-50 text-left text-xs text-slate-500">
+            <tr><th class="w-8 px-3 py-2"><span class="sr-only">Import</span></th><th class="px-3 py-2 font-medium">Title</th><th class="px-3 py-2 font-medium">Severity</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-3 py-2 align-top"><input type="checkbox" name="include" value="{{ row.index }}" id="include-{{ row.index }}" aria-label="Import {{ row.title }}" {% if not row.duplicate %}checked{% endif %}></td>
+                <td class="px-3 py-2 align-top min-w-0">
+                    <label for="include-{{ row.index }}" class="block font-medium text-slate-900 break-words">{{ row.title }}</label>
+                    {% if row.detail %}<p class="text-xs text-slate-500 break-all">{{ row.detail }}</p>{% endif %}
+                    {% if row.duplicate %}<span class="badge-amber mt-1">{{ duplicate_label }}</span>{% endif %}
+                </td>
+                <td class="px-3 py-2 align-top whitespace-nowrap"><span class="badge-severity" style="{{ row.severity|severity_chip_style }}">{{ row.severity_label }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="field-help mt-2">Rows that look like duplicates start unticked. Nothing is saved until you import.</p>
+{% endif %}

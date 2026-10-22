@@ -142,4 +142,19 @@ def bulk_submit_qa(request, engagement_id):
 @login_required
 def my_queue(request):
     to_review, to_qa = review.assignments_for_user(request.user)
-    return render(request, "findings/my_queue.html", {"to_review": to_review, "to_qa": to_qa})
+    changes_on_mine = Finding.objects.filter(
+        created_by=request.user,
+        workflow_status__in=[Finding.WorkflowStatus.REVIEW_CHANGES_REQUESTED, Finding.WorkflowStatus.QA_CHANGES_REQUESTED],
+    ).select_related("engagement")
+    groups = [
+        {"title": "Waiting for your review", "tone": "badge-purple", "empty": "Nothing to review right now.",
+         "findings": to_review.order_by("updated_at")},
+        {"title": "Waiting for your QA", "tone": "badge-mist", "empty": "Nothing to QA right now.",
+         "findings": to_qa.order_by("updated_at")},
+        {"title": "Changes requested on your findings", "tone": "badge-amber", "empty": "None of your findings are waiting on you.",
+         "findings": changes_on_mine.order_by("updated_at")},
+    ]
+    return render(
+        request, "findings/my_queue.html",
+        {"to_review": to_review, "to_qa": to_qa, "groups": groups, "breadcrumbs": [{"label": "My queue"}]},
+    )

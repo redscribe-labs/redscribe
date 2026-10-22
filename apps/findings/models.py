@@ -168,6 +168,12 @@ class Finding(models.Model):
     archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
 
+    # The catalogue entry this finding was started from, if any. Kept only as a
+    # pointer: editing the entry later never changes the finding.
+    source_template = models.ForeignKey(
+        "VulnerabilityTemplate", null=True, blank=True, on_delete=models.SET_NULL, related_name="findings_created",
+    )
+
     affects = models.TextField(blank=True, default="")
 
     workflow_status = models.CharField(

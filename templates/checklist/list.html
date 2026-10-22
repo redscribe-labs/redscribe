@@ -1,100 +1,193 @@
 {% extends "base/base.html" %}
-{% load redscribe_extras %}
+{% load redscribe_extras static %}
 {% block title %}Checklist — {{ engagement.client_name }}{% endblock %}
 
 {% block engagement_subnav %}
 {% include "engagements/_subnav.html" with engagement=engagement active="checklist" %}
 {% endblock %}
 
+{% block topbar_actions %}
+{% if runs %}
+<a href="{% url 'checklist:export' engagement.pk %}" class="btn-secondary">Export JSON</a>
+<a href="#start-run" class="btn-secondary">Start a checklist run</a>
+{% if selected_context.suggestions %}
+<a href="{% url 'checklist:item_detail' engagement.pk selected_context.suggestions.0.item.pk %}" class="btn-primary">Continue testing</a>
+{% endif %}
+{% endif %}
+{% endblock %}
+
 {% block page_header %}
-{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Checklist" %}
+<div class="mb-6">
+    <p class="page-eyebrow">Checklist</p>
+    <h1 class="page-title">Testing posture</h1>
+    <p class="text-sm text-slate-500 mt-1 max-w-3xl">How thoroughly each asset has been tested, where the findings came from, and what's still open.</p>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="card mb-6">
-    <h2 class="font-semibold text-slate-900 mb-3">Start a checklist run</h2>
-    <p class="text-sm text-slate-500 mb-3">
-        An engagement can run several checklists at once — e.g. OWASP WSTG against the main web app and
-        OWASP API Top 10 against its REST API. Give this run a label so it's easy to tell apart.
-    </p>
-    <form method="post" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
-        {% csrf_token %}
-        <div class="flex-1 min-w-0 w-full">
-            <label for="checklist-run-label" class="field-label">Label</label>
-            <input type="text" id="checklist-run-label" name="label" class="field-input" placeholder="e.g. app.example.com, REST API v2">
-        </div>
-        <div class="flex-1 min-w-0 w-full">
-            <label for="checklist-template-select" class="field-label">Template</label>
-            <select id="checklist-template-select" name="template_id" class="field-input">
-                {% for t in checklist_templates %}
-                <option value="{{ t.pk }}" {% if t.is_default %}selected{% endif %}>{{ t.name }}{% if t.is_default %} (default){% endif %}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" name="start_checklist" value="1" class="btn-primary shrink-0">Start checklist</button>
-    </form>
+{% if posture %}
+<ul aria-label="Checklist runs" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 mb-6">
+    {% for p in postures %}
+    <li class="flex"><a href="?run={{ p.run.pk }}" class="flex flex-1 flex-col gap-2.5 rounded-lg bg-white dark:bg-slate-100 p-4 hover:shadow-md transition-shadow {% if p.run.pk == posture.run.pk %}border-2 border-brand-500 ring-4 ring-brand-100 dark:ring-brand-950{% else %}border border-slate-200{% endif %}"{% if p.run.pk == posture.run.pk %} aria-current="true"{% endif %}>
+        <span class="flex items-baseline gap-2">
+            <span class="flex-1 min-w-0 truncate font-semibold text-slate-900">{{ p.run.label }}</span>
+            <span class="font-mono text-xs text-slate-600">{{ p.pct }}%</span>
+        </span>
+        <span class="text-xs text-slate-500">{% if p.run.template %}{{ p.run.template.name }} &middot; {% endif %}{{ p.done }} of {{ p.total }} have an outcome</span>
+        <span class="flex gap-0.5 h-2" aria-hidden="true">
+            {% for b in p.breakdown %}{% if b.count %}<span class="posture-bar posture-cell-{{ b.key }}" style="flex: {{ b.count }} 1 0"></span>{% endif %}{% endfor %}
+        </span>
+        <span class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+            <span><span class="font-mono font-semibold text-slate-900">{{ p.finding_checks }}</span> checks raised findings</span>
+            {% if p.worst %}<span>Worst: <span class="badge-severity" style="{{ p.worst|severity_chip_style }}">{{ p.worst|title }}</span></span>{% endif %}
+        </span>
+    </a></li>
+    {% endfor %}
+</ul>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.pct }}%</span><p class="text-xs text-slate-500 mt-0.5">Coverage &middot; {{ posture.done }} of {{ posture.total }} checks</p></div></div>
+    <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.finding_checks }}</span><p class="text-xs text-slate-500 mt-0.5">Checks that raised a finding</p></div></div>
+    <div class="stat-tile"><div>
+        {% if posture.worst %}<span class="badge-severity text-sm px-3 py-1" style="{{ posture.worst|severity_chip_style }}">{{ posture.worst|title }}</span>{% else %}<span class="stat-tile-value">—</span>{% endif %}
+        <p class="text-xs text-slate-500 mt-1.5">Worst severity found</p>
+    </div></div>
+    <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.open }}</span><p class="text-xs text-slate-500 mt-0.5">Checks not tested yet</p></div></div>
 </div>
 
-{% if not runs %}
-<div class="card text-center py-10">
-    <p class="text-slate-600">No checklist runs started yet — use the form above.</p>
-</div>
-{% else %}
-<div class="flex justify-end mb-3">
-    <a href="{% url 'checklist:export' engagement.pk %}" class="btn-secondary text-sm">Export JSON</a>
-</div>
-<div class="space-y-6">
-    {% for rc in runs %}
-    <details class="card p-0! overflow-hidden" open>
-        <summary class="cursor-pointer select-none px-5 py-4 border-b border-slate-200 bg-slate-50 dark:bg-slate-50 flex items-center gap-4">
-            <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                    <span class="font-semibold text-slate-900">{{ rc.run.label }}</span>
-                    {% if rc.run.template %}<span class="text-xs text-slate-400">from {{ rc.run.template.name }}</span>{% endif %}
-                </div>
-                <div class="flex items-baseline justify-between gap-4 mt-1.5 max-w-sm">
-                    <p class="text-xs text-slate-500">{{ rc.tested_count }} of {{ rc.total_count }} tested</p>
-                    <p class="text-xs text-slate-400 tabular-nums">{{ rc.progress_pct }}%</p>
-                </div>
-                <div class="mt-1 bg-slate-100 dark:bg-slate-200 rounded-full h-1.5 overflow-hidden max-w-sm">
-                    <div class="bg-green-600 h-full rounded-full" style="width: {{ rc.progress_pct }}%"></div>
-                </div>
+<div class="flex flex-col xl:flex-row xl:items-start gap-6">
+    <section class="panel min-w-0 flex-1" aria-labelledby="coverage-heading">
+        <div class="panel-header">
+            <div>
+                <h2 id="coverage-heading" class="font-semibold text-slate-900">Coverage by category</h2>
+                <p class="text-xs text-slate-500">One square per check, in template order. Select a square to open it.</p>
             </div>
-        </summary>
-
-        <div class="p-5">
-            {% if rc.suggestions %}
-            <div class="rounded-lg border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-4 mb-5">
-                <p class="text-sm font-medium text-brand-900 dark:text-brand-200 mb-2">Suggested next checks <span class="font-normal text-brand-700 dark:text-brand-400">— just a nudge, test in whatever order makes sense</span></p>
-                <div class="flex flex-wrap gap-2">
-                    {% for s in rc.suggestions %}
-                    <a href="{% url 'checklist:item_detail' engagement.pk s.item.pk %}"
-                       class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-100 border border-brand-200 dark:border-brand-800 rounded-full pl-2 pr-3 py-1 text-xs text-brand-800 dark:text-brand-300 hover:border-brand-400 hover:shadow-sm transition-shadow">
-                        <span class="text-slate-400 font-mono">{{ s.item.code }}</span>
-                        <span>{{ s.item.title }}</span>
+        </div>
+        <div class="flex flex-wrap gap-x-5 gap-y-2 px-5 py-3 border-b border-slate-100 dark:border-slate-200 text-xs text-slate-700">
+            {% for b in posture.breakdown %}
+            <span class="inline-flex items-center gap-1.5">{% include "checklist/_posture_cell_glyph.html" with key=b.key size="h-4 w-4" %}{{ b.label }}</span>
+            {% endfor %}
+        </div>
+        <p id="posture-detail" role="status" aria-live="polite" class="min-h-11 px-5 py-2.5 bg-slate-50 dark:bg-slate-50 border-b border-slate-100 dark:border-slate-200 text-sm text-slate-500">
+            Hover over or tab to a square to see the check.
+        </p>
+        <ul class="py-2">
+            {% for row in posture.rows %}
+            <li class="grid grid-cols-1 md:grid-cols-[13rem_minmax(0,1fr)_8rem] items-center gap-x-4 gap-y-1.5 px-5 py-2">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-900 truncate">{{ row.name }}</p>
+                    <p class="font-mono text-[0.6875rem] text-slate-500">{{ row.done }}/{{ row.total }} tested</p>
+                </div>
+                <div class="flex flex-wrap gap-[3px]">
+                    {% for cell in row.cells %}
+                    <a href="{% url 'checklist:item_detail' engagement.pk cell.item.pk %}"
+                       class="posture-cell posture-cell-{{ cell.key }} h-5 w-5"
+                       data-detail-for="posture-detail"
+                       data-detail="{% if cell.item.code %}{{ cell.item.code }} · {% endif %}{{ cell.item.title }} — {{ cell.item.get_status_display }}{% if cell.item.tested_at %} by {{ cell.item.tested_by|default:"a former user" }}, {{ cell.item.tested_at|date:"d/m/Y" }}{% endif %}{% if cell.finding_titles %} — {{ cell.finding_titles|join:', ' }}{% endif %}"
+                       title="{% if cell.item.code %}{{ cell.item.code }} {% endif %}{{ cell.item.title }}: {{ cell.item.get_status_display }}"
+                       aria-label="{% if cell.item.code %}{{ cell.item.code }} {% endif %}{{ cell.item.title }}: {{ cell.item.get_status_display }}">
+                        {% include "checklist/_posture_cell_glyph.html" with key=cell.key inner=True %}
                     </a>
                     {% endfor %}
                 </div>
-            </div>
-            {% endif %}
+                <div class="flex md:justify-end items-center gap-1.5">
+                    {% if row.worst %}
+                    <span class="badge-severity" style="{{ row.worst|severity_chip_style }}">{{ row.worst|title }}</span>
+                    <span class="font-mono text-xs text-slate-500">&times;{{ row.findings|length }}</span>
+                    {% elif row.counts.open == row.total %}<span class="text-xs text-slate-500">Not started</span>
+                    {% elif row.counts.open %}<span class="text-xs text-slate-500">{{ row.counts.open }} to go</span>
+                    {% else %}<span class="text-xs text-slate-500">No findings</span>{% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
 
-            <div class="space-y-5">
-                {% for group in rc.grouped %}
-                <div class="card p-0! overflow-hidden">
-                    <h3 class="font-semibold text-slate-900 px-5 py-3 border-b border-slate-200 bg-slate-50 dark:bg-slate-50 flex items-center justify-between">
-                        {{ group.category }}
-                        <span class="text-xs font-normal text-slate-400 tabular-nums">{{ group.items|length }} check{{ group.items|length|pluralize }}</span>
-                    </h3>
-                    <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+        <details class="border-t border-slate-100 dark:border-slate-200">
+            <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline">Show as a table</summary>
+            <div class="relative overflow-x-auto pb-3">
+                <table class="w-full min-w-[36rem] text-sm">
+                    <caption class="sr-only">Checklist outcomes by category for {{ posture.run.label }}</caption>
+                    <thead><tr class="text-right text-xs text-slate-500 border-b border-slate-200">
+                        <th scope="col" class="text-left px-5 py-2 font-semibold">Category</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">Checks</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">No finding</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">Finding</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">Blocked</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">N/A</th>
+                        <th scope="col" class="px-2 py-2 font-semibold">Not tested</th>
+                        <th scope="col" class="px-5 py-2 font-semibold">Coverage</th>
+                    </tr></thead>
+                    <tbody class="font-mono text-xs text-right divide-y divide-slate-100 dark:divide-slate-200">
+                        {% for row in posture.rows %}
+                        <tr>
+                            <th scope="row" class="text-left px-5 py-2 font-sans text-sm font-semibold text-slate-900">{{ row.name }}</th>
+                            <td class="px-2 py-2">{{ row.total }}</td>
+                            <td class="px-2 py-2">{{ row.counts.pass }}</td>
+                            <td class="px-2 py-2">{{ row.counts.finding }}</td>
+                            <td class="px-2 py-2">{{ row.counts.blocked }}</td>
+                            <td class="px-2 py-2">{{ row.counts.na }}</td>
+                            <td class="px-2 py-2">{{ row.counts.open }}</td>
+                            <td class="px-5 py-2">{{ row.pct }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        <details class="border-t border-slate-100 dark:border-slate-200">
+            <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline">+ Add a custom check to {{ posture.run.label }}</summary>
+            <form method="post" class="px-5 pb-5 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,2fr)_auto] gap-3 items-end">
+                {% csrf_token %}
+                <input type="hidden" name="run_id" value="{{ posture.run.pk }}">
+                <div>
+                    <label for="custom-category" class="field-label">Category</label>
+                    <input id="custom-category" name="category" list="custom-categories" class="field-input" placeholder="Custom checks">
+                    <datalist id="custom-categories">{% for row in posture.rows %}<option value="{{ row.name }}">{% endfor %}</datalist>
+                </div>
+                <div>
+                    <label for="custom-code" class="field-label">Code</label>
+                    <input id="custom-code" name="code" maxlength="32" class="field-input font-mono" placeholder="Optional">
+                </div>
+                <div>
+                    <label for="custom-title" class="field-label">Title</label>
+                    <input id="custom-title" name="title" maxlength="500" required class="field-input" placeholder="e.g. Testing the PDF export for SSRF">
+                </div>
+                <button type="submit" name="add_custom_check" value="1" class="btn-secondary">Add check</button>
+            </form>
+            <p class="px-5 pb-4 -mt-2 text-xs text-slate-500">Only this run gets the check; the template stays as it is.</p>
+        </details>
+
+        <details class="border-t border-slate-100 dark:border-slate-200">
+            <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline">List every check</summary>
+            <div class="space-y-4 px-5 pb-5">
+                {% for group in selected_context.grouped %}
+                <div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <h3 class="text-sm font-semibold text-slate-900">{{ group.category }} <span class="font-normal text-xs text-slate-500">&middot; {{ group.items|length }} check{{ group.items|length|pluralize }}</span></h3>
+                        {% if group.untested %}
+                        <form method="post" class="flex items-center gap-1.5">
+                            {% csrf_token %}
+                            <input type="hidden" name="run_id" value="{{ selected_context.run.pk }}">
+                            <input type="hidden" name="category" value="{{ group.category }}">
+                            <label for="bulk-{{ forloop.counter }}" class="text-xs text-slate-500">Mark {{ group.untested }} untested as</label>
+                            <select id="bulk-{{ forloop.counter }}" name="status" class="field-input !w-auto !py-1 text-xs">
+                                {% for value, label in bulk_outcomes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                            </select>
+                            <button type="submit" name="bulk_category" value="1" class="btn-secondary !py-1 text-xs">Apply</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    <ul class="divide-y divide-slate-100 dark:divide-slate-200 rounded-md border border-slate-200">
                         {% for item in group.items %}
                         <li>
-                            <a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-100 transition-colors">
-                                <span class="text-sm text-slate-800 min-w-0 truncate">
-                                    {% if item.code %}<span class="text-slate-400 font-mono text-xs mr-2">{{ item.code }}</span>{% endif %}
-                                    {{ item.title }}
+                            <a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-50">
+                                <span class="text-sm text-slate-800 min-w-0 sm:truncate">
+                                    {% if item.code %}<span class="text-slate-500 font-mono text-xs mr-2">{{ item.code }}</span>{% endif %}{{ item.title }}
                                 </span>
-                                <span class="flex items-center gap-1.5 shrink-0">
-                                    {% if item.pk in rc.suggested_ids %}<span class="badge-amber">Suggested</span>{% endif %}
+                                <span class="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                                    {% if item.assignee %}<span class="text-xs text-slate-500">{{ item.assignee }}</span>{% endif %}
+                                    {% if item.pk in selected_context.suggested_ids %}<span class="badge-amber">Suggested</span>{% endif %}
                                     {% if item.findings.all %}<span class="badge-red">{{ item.findings.all|length }} finding{{ item.findings.all|length|pluralize }}</span>{% endif %}
                                     <span class="{{ item.status|badge_class }}">{{ item.get_status_display }}</span>
                                 </span>
@@ -105,12 +198,136 @@
                 </div>
                 {% endfor %}
             </div>
-        </div>
-    </details>
-    {% endfor %}
+        </details>
+    </section>
+
+    <aside aria-label="Outcomes and gaps" class="xl:w-[22rem] xl:shrink-0 space-y-6">
+        <section class="card !p-5" aria-labelledby="outcomes-heading">
+            <h2 id="outcomes-heading" class="font-semibold text-slate-900 mb-3">Outcomes</h2>
+            <div class="flex gap-0.5 h-2.5 mb-3" aria-hidden="true">
+                {% for b in posture.breakdown %}{% if b.count %}<span class="posture-bar posture-cell-{{ b.key }}" style="flex: {{ b.count }} 1 0"></span>{% endif %}{% endfor %}
+            </div>
+            <ul class="space-y-1.5">
+                {% for b in posture.breakdown %}
+                <li class="flex items-center gap-2 text-sm">
+                    {% include "checklist/_posture_cell_glyph.html" with key=b.key size="h-3.5 w-3.5" %}
+                    <span class="flex-1 text-slate-700">{{ b.label }}</span>
+                    <span class="font-mono text-xs text-slate-900">{{ b.count }}</span>
+                    <span class="font-mono text-xs text-slate-500 w-9 text-right">{{ b.pct }}%</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <section class="panel" aria-labelledby="risk-heading">
+            <div class="panel-header"><div>
+                <h2 id="risk-heading" class="font-semibold text-slate-900">Where the risk is</h2>
+                <p class="text-xs text-slate-500">Categories ranked by the worst finding linked to their checks</p>
+            </div></div>
+            {% if posture.risk %}
+            <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+                {% for row in posture.risk %}
+                <li class="px-5 py-3">
+                    <p class="text-sm font-semibold text-slate-900">{{ row.name }}</p>
+                    <ul class="mt-1.5 space-y-1">
+                        {% for finding in row.findings %}
+                        <li class="flex items-center gap-2 text-xs">
+                            <span class="badge-severity shrink-0" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+                            <a href="{% url 'findings:detail' engagement.pk finding.pk %}" class="min-w-0 truncate text-slate-700 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="px-5 py-4 text-sm text-slate-500">No findings are linked to this run's checks yet.</p>
+            {% endif %}
+        </section>
+
+        <section class="panel" aria-labelledby="gaps-heading">
+            <div class="panel-header"><h2 id="gaps-heading" class="font-semibold text-slate-900">Gaps to close</h2></div>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-200 text-sm">
+                {% for b in posture.blocked %}
+                <li class="flex gap-2 px-5 py-2.5">
+                    {% include "checklist/_posture_cell_glyph.html" with key="blocked" size="h-3.5 w-3.5 mt-0.5" %}
+                    <div class="min-w-0 flex-1">
+                        <a href="{% url 'checklist:item_detail' engagement.pk b.item.pk %}" class="text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{% if b.item.code %}<span class="font-mono text-xs text-slate-500 mr-1">{{ b.item.code }}</span>{% endif %}<strong>Blocked</strong> &middot; {{ b.item.title }}</a>
+                        {% if b.reason %}<p class="text-xs text-slate-600 mt-0.5">{{ b.reason }}</p>{% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+                {% for row in posture.untested %}
+                <li class="flex items-center gap-2 px-5 py-2.5">
+                    {% include "checklist/_posture_cell_glyph.html" with key="open" size="h-3.5 w-3.5" %}
+                    <span class="flex-1 text-slate-700">{{ row.name }} &middot; <span class="font-semibold text-slate-900">{{ row.counts.open }}</span> not tested</span>
+                </li>
+                {% empty %}
+                {% if not posture.blocked %}<li class="px-5 py-3 text-slate-500">Every check in this run has an outcome.</li>{% endif %}
+                {% endfor %}
+                {% if selected_context.suggestions %}
+                <li class="px-5 py-3">
+                    <p class="text-xs font-semibold text-slate-700 mb-1.5">Up next <span class="font-normal text-slate-500">— the first untested check in each category</span></p>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for s in selected_context.suggestions %}
+                        <a href="{% url 'checklist:item_detail' engagement.pk s.item.pk %}" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white dark:bg-slate-100 px-2.5 py-1 text-xs text-slate-700 hover:border-brand-400">
+                            {% if s.item.code %}<span class="font-mono text-slate-500">{{ s.item.code }}</span>{% endif %}<span class="truncate max-w-[12rem]">{{ s.item.title }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </li>
+                {% endif %}
+                {% if unlinked_findings %}
+                <li class="flex items-center gap-2 px-5 py-3 bg-mist-50 dark:bg-mist-950/40">
+                    <span class="flex-1 text-mist-800 dark:text-mist-200">{{ unlinked_findings }} finding{{ unlinked_findings|pluralize }} in this engagement {{ unlinked_findings|pluralize:"isn't,aren't" }} linked to any check</span>
+                    <a href="{% url 'findings:list' engagement.pk %}" class="text-xs font-semibold text-mist-800 dark:text-mist-200 hover:underline">Review</a>
+                </li>
+                {% endif %}
+            </ul>
+        </section>
+    </aside>
+</div>
+{% endif %}
+
+<details id="start-run" class="panel mt-6 scroll-mt-24"{% if not runs %} open{% endif %}>
+    <summary class="panel-header cursor-pointer select-none">
+        <span class="font-semibold text-slate-900">Start a checklist run</span>
+        <span class="text-xs text-slate-500">One run per asset</span>
+    </summary>
+    <div class="panel-body">
+        <p class="text-sm text-slate-500 mb-3">
+            An engagement can run several checklists at once — e.g. OWASP WSTG against the main web app and
+            OWASP API Top 10 against its REST API. Give this run a label so it's easy to tell apart.
+        </p>
+        <form method="post" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+            {% csrf_token %}
+            <div class="flex-1 min-w-0 w-full">
+                <label for="checklist-run-label" class="field-label">Label</label>
+                <input type="text" id="checklist-run-label" name="label" class="field-input" placeholder="e.g. app.example.com, REST API v2">
+            </div>
+            <div class="flex-1 min-w-0 w-full">
+                <label for="checklist-template-select" class="field-label">Template</label>
+                <select id="checklist-template-select" name="template_id" class="field-input">
+                    {% for t in checklist_templates %}
+                    <option value="{{ t.pk }}" {% if t.is_default %}selected{% endif %}>{{ t.name }}{% if t.is_default %} (default){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" name="start_checklist" value="1" class="btn-primary shrink-0">Start checklist</button>
+        </form>
+    </div>
+</details>
+
+{% if not runs %}
+<div class="mt-6">
+{% include "base/_empty_state.html" with icon="check" title="No checklist runs started yet" message="Start a run per asset, for example the web app and its API, to track coverage separately." %}
 </div>
 {% endif %}
 
 {% url 'engagements:detail' engagement.pk as back_url %}
 {% include "base/_back_link.html" with url=back_url label="Back to engagement" %}
+{% endblock %}
+
+{% block extra_body %}
+{% if posture %}<script src="{% static 'js/redscribe-hover-detail.js' %}"></script>{% endif %}
 {% endblock %}

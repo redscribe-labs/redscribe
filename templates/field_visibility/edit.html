@@ -1,10 +1,13 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% load redscribe_extras %}
 {% block title %}Finding structure — RedScribe{% endblock %}
-{% block content %}
-<div class="max-w-5xl mx-auto space-y-6">
+{% block settings_content %}
+<div class="max-w-5xl space-y-6">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Finding structure</h1>
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+            <h1 class="page-title">Finding structure</h1>
+            <button type="button" class="btn-primary" data-add-section-open>Add section</button>
+        </div>
         <p class="text-sm text-slate-500 mb-5">
             These are the narrative content sections a Finding and a Catalogue entry can carry — add, relabel,
             reorder, or retire them freely. Retiring a section (uncheck "Active") hides it from create/edit/detail
@@ -28,7 +31,7 @@
             {% csrf_token %}
             {{ formset.management_form }}
             <div class="md:overflow-x-auto">
-            <div class="hidden md:grid md:min-w-[54rem] grid-cols-[2.5rem_minmax(11rem,1fr)_4.5rem_4.5rem_4.5rem_5.5rem_5.5rem_3.5rem] gap-x-3 items-end pb-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <div class="hidden md:grid md:min-w-[54rem] grid-cols-[2.5rem_minmax(11rem,1fr)_4.5rem_4.5rem_4.5rem_5.5rem_5.5rem_3.5rem] gap-x-3 items-end pb-2 border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <div></div>
                 <div>Label</div>
                 <div class="text-center border-l border-slate-200 dark:border-slate-300 pl-3" title="Shown on create/edit/detail pages and open to new comments">Active</div>
@@ -45,9 +48,9 @@
                 <div class="flex items-center gap-3 md:block md:space-y-0">
                     {% if form.instance.pk %}
                     <button type="submit" formaction="{% url 'field_visibility:move' form.instance.pk 'up' %}" formmethod="post"
-                            class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move up" {% if forloop.first %}disabled{% endif %}>&uarr;</button>
+                            class="text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move up" {% if forloop.first %}disabled{% endif %}>&uarr;</button>
                     <button type="submit" formaction="{% url 'field_visibility:move' form.instance.pk 'down' %}" formmethod="post"
-                            class="text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move down" {% if forloop.last %}disabled{% endif %}>&darr;</button>
+                            class="text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none" title="Move down" {% if forloop.last %}disabled{% endif %}>&darr;</button>
                     {% endif %}
                     <span class="md:hidden text-sm font-semibold text-slate-800">Section {{ forloop.counter }}</span>
                 </div>
@@ -55,7 +58,7 @@
                     <label class="field-label md:hidden">Label</label>
                     {{ form.label|add_class:"field-input" }}
                     {% if form.instance.is_protected %}
-                    <p class="text-xs text-slate-400 mt-1">Built-in finding metadata — can be renamed and reordered, but not deleted.</p>
+                    <p class="text-xs text-slate-500 mt-1">Built-in finding metadata — can be renamed and reordered, but not deleted.</p>
                     {% endif %}
                 </div>
                 <div class="flex items-center gap-2 md:justify-center md:border-l md:border-slate-100 dark:md:border-slate-200 md:pl-3">
@@ -91,8 +94,17 @@
         </form>
     </div>
 
-    <div class="card">
-        <h2 class="text-lg font-semibold mb-4">Add a new section</h2>
+</div>
+
+<style>
+    #add-section-modal[open] {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0;
+    }
+</style>
+<dialog id="add-section-modal" class="p-0 border-0 bg-transparent w-[calc(100%-2rem)] max-w-lg backdrop:bg-black/40" aria-labelledby="add-section-modal-title"
+        {% if create_form.is_bound and create_form.errors %}data-open-on-load{% endif %}>
+    <div class="card !m-0 max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <h2 id="add-section-modal-title" class="text-lg font-semibold mb-4">Add a new section</h2>
         <form method="post" class="space-y-4">
             {% csrf_token %}
             <input type="hidden" name="action" value="create">
@@ -101,22 +113,54 @@
                 {{ create_form.label|add_class:"field-input" }}
                 {% for error in create_form.label.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
             </div>
-            <p class="text-xs text-slate-500">New sections are added to the end of the list — reorder with the &uarr;/&darr; arrows above once it's created.</p>
+            <p class="text-xs text-slate-500">New sections are added to the end of the list — reorder with the &uarr;/&darr; arrows once it's created.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                 {% for field in create_form %}
                 {% if field.name != "label" %}
-                <div class="flex items-center gap-2">
-                    {{ field }}
-                    <label for="{{ field.id_for_label }}" class="text-sm text-slate-700">{{ field.label }}</label>
+                <div>
+                    <div class="flex items-center gap-2">
+                        {{ field }}
+                        <label for="{{ field.id_for_label }}" class="text-sm text-slate-700">{{ field.label }}</label>
+                    </div>
+                    {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
                 </div>
                 {% endif %}
                 {% endfor %}
             </div>
-            <button type="submit" class="btn-primary w-full">Add section</button>
+            <div class="flex gap-2">
+                <button type="submit" class="btn-primary">Add section</button>
+                <button type="button" class="btn-secondary" data-add-section-cancel>Cancel</button>
+            </div>
         </form>
     </div>
+</dialog>
+{% endblock %}
 
-    {% url 'accounts:dashboard' as back_url %}
-    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
-</div>
+{% block extra_body %}
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var modal = document.getElementById("add-section-modal");
+        if (!modal) return;
+
+        function open() {
+            modal.showModal();
+            var label = modal.querySelector("input[name='create-label']");
+            if (label) label.focus();
+        }
+
+        document.querySelectorAll("[data-add-section-open]").forEach(function (btn) {
+            btn.addEventListener("click", open);
+        });
+
+        modal.querySelectorAll("[data-add-section-cancel]").forEach(function (btn) {
+            btn.addEventListener("click", function () { modal.close(); });
+        });
+
+        modal.addEventListener("click", function (e) {
+            if (e.target === modal) modal.close();
+        });
+
+        if (modal.hasAttribute("data-open-on-load")) open();
+    })();
+</script>
 {% endblock %}

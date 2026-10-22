@@ -1,10 +1,10 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% block title %}New client user — RedScribe{% endblock %}
 
-{% block content %}
-<div class="max-w-lg mx-auto">
+{% block settings_content %}
+<div class="max-w-2xl">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">New client user</h1>
+        <h1 class="page-title mb-1">New client user</h1>
         <p class="text-sm text-slate-500 mb-5">
             Creates a portal account for {{ company.name }}. They'll get a welcome email with a
             link to set their own password (valid for 24 hours) and set up two-factor

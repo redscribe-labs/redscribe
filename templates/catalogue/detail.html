@@ -13,9 +13,9 @@
             <span class="badge-severity" style="{{ template.default_severity|severity_chip_style }}">{{ template.get_default_severity_display }}</span>
             {% if template.default_cvss_score %}<span class="text-sm text-slate-500">CVSS <span class="font-mono font-semibold text-slate-800">{{ template.default_cvss_score }}</span></span>{% endif %}
         </div>
-        {% if template.created_by %}<p class="text-xs text-slate-400 mt-1.5">Created by {{ template.created_by }}</p>{% endif %}
+        {% if template.created_by %}<p class="text-xs text-slate-500 mt-1.5">Created by {{ template.created_by }}</p>{% endif %}
     </div>
-    <div class="flex gap-2 shrink-0">
+    <div class="flex flex-wrap gap-2 min-w-0">
         {% if can_submit_qa %}
         <form method="post" action="{% url 'catalogue:submit_qa' template.pk %}">
             {% csrf_token %}
@@ -60,7 +60,7 @@
         {% if is_importable %}
         <p class="text-xs text-brand-800 dark:text-brand-300 mt-1 mb-3">
             Copies these fields into a new Draft finding in the engagement you pick below.
-            The finding has no ongoing link back to this template — editing this template later won't change it.
+            The finding remembers which entry it came from, but editing this entry later won't change it.
         </p>
         {% if importing_stale_version %}
         <p class="text-xs bg-amber-100 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300 rounded-md px-3 py-2 mb-3">
@@ -71,6 +71,7 @@
         {% endif %}
         {% if engagements %}
         <div class="flex flex-col gap-2">
+            <label for="copy-target-engagement" class="sr-only">Engagement to add this finding to</label>
             <select id="copy-target-engagement" class="field-input">
                 {% for engagement in engagements %}
                 <option value="{{ engagement.pk }}">{{ engagement.client_name }}</option>
@@ -96,7 +97,7 @@
         <h2 class="font-semibold text-slate-900 text-sm mb-3">Classification</h2>
         <div class="flex flex-wrap gap-1.5">
             {% for tag in template.classifications.all %}
-            <span class="badge-slate" title="{{ tag.taxonomy }}">{{ tag.value }}</span>
+            <span class="badge-mist" title="{{ tag.taxonomy }}">{{ tag.value }}</span>
             {% endfor %}
         </div>
     </div>
@@ -106,11 +107,11 @@
         <h2 class="font-semibold text-slate-900 text-sm mb-3">About this entry</h2>
         <dl class="space-y-2 text-sm">
             {% if template.created_by %}
-            <div class="flex justify-between gap-3"><dt class="text-slate-400">Created by</dt><dd class="text-slate-700 text-right">{{ template.created_by }}</dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-slate-500">Created by</dt><dd class="text-slate-700 text-right">{{ template.created_by }}</dd></div>
             {% endif %}
-            <div class="flex justify-between gap-3"><dt class="text-slate-400">Created</dt><dd class="text-slate-700">{{ template.created_at|date:"d/m/Y" }}</dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-slate-500">Created</dt><dd class="text-slate-700">{{ template.created_at|date:"d/m/Y" }}</dd></div>
             {% if template.updated_at != template.created_at %}
-            <div class="flex justify-between gap-3"><dt class="text-slate-400">Updated</dt><dd class="text-slate-700">{{ template.updated_at|date:"d/m/Y" }}</dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-slate-500">Updated</dt><dd class="text-slate-700">{{ template.updated_at|date:"d/m/Y" }}</dd></div>
             {% endif %}
         </dl>
     </div>
@@ -119,10 +120,34 @@
 
 {% block content %}
 <div class="max-w-5xl">
+{% if has_pending_changes %}
+<section class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 mb-5 space-y-3">
+    <div class="flex flex-wrap items-center gap-3">
+        <p class="flex-1 min-w-[16rem] text-sm text-amber-900 dark:text-amber-200">
+            <strong>Edits are waiting for QA.</strong> Findings created from this entry still use the approved version
+            {% if approved_version.approved_at %}from {{ approved_version.approved_at|date:"d/m/Y" }}{% endif %}.
+        </p>
+        <nav aria-label="Version" class="inline-flex rounded-md border border-amber-300 dark:border-amber-800 overflow-hidden bg-white dark:bg-slate-100 text-sm">
+            <a href="?" class="px-3 py-1.5 {% if not show_approved %}bg-amber-100 dark:bg-amber-900/50 font-semibold text-amber-900 dark:text-amber-100{% else %}text-slate-700{% endif %}"{% if not show_approved %} aria-current="page"{% endif %}>Pending changes</a>
+            <a href="?version=approved" class="px-3 py-1.5 border-l border-amber-300 dark:border-amber-800 {% if show_approved %}bg-amber-100 dark:bg-amber-900/50 font-semibold text-amber-900 dark:text-amber-100{% else %}text-slate-700{% endif %}"{% if show_approved %} aria-current="page"{% endif %}>Approved version (in use)</a>
+        </nav>
+    </div>
+    {% if changed_fields or changed_sections %}
+    <div class="text-sm text-amber-900 dark:text-amber-200">
+        <p class="font-semibold mb-1">Changed since approval</p>
+        <ul class="space-y-0.5">
+            {% for field in changed_fields %}<li>{{ field.label }}: <del class="decoration-1"><span class="sr-only">was </span>{{ field.previous }}</del> &rarr; {{ field.current }}</li>{% endfor %}
+            {% if changed_sections %}<li>{{ changed_sections|length }} content section{{ changed_sections|length|pluralize }} (marked below)</li>{% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
 {% if document_sections %}
 <div class="card">
     {% for section in document_sections %}
     <div class="{% if not forloop.first %}mt-11 pt-11 border-t border-slate-200 dark:border-slate-200{% endif %}">
+        {% if section.field_name in changed_sections %}<p class="mb-2"><span class="badge-amber">{% if show_approved %}Differs from the pending edit{% else %}Changed since approval{% endif %}</span></p>{% endif %}
         {% include "base/_document_section.html" with field_name=section.field_name label=section.label encrypted=section.encrypted content_json=section.content_json readonly_partial="catalogue/_rte_readonly.html" %}
     </div>
     {% endfor %}
@@ -131,7 +156,7 @@
 <div class="card text-center text-sm text-slate-500">
     No content sections have been filled in yet.
     {% if can_edit %}
-    <a href="{% url 'catalogue:edit' template.pk %}" class="text-brand-600 hover:underline">Add some</a>.
+    <a href="{% url 'catalogue:edit' template.pk %}" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200">Add some</a>.
     {% endif %}
 </div>
 {% endif %}

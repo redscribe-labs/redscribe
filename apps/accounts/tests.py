@@ -2158,3 +2158,39 @@ class LoginPageOAuthAdditiveTests(TestCase):
         self.assertNotContains(resp, "Sign in with Google")
         self.assertNotContains(resp, "Sign in with Microsoft")
         self.assertContains(resp, "Forgot your password?")
+
+
+class ClientLandingTests(TestCase):
+    """Client users only have the portal, so every "you're signed in, go home"
+    step must send them there rather than to the staff dashboard (a 403 for them)."""
+
+    def setUp(self):
+        from apps.clients.models import Client as ClientCompany
+        from apps.feature_flags.models import FeatureFlags
+
+        FeatureFlags.objects.update_or_create(pk=1, defaults={"client_portal_enabled": True})
+        self.user = make_user("client", client=ClientCompany.objects.create(name="Northwind"))
+
+    def _totp(self, device):
+        from django_otp.oath import totp as totp_token
+
+        return str(totp_token(device.bin_key, device.step, device.t0, device.digits, device.drift)).zfill(device.digits)
+
+    def test_mfa_verify_sends_a_client_to_the_portal(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        device = TOTPDevice.objects.create(user=self.user, name="default", confirmed=True)
+        client = Client()
+        client.post(reverse("accounts:login"), {"username": self.user.username, "password": TEST_PASSWORD})
+        resp = client.post(reverse("accounts:mfa_verify"), {"token": self._totp(device)})
+        self.assertRedirects(resp, reverse("clients_portal:dashboard"), fetch_redirect_response=False)
+
+    def test_first_time_enrolment_sends_a_client_to_the_portal(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        client = Client()
+        client.post(reverse("accounts:login"), {"username": self.user.username, "password": TEST_PASSWORD})
+        client.get(reverse("accounts:mfa_enroll"))
+        device = TOTPDevice.objects.get(user=self.user, confirmed=False)
+        resp = client.post(reverse("accounts:mfa_enroll"), {"token": self._totp(device)})
+        self.assertRedirects(resp, reverse("clients_portal:dashboard"), fetch_redirect_response=False)

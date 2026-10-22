@@ -3,11 +3,59 @@
 All notable changes to RedScribe. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0, each
-release carries an `-alpha.N` suffix and may include breaking changes.
+release carries an `-alpha` suffix and may include breaking changes.
 
-## [Unreleased]
+## [0.6.0-alpha] - 2026-10-22
 
-## [0.2.0-alpha.4] - 2026-10-06
+A redesign of the whole app, with a new checklist workflow. The database
+updates itself when you upgrade; as always, take a backup first.
+
+Version numbers no longer carry a number after "alpha". Earlier releases
+have been renumbered to match: 0.2.0-alpha.1 to .4 are now 0.2.0-alpha to
+0.5.0-alpha.
+
+### Security
+
+- Image uploads only accept genuine PNG, JPEG, GIF, or WebP files.
+- Updated Django, Pillow, and other libraries to fix known vulnerabilities.
+
+### Added
+
+- A testing posture page for each checklist: coverage by category, where
+  the risk is, blocked checks, and what's still untested.
+- A redesigned checklist item page with an assignee, a **Blocked** outcome,
+  a note of what was tested, a history, and automatic saving.
+- Raise a finding straight from a checklist item, and start a checklist
+  when you create an engagement.
+- Imports from scanners and the catalogue show what they'll create before
+  saving, leave likely duplicates unticked, and warn about content that
+  would be lost.
+- Home lists everything waiting on you. The engagement and finding lists
+  gain tabs, filters, and a preview pane.
+- Audit log export as CSV, and keyboard shortcuts across the app.
+
+### Changed
+
+- A new layout: a reorganized sidebar, breadcrumbs, and one **Settings**
+  area for every admin page.
+- The CVSS calculator opens in a pop-up, with a button for each metric and
+  a live score.
+- Reports say **Vulnerability ID**, list the assessment team by name only,
+  and leave out the CVE row when a finding has none.
+- Only one finding section can receive scanner import details.
+
+### Fixed
+
+- Client users now stay in the portal after signing in with MFA or
+  changing their password.
+- Editor toolbars no longer cover the page tabs or the text being edited,
+  and several pages fit better on phones.
+- The label on a report's cover no longer overlaps the title when there's
+  no logo.
+- Many accessibility fixes, including contrast, form labels, and names for
+  screen readers.
+
+## [0.5.0-alpha] - 2026-10-06
 
 A small maintenance release. When you upgrade, follow the updated upgrade
 steps so your containers also pick up the latest OS security fixes.
@@ -25,7 +73,7 @@ steps so your containers also pick up the latest OS security fixes.
   existing installs.
 - Updated a build-time dependency to fix a known vulnerability.
 
-## [0.2.0-alpha.3] - 2026-09-30
+## [0.4.0-alpha] - 2026-09-30
 
 A security and maintenance update. Upgrading is recommended for everyone.
 
@@ -39,7 +87,7 @@ A security and maintenance update. Upgrading is recommended for everyone.
 
 - Routine updates to other dependencies.
 
-## [0.2.0-alpha.2] - 2026-09-29
+## [0.3.0-alpha] - 2026-09-29
 
 A bug-fix release for report fonts, User Management, and Docker setup.
 
@@ -54,7 +102,7 @@ A bug-fix release for report fonts, User Management, and Docker setup.
 
 - The backup passphrase can now be stored as a secret file.
 
-## [0.2.0-alpha.1] - 2026-09-22
+## [0.2.0-alpha] - 2026-09-22
 
 A security hardening release. MFA is now on by default.
 
@@ -78,6 +126,6 @@ A security hardening release. MFA is now on by default.
 - MFA is on by default for every local account.
 - Docker Compose now limits how much memory and CPU each service can use.
 
-## [0.1.0-alpha.1] - 2026-09-17
+## [0.1.0-alpha] - 2026-09-17
 
 Initial public release.

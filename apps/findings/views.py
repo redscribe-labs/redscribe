@@ -1,6 +1,9 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -80,6 +83,11 @@ def _cvss_sort_key(finding):
 def finding_list(request, engagement_id):
     query = request.GET.get("q", "").strip()
     show_archived = request.GET.get("archived") == "1"
+    severity = request.GET.get("severity", "")
+    workflow = request.GET.get("workflow", "")
+    mine = request.GET.get("mine") == "1"
+    Status = Finding.WorkflowStatus
+    user = request.user
     all_findings = request.engagement.findings.select_related(
         "created_by", "assigned_reviewer", "assigned_qa"
     ).prefetch_related("classifications")
@@ -87,12 +95,33 @@ def finding_list(request, engagement_id):
     findings = all_findings if show_archived else all_findings.filter(archived=False)
     if query:
         findings = findings.filter(Q(title__icontains=query) | Q(cve_id__icontains=query))
+    if severity in Finding.Severity.values:
+        findings = findings.filter(severity=severity)
+    if workflow in Status.values:
+        findings = findings.filter(workflow_status=workflow)
+    if mine:
+        # Same rules as My queue: waiting for my review or QA, or my own finding sent back to me.
+        findings = findings.filter(
+            Q(assigned_reviewer=user, workflow_status__in=[Status.DRAFT, Status.REVIEW_CHANGES_REQUESTED])
+            | Q(assigned_qa=user, workflow_status__in=[Status.REVIEWED, Status.QA_CHANGES_REQUESTED])
+            | Q(created_by=user, workflow_status__in=[Status.REVIEW_CHANGES_REQUESTED, Status.QA_CHANGES_REQUESTED])
+        )
     findings = sorted(findings, key=_cvss_sort_key)
 
     page_obj = Paginator(findings, PAGE_SIZE).get_page(request.GET.get("page"))
 
-    Status = Finding.WorkflowStatus
-    user = request.user
+    selected = None
+    selected_id = request.GET.get("selected")
+    if selected_id:
+        try:
+            selected = all_findings.prefetch_related("checklist_items").get(pk=selected_id)
+        except (Finding.DoesNotExist, ValueError, ValidationError):
+            selected = None
+    if selected is None and page_obj.object_list:
+        selected = page_obj.object_list[0]
+
+    carry = {k: v for k, v in (("q", query), ("severity", severity), ("workflow", workflow),
+                                ("mine", "1" if mine else ""), ("archived", "1" if show_archived else "")) if v}
     is_manager = is_engagement_manager(user, request.engagement)
     non_archived = request.engagement.findings.filter(archived=False)
     awaiting_review_count = non_archived.filter(
@@ -117,6 +146,14 @@ def finding_list(request, engagement_id):
             "query": query,
             "show_archived": show_archived,
             "archived_count": archived_count,
+            "severity": severity,
+            "workflow": workflow,
+            "mine": mine,
+            "severity_choices": Finding.Severity.choices,
+            "workflow_choices": Status.choices,
+            "selected": selected,
+            "carry_querystring": urlencode(carry),
+            "page_querystring": urlencode({**carry, **({"page": page_obj.number} if page_obj.number > 1 else {})}),
             "is_manager": is_manager,
             "bulk_reviewer_candidates": bulk_eligible_reviewer_candidates() if is_manager else None,
             "bulk_qa_candidates": bulk_eligible_qa_candidates() if is_manager else None,
@@ -149,6 +186,27 @@ def _importable_catalogue_source(template: VulnerabilityTemplate):
     return getattr(template, "approved_version", None)
 
 
+def _catalogue_entry_or_none(template_id):
+    if not template_id:
+        return None
+    try:
+        return VulnerabilityTemplate.objects.filter(pk=template_id).first()
+    except (ValueError, ValidationError):
+        return None
+
+
+def _checklist_item_or_none(engagement, item_id):
+    """The check a finding is being raised from (?from_check=), if it's in this engagement."""
+    from apps.checklist.models import ChecklistItem
+
+    if not item_id:
+        return None
+    try:
+        return ChecklistItem.objects.filter(pk=item_id, run__engagement=engagement).first()
+    except (ValueError, ValidationError):
+        return None
+
+
 def _initial_from_template(source) -> dict:
     initial = {
         form_field: getattr(source, template_field)
@@ -175,23 +233,43 @@ def finding_create(request, engagement_id):
                 form, request.engagement, request.project_key, created_by=request.user,
                 classification_tags=save_classification_rows(classification_rows), sections=sections,
             )
+            source = _catalogue_entry_or_none(request.GET.get("from_template"))
+            if source is not None:
+                finding.source_template = source
+                finding.save(update_fields=["source_template"])
+            check = _checklist_item_or_none(request.engagement, request.GET.get("from_check"))
+            if check is not None:
+                from apps.checklist.services import link_raised_finding
+
+                link_raised_finding(check, finding, request.user)
             auto_assign_reviewer_if_configured(finding)
             messages.success(request, f"Finding '{finding.title}' created as Draft.")
+            if check is not None:
+                messages.info(request, f"Linked to checklist item {check.code or check.title}.")
             return redirect("findings:detail", engagement_id=engagement_id, pk=finding.pk)
     else:
         template_source = None
         template_id = request.GET.get("from_template")
         if template_id:
-            catalogue_entry = get_object_or_404(VulnerabilityTemplate, pk=template_id)
+            catalogue_entry = _catalogue_entry_or_none(template_id)
+            if catalogue_entry is None:
+                raise Http404("No such catalogue entry.")
             template_source = _importable_catalogue_source(catalogue_entry)
             if template_source is None:
                 messages.error(
                     request,
                     f"'{catalogue_entry.title}' isn't approved yet and can't be imported into a finding.",
                 )
-        form = FindingForm(
-            initial=_initial_from_template(template_source) if template_source else None, sections=sections,
-        )
+        initial = _initial_from_template(template_source) if template_source else {}
+        if request.GET.get("from_check"):
+            check = _checklist_item_or_none(request.engagement, request.GET["from_check"])
+            if check is None:
+                raise Http404("No such checklist item in this engagement.")
+            from apps.checklist.services import decrypt_item_text
+
+            initial.setdefault("title", check.title)
+            initial["affects"] = decrypt_item_text(check, "scope_tested", request.project_key)
+        form = FindingForm(initial=initial or None, sections=sections)
         classification_rows = classification_rows_for(template_source) if template_source else []
         classification_errors = []
 
@@ -199,6 +277,7 @@ def finding_create(request, engagement_id):
         request, "findings/create.html",
         {
             "engagement": request.engagement, "form": form,
+            "from_check": _checklist_item_or_none(request.engagement, request.GET.get("from_check")),
             "classification_rows": classification_rows, "classification_errors": classification_errors,
             "classification_suggestions": classification_suggestions(),
             "breadcrumbs": engagement_crumbs(request.engagement) + [

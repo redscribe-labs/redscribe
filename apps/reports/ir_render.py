@@ -68,11 +68,16 @@ _PREVIEW_CSS_BASE = """
     flex: 1; display: flex; flex-direction: column;
     padding: 2.4rem 3rem 3.2rem; box-sizing: border-box; position: relative;
 }}
-.report-cover-brand {{ display: flex; align-items: center; gap: .6rem; }}
+/* Brand (left) and classification label (right) share one top row in normal
+   flow, so the title block always starts below both. The label used to be
+   absolutely positioned, which only stayed clear of the title while a logo
+   row pushed the title down. */
+.report-cover-top {{ display: flex; align-items: flex-start; gap: 1rem; }}
+.report-cover-brand {{ display: flex; align-items: center; gap: .6rem; flex: 1; min-width: 0; }}
 .report-cover-logo {{ max-height: 2.4rem; max-width: 10rem; display: block; }}
 .report-cover-firm {{ color: #475569; font-size: .8rem; font-weight: 600; }}
 .report-classification {{
-    position: absolute; top: 2.4rem; right: 3rem;
+    margin-left: auto; flex-shrink: 0;
     font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
     color: #b91c1c; border: 1px solid #b91c1c; border-radius: .25rem; padding: .3rem .6rem;
 }}
@@ -359,9 +364,13 @@ def render_cover_html(meta) -> str:
         for label, value in meta_fields
     )
 
-    cover_block = (
+    top_html = (
         (f'<div class="report-cover-brand">{brand_html}</div>' if brand_html else "")
-        + f'<div class="report-classification">{_escape(meta.classification_label)}</div>'
+        + (f'<div class="report-classification">{_escape(meta.classification_label)}</div>'
+           if meta.classification_label else "")
+    )
+    cover_block = (
+        (f'<div class="report-cover-top">{top_html}</div>' if top_html else "")
         + '<div class="report-cover-title-block">'
         + (f'<p class="report-cover-title">{_escape(meta.cover_title)}</p>' if meta.cover_title else "")
         + f'<h1>{_escape(meta.client_name)}</h1>'

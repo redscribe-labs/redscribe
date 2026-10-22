@@ -1,0 +1,7 @@
+{% comment %}
+Outcome glyph for the posture map. Colour is never the only signal: a tick
+for "no finding", "!" for "finding raised", a dashed outline for N/A, a slash for "blocked"
+and an empty outline for "not tested".
+inner=True: just the icon, for use inside an existing .posture-cell.
+Otherwise: a standalone swatch of the given size (legend, breakdown list).
+{% endcomment %}{% if not inner %}<span class="posture-cell posture-cell-{{ key }} {{ size|default:'h-4 w-4' }} shrink-0" aria-hidden="true">{% endif %}{% if key == "pass" %}<svg class="h-[60%] w-[60%]" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 5.2 4 7.2 8 3"/></svg>{% elif key == "finding" %}<svg class="h-[60%] w-[60%]" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 1.8v4M5 7.6v.8"/></svg>{% elif key == "blocked" %}<svg class="h-[60%] w-[60%]" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 8 8 2"/></svg>{% endif %}{% if not inner %}</span>{% endif %}

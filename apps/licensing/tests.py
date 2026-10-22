@@ -183,6 +183,35 @@ class LicenseEditViewTests(TestCase):
         self.assertTrue(resp.context["form"].errors.get("key_text"))
         self.assertEqual(LicenseKey.get_solo().key_text, "")
 
+    def test_page_shows_the_licence_details(self):
+        private_key, public_pem = _keypair()
+        key = LicenseKey.get_solo()
+        key.key_text = _sign(private_key, org="ACME Corp", issued="2026-02-03")
+        key.updated_by = self.superadmin
+        key.save()
+        client = Client()
+        login(client, self.superadmin)
+        with override_settings(LICENSE_SIGNING_PUBLIC_KEY=public_pem):
+            resp = client.get(self.url)
+        self.assertContains(resp, "Licensed to ACME Corp")
+        self.assertContains(resp, "2026-02-03")
+        self.assertContains(resp, "Commercial license")
+        self.assertContains(resp, f"by {self.superadmin}")
+
+    def test_a_saved_key_that_no_longer_verifies_is_called_out(self):
+        private_key, public_pem = _keypair()
+        key = LicenseKey.get_solo()
+        key.key_text = _sign(private_key)
+        key.save()
+        _, other_public_pem = _keypair()
+        client = Client()
+        login(client, self.superadmin)
+        with override_settings(LICENSE_SIGNING_PUBLIC_KEY=other_public_pem):
+            resp = client.get(self.url)
+        self.assertEqual(resp.context["status"]["state"], "unverified")
+        self.assertContains(resp, "License key not recognised")
+        self.assertNotContains(resp, "No commercial license key is set")
+
     def test_blank_key_text_is_allowed_community_use(self):
         client = Client()
         login(client, self.superadmin)

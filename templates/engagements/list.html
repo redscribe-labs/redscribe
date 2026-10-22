@@ -2,45 +2,108 @@
 {% load redscribe_extras %}
 {% block title %}Engagements — RedScribe{% endblock %}
 
+{% block topbar_actions %}
+{% if can_create %}
+<a href="{% url 'engagements:create' %}" class="btn-primary">New engagement</a>
+{% endif %}
+{% endblock %}
+
 {% block page_header %}
-<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+<div class="mb-5">
     <h1 class="page-title">Engagements</h1>
-    {% if can_create %}
-    <a href="{% url 'engagements:create' %}" class="btn-primary">New engagement</a>
-    {% endif %}
 </div>
+
+<nav aria-label="Engagement status" class="flex gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
+    <a href="?{% if query %}q={{ query|urlencode }}{% endif %}" class="{% if not status %}tab-link-active{% else %}tab-link{% endif %}"{% if not status %} aria-current="page"{% endif %}>
+        All <span class="font-mono text-[0.6875rem] text-slate-500">{{ total_count }}</span>
+    </a>
+    {% for stage in pipeline %}
+    <a href="?status={{ stage.value }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="{% if stage.value == status %}tab-link-active{% else %}tab-link{% endif %}"{% if stage.value == status %} aria-current="page"{% endif %}>
+        {{ stage.label }} <span class="font-mono text-[0.6875rem] text-slate-500">{{ stage.count }}</span>
+    </a>
+    {% endfor %}
+</nav>
+
+<form method="get" class="mb-4">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <div class="relative max-w-md">
+        <label for="engagement-search" class="sr-only">Search engagements</label>
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+        <input id="engagement-search" type="search" name="q" value="{{ query }}" placeholder="Search by client name or reference number" class="field-input pl-9">
+    </div>
+</form>
 {% endblock %}
 
 {% block content %}
-{% include "base/_search_box.html" with query=query placeholder="Search by client name or reference number" %}
-
 {% if page_obj.object_list %}
-<ul class="space-y-2">
-    {% for engagement in page_obj.object_list %}
-    <li>
-        <a href="{% url 'engagements:detail' engagement.pk %}"
-           class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
-                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all">
-            <span class="stat-tile-icon !h-9 !w-9 shrink-0">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5V15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7.5"/><path d="M3 7.5 4.5 4h11L17 7.5"/><path d="M8 10h4"/></svg>
-            </span>
-            <div class="min-w-0 flex-1">
-                <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ engagement.client_name }}</p>
-                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
-                    {% if engagement.archived %}<span class="badge-red">Archived</span>{% endif %}
-                    <span class="text-xs text-slate-400">{{ engagement.start_date|default:"—" }} – {{ engagement.end_date|default:"—" }}</span>
-                </div>
-            </div>
-            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
-        </a>
-    </li>
-    {% endfor %}
-</ul>
-{% include "base/_pagination.html" %}
+<div class="relative overflow-x-auto rounded-lg border border-slate-200 bg-white dark:bg-slate-100">
+    <table class="w-full min-w-[58rem] text-sm">
+        <thead>
+            <tr class="text-left text-xs text-slate-500 border-b border-slate-200">
+                <th scope="col" class="px-4 py-3 font-semibold">Client</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Type</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Status</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Testing window</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Open findings</th>
+                <th scope="col" class="px-4 py-3 font-semibold">Checklist</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for engagement in page_obj.object_list %}
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-50">
+                <td class="px-4 py-3">
+                    <a href="{% url 'engagements:detail' engagement.pk %}" class="font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ engagement.client_name }}</a>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        {% if engagement.reference_number %}<span class="font-mono text-xs text-slate-500">{{ engagement.reference_number }}</span>{% endif %}
+                        {% if engagement.archived %}<span class="badge-red">Archived</span>{% endif %}
+                    </div>
+                </td>
+                <td class="px-3 py-3 text-slate-600">{{ engagement.get_test_type_display|default:"—" }}</td>
+                <td class="px-3 py-3"><span class="{{ engagement.status|badge_class }} whitespace-nowrap">{{ engagement.get_status_display }}</span></td>
+                <td class="px-3 py-3 text-slate-600 whitespace-nowrap tabular-nums">{{ engagement.start_date|date:"d/m/Y"|default:"—" }} – {{ engagement.end_date|date:"d/m/Y"|default:"—" }}</td>
+                <td class="px-3 py-3">
+                    <span class="flex gap-1">
+                        {% for value, short, label, count in engagement.severity_counts %}
+                        {% if count %}<span class="badge-severity" style="{{ value|severity_chip_style }}" title="{{ count }} open {{ label }}">{{ short }} {{ count }}<span class="sr-only"> {{ label }}</span></span>{% endif %}
+                        {% endfor %}
+                        {% if not engagement.open_total %}<span class="text-slate-500">{% if engagement.findings_total %}None open{% else %}—{% endif %}</span>{% endif %}
+                    </span>
+                </td>
+                <td class="px-4 py-3">
+                    {% if engagement.checklist_pct is not None %}
+                    <div class="flex items-center gap-2">
+                        <div class="h-1.5 w-20 rounded-full bg-slate-200 dark:bg-slate-300 overflow-hidden" aria-hidden="true">
+                            <div class="h-full rounded-full bg-brand-600" style="width: {{ engagement.checklist_pct }}%"></div>
+                        </div>
+                        <span class="font-mono text-xs text-slate-600">{{ engagement.checklist_pct }}%</span>
+                    </div>
+                    {% else %}<span class="text-slate-500">Not started</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Pagination" class="flex items-center justify-between mt-6">
+    <p class="text-sm text-slate-500">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        &middot; {{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}
+    </p>
+    <div class="flex items-center gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?{% if carry_querystring %}{{ carry_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn-secondary">Previous</a>
+        {% else %}<span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Previous</span>{% endif %}
+        {% if page_obj.has_next %}
+        <a href="?{% if carry_querystring %}{{ carry_querystring }}&{% endif %}page={{ page_obj.next_page_number }}" class="btn-secondary">Next</a>
+        {% else %}<span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Next</span>{% endif %}
+    </div>
+</nav>
+{% endif %}
 {% else %}
-{% if query %}
-{% include "base/_empty_state.html" with icon="search" title="No matches" message="No engagement or client name matches your search." %}
+{% if query or status %}
+{% include "base/_empty_state.html" with icon="search" title="No matches" message="No engagement matches your search and status filter." %}
 {% elif can_create %}
 {% url 'engagements:create' as create_url %}
 {% include "base/_empty_state.html" with icon="folder" title="No engagements yet" message="Start one to begin logging findings, running checklists, and tracking review." action_url=create_url action_label="New engagement" %}
@@ -48,7 +111,4 @@
 {% include "base/_empty_state.html" with icon="folder" title="No engagements yet" message="You'll see engagements here once you're added to one." %}
 {% endif %}
 {% endif %}
-
-{% url 'accounts:dashboard' as back_url %}
-{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
 {% endblock %}

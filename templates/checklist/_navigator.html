@@ -1,0 +1,31 @@
+{% load redscribe_extras %}{% comment %}Checks in this run, grouped by category; the current check is highlighted.{% endcomment %}
+<div class="divide-y divide-slate-100 dark:divide-slate-200">
+    {% for group in navigator %}
+    <details class="group/cat"{% if group.open %} open{% endif %}>
+        <summary class="flex cursor-pointer select-none items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 dark:hover:bg-slate-50">
+            <svg class="h-3 w-3 shrink-0 text-slate-500 transition-transform group-open/cat:rotate-90" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 2.5 7.5 6 4 9.5"/></svg>
+            <span class="min-w-0 flex-1 truncate">{{ group.category }}</span>
+            <span class="font-mono text-[0.6875rem] font-normal text-slate-500">{{ group.done }}/{{ group.items|length }}</span>
+        </summary>
+        <ul class="pb-1.5">
+            {% for it in group.items %}
+            <li>
+                <a href="{% url 'checklist:item_detail' engagement.pk it.pk %}" data-nav-item="{{ it.pk }}"
+                   class="flex items-center gap-2 px-4 py-1.5 text-[13px] {% if it.pk == item.pk %}bg-brand-50 dark:bg-brand-950/50 font-semibold text-slate-900 shadow-[inset_3px_0_0_var(--color-brand-600)]{% else %}text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-50{% endif %}"
+                   {% if it.pk == item.pk %}aria-current="page"{% endif %}>
+                    {% if it.status == "TESTED_NO_FINDING" %}{% include "checklist/_posture_cell_glyph.html" with key="pass" size="h-3.5 w-3.5" %}
+                    {% elif it.status == "TESTED_FINDING_RAISED" %}{% include "checklist/_posture_cell_glyph.html" with key="finding" size="h-3.5 w-3.5" %}
+                    {% elif it.status == "NOT_APPLICABLE" %}{% include "checklist/_posture_cell_glyph.html" with key="na" size="h-3.5 w-3.5" %}
+                    {% elif it.status == "BLOCKED" %}{% include "checklist/_posture_cell_glyph.html" with key="blocked" size="h-3.5 w-3.5" %}
+                    {% else %}{% include "checklist/_posture_cell_glyph.html" with key="open" size="h-3.5 w-3.5" %}{% endif %}
+                    <span class="sr-only">{{ it.get_status_display }}:</span>
+                    {% if it.code %}<span class="font-mono text-[0.6875rem] font-normal {% if it.pk == item.pk %}text-slate-600{% else %}text-slate-500{% endif %} shrink-0">{{ it.code }}</span>{% endif %}
+                    <span class="min-w-0 flex-1 truncate">{{ it.title }}</span>
+                    {% if it.assignee %}<span class="shrink-0 rounded-full bg-navy-50 px-1.5 font-mono text-[0.625rem] text-navy-700 dark:bg-navy-950 dark:text-navy-300" title="Assigned to {{ it.assignee }}">{{ it.assignee|initials }}</span>{% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endfor %}
+</div>

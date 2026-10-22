@@ -1,0 +1,18 @@
+{% extends "base/base.html" %}
+{% comment %}
+Shell for the admin pages that live under Settings in the sidebar. Pages
+put their heading in settings_header and their body in settings_content;
+the settings menu sits to the left on large screens and above on small ones.
+{% endcomment %}
+
+{% block content %}
+<div class="flex flex-col lg:flex-row lg:items-start gap-8">
+    <aside aria-label="Settings sections" class="lg:w-56 lg:shrink-0 lg:sticky lg:top-24">
+        {% include "base/_settings_nav.html" %}
+    </aside>
+    <div class="min-w-0 flex-1">
+        {% block settings_header %}{% endblock %}
+        {% block settings_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

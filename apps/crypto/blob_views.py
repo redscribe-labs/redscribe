@@ -30,10 +30,13 @@ def blob_upload(request, engagement_id):
         return HttpResponseBadRequest("File too large (10MB limit).")
 
     plaintext = upload.read()
+    # formats= keeps Pillow from trying any other decoder (TIFF, PPM, EPS...)
+    # on a file whose declared content type was spoofed: those parsers are
+    # never needed here and are where most Pillow advisories land.
     try:
-        with Image.open(io.BytesIO(plaintext)) as probe:
+        with Image.open(io.BytesIO(plaintext), formats=list(_PIL_FORMAT_TO_CONTENT_TYPE)) as probe:
             probe.verify()
-        with Image.open(io.BytesIO(plaintext)) as probe:
+        with Image.open(io.BytesIO(plaintext), formats=list(_PIL_FORMAT_TO_CONTENT_TYPE)) as probe:
             detected_content_type = _PIL_FORMAT_TO_CONTENT_TYPE.get(probe.format)
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         detected_content_type = None

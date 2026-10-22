@@ -5,6 +5,8 @@ from django.utils import timezone
 from apps.crypto.services import decrypt_or_blank, record_aad
 from apps.reports.tiptap_render import tiptap_to_html
 
+from .services import decrypt_item_text
+
 _MAX_NODE_DEPTH = 50
 
 
@@ -74,6 +76,11 @@ def _item_payload(item, project_key):
         "category": item.category,
         "title": item.title,
         "status": item.status,
+        "blocked_reason": decrypt_item_text(item, "blocked_reason", project_key),
+        "scope_tested": decrypt_item_text(item, "scope_tested", project_key),
+        "tested_by": str(item.tested_by) if item.tested_by else None,
+        "assignee": str(item.assignee) if item.assignee else None,
+        "tested_at": item.tested_at.isoformat() if item.tested_at else None,
         "objectives_html": objectives_html,
         "objectives_images_omitted": objectives_images_omitted,
         "test_results_html": test_results_html,

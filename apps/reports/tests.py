@@ -1178,7 +1178,7 @@ class FindingMetadataClassificationTests(TestCase):
         self.assertEqual(rows["MITRE ATT&CK"], "TA0001 – Initial Access")
         self.assertNotIn("Classification", rows)
 
-    def test_cve_id_row_present_and_falls_back_to_em_dash(self):
+    def test_cve_id_row_present_only_when_the_finding_has_a_cve(self):
         from .assembly import _finding_metadata_table
 
         with_cve = make_finding(self.engagement, self.author, cve_id="CVE-2024-12345")
@@ -1189,7 +1189,7 @@ class FindingMetadataClassificationTests(TestCase):
         rows_without = {row[0]: row[1] for row in _finding_metadata_table(without_cve, profile).rows}
 
         self.assertEqual(rows_with["CVE ID"], "CVE-2024-12345")
-        self.assertEqual(rows_without["CVE ID"], "—")
+        self.assertNotIn("CVE ID", rows_without)
 
     def test_severity_and_status_names_are_overridable_per_profile(self):
         from .assembly import _finding_metadata_table
@@ -3619,3 +3619,40 @@ class SeedPentestReportFormatCommandTests(TestCase):
         self.assertIn("Root Cause Analysis", titles)
         self.assertIn("Conclusion", titles)
 
+
+
+class ReportWordingTests(TestCase):
+    def test_assessment_team_lists_names_without_app_role(self):
+        from .assembly import _assessment_team_section
+
+        engagement = Engagement.objects.create(client_name="Acme")
+        lead = make_user(User.Role.TEAM_LEAD)
+        EngagementMembership.objects.create(user=lead, engagement=engagement)
+        section = _assessment_team_section(engagement, ReportProfile.objects.get(is_default=True))
+        self.assertEqual([child.title for child in section.children], [str(lead)])
+        self.assertNotIn(lead.role.name, section.children[0].title)
+
+    def test_finding_id_row_reads_vulnerability_id(self):
+        from .labels import get_label
+
+        self.assertEqual(get_label(ReportProfile.objects.get(is_default=True), "finding_id_row"), "Vulnerability ID")
+
+    def test_cover_keeps_classification_in_the_top_row_without_a_logo(self):
+        from .ir_render import render_cover_html
+        from .report_ir import ReportMeta
+
+        meta = ReportMeta(
+            project_id="PT-1", client_name="Acme", test_type_label="", classification_label="Confidential",
+            report_date="2026-01-01", cover_title="Sample penetration test report",
+        )
+        html = render_cover_html(meta)
+        # In flow, ahead of the title block, so the two can't overlap.
+        self.assertIn('<div class="report-cover-top"><div class="report-classification">Confidential</div></div>', html)
+        self.assertLess(html.index("report-cover-top"), html.index("report-cover-title-block"))
+
+    def test_cover_omits_an_empty_classification_label(self):
+        from .ir_render import render_cover_html
+        from .report_ir import ReportMeta
+
+        meta = ReportMeta(project_id="PT-1", client_name="Acme", test_type_label="", classification_label="", report_date="")
+        self.assertNotIn("report-classification", render_cover_html(meta))

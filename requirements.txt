@@ -1,9 +1,9 @@
 # Web framework
-Django==5.2.17
+Django==5.2.18
 
 # Auth: single-provider, single-domain OAuth (Google/Microsoft) alongside
 # local username/password
-django-allauth==65.19.5
+django-allauth==65.20.1
 # Required by allauth's Google provider to verify the id_token JWT it gets
 # back from the token endpoint.
 PyJWT==2.15.1
@@ -12,20 +12,20 @@ PyJWT==2.15.1
 requests==2.34.2
 
 # MFA: TOTP
-django-otp==1.7.3
+django-otp==1.7.5
 qrcode==8.2
 # Also used by apps.reports.docx_export to raster the severity/status
 # breakdown bar chart into a PNG for DOCX export — python-docx has no
 # charting API, so this is drawn by hand instead of via a native Word
 # chart object.
-Pillow==12.3.0
+Pillow==13.0.0
 
 # Password hashing backend for Django's built-in Argon2PasswordHasher
 argon2-cffi==25.1.0
 
 # Cryptography (AES-256-GCM data keys / root-key wrapping) - well-audited.
 # Kept current for CVE fixes; bump deliberately, not automatically.
-cryptography==50.0.1
+cryptography==50.0.2
 
 # Postgres driver
 psycopg[binary]==3.3.6
@@ -45,7 +45,7 @@ weasyprint==70.0
 # (apps.reports.pdf_export.encrypt_pdf) — WeasyPrint/pydyf have no
 # encryption support at all, so this is a separate pass over the finished
 # bytes, not part of rendering. Pure Python, no system dependency.
-pypdf==6.19.0
+pypdf==6.21.2
 
 # DOCX report export (apps.reports.docx_export / tiptap_docx / docx_styles).
 # docxtpl (Jinja2 templating over python-docx) fills {{ tag }} placeholders
@@ -78,4 +78,4 @@ defusedxml==0.7.1
 # variable that's already set in the real environment (default `override`
 # is False), so it changes nothing under Docker/CI where the value is set
 # some other way.
-python-dotenv==1.2.3
+python-dotenv==1.2.4

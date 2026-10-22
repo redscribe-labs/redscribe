@@ -1,9 +1,10 @@
 {% extends "base/base.html" %}
-{% load redscribe_extras %}
+{% load redscribe_extras static %}
 {% block title %}Trends — RedScribe{% endblock %}
 
 {% block page_header %}
-<div class="mb-2">
+<div class="mb-6">
+    <p class="page-eyebrow">Reporting</p>
     <h1 class="page-title">Trend reporting</h1>
     <p class="text-sm text-slate-500 mt-1">{{ scope_label }}.</p>
 </div>
@@ -25,25 +26,28 @@
             {% endfor %}
         </div>
 
-        <div class="overflow-x-auto -mx-1 px-1 pb-1">
+        <p id="trend-detail" role="status" aria-live="polite" class="min-h-6 mb-3 text-sm text-slate-500">Hover over or tab to a month for its breakdown.</p>
+        <div class="relative overflow-x-auto -mx-1 px-1 pb-1">
             <div class="flex items-end gap-3 min-w-max">
                 {% for col in severity_chart.columns %}
-                <div class="flex flex-col items-center gap-2 w-9 shrink-0">
-                    <span class="text-[0.7rem] font-medium text-slate-500 tabular-nums">{{ col.total }}</span>
-                    <div class="flex flex-col-reverse gap-[2px] w-6 h-40 rounded-sm overflow-hidden bg-slate-100 dark:bg-slate-200"
-                         title="{{ col.label }}: {{ col.total }} finding{{ col.total|pluralize }}">
+                <button type="button" class="group flex flex-col items-center gap-2 w-9 shrink-0 rounded-md cursor-default"
+                        data-detail-for="trend-detail"
+                        data-detail="{{ col.label }}: {{ col.total }} finding{{ col.total|pluralize }}{% for seg in col.segments %}{% if seg.count %} · {{ seg.count }} {{ seg.label }}{% endif %}{% endfor %}"
+>
+                    <span class="sr-only">{{ col.label }}: {{ col.total }} finding{{ col.total|pluralize }}{% for seg in col.segments %}{% if seg.count %}, {{ seg.count }} {{ seg.label }}{% endif %}{% endfor %}</span>
+                    <span class="text-[0.7rem] font-medium text-slate-500 tabular-nums" aria-hidden="true">{{ col.total }}</span>
+                    <span class="flex flex-col-reverse gap-[2px] w-6 h-40 rounded-sm overflow-hidden bg-slate-100 dark:bg-slate-200 ring-brand-400 group-hover:ring-2 group-focus-visible:ring-2" aria-hidden="true">
                         {% for seg in col.segments %}
-                        <div class="w-full shrink-0" style="height: {{ seg.height_pct }}%;{{ seg.style }}"
-                             title="{{ seg.label }}: {{ seg.count }}"></div>
+                        <span class="block w-full shrink-0" style="height: {{ seg.height_pct }}%;{{ seg.style }}"></span>
                         {% endfor %}
-                    </div>
-                    <span class="text-[0.65rem] text-slate-400 tabular-nums whitespace-nowrap">{{ col.label }}</span>
-                </div>
+                    </span>
+                    <span class="text-[0.65rem] text-slate-500 tabular-nums whitespace-nowrap" aria-hidden="true">{{ col.label }}</span>
+                </button>
                 {% endfor %}
             </div>
         </div>
         {% else %}
-        <p class="text-sm text-slate-400">No findings yet.</p>
+        <p class="text-sm text-slate-500">No findings yet.</p>
         {% endif %}
     </div>
 
@@ -69,13 +73,13 @@
                     <div class="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-200 overflow-hidden">
                         <div class="h-full rounded-full" style="width: {{ row.bar_pct }}%;{{ row.style }}"></div>
                     </div>
-                    <span class="text-slate-600 tabular-nums w-20 text-right shrink-0">{{ row.mean_days }}d <span class="text-slate-400">({{ row.sample_size }})</span></span>
+                    <span class="text-slate-600 tabular-nums w-20 text-right shrink-0">{{ row.mean_days }}d <span class="text-slate-500">({{ row.sample_size }})</span></span>
                 </li>
                 {% endfor %}
             </ul>
             {% endif %}
             {% else %}
-            <p class="text-sm text-slate-400">No findings have been marked Fixed yet.</p>
+            <p class="text-sm text-slate-500">No findings have been marked Fixed yet.</p>
             {% endif %}
         </div>
 
@@ -93,22 +97,22 @@
                 <li class="flex items-center justify-between gap-4 px-1 py-2.5">
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-800 truncate">{{ row.client_name }}</p>
-                        <p class="text-xs text-slate-400 truncate" title="{{ row.tag.taxonomy }}">{{ row.tag.value }}</p>
+                        <p class="text-xs text-slate-500 truncate" title="{{ row.tag.taxonomy }}">{{ row.tag.value }}</p>
                     </div>
                     <div class="text-right shrink-0">
                         <p class="text-sm text-slate-700 tabular-nums">{{ row.engagement_count }} engagements</p>
-                        <p class="text-xs text-slate-400 tabular-nums">{{ row.finding_count }} finding{{ row.finding_count|pluralize }}</p>
+                        <p class="text-xs text-slate-500 tabular-nums">{{ row.finding_count }} finding{{ row.finding_count|pluralize }}</p>
                     </div>
                 </li>
                 {% endfor %}
             </ul>
             {% else %}
-            <p class="text-sm text-slate-400">No repeat findings detected yet.</p>
+            <p class="text-sm text-slate-500">No repeat findings detected yet.</p>
             {% endif %}
         </div>
     </div>
 </div>
 
-{% url 'accounts:dashboard' as back_url %}
-{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
 {% endblock %}
+
+{% block extra_body %}<script src="{% static 'js/redscribe-hover-detail.js' %}"></script>{% endblock %}

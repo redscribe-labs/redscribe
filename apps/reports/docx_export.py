@@ -274,8 +274,9 @@ def _finding_details_table_subdoc(tpl, finding, profile, styles):
         [get_label(profile, "finding_id_row"), finding.display_id],
         [get_label(profile, "finding_cvss_score"), finding.cvss_score or "—"],
         [get_label(profile, "finding_cvss_vector"), finding.cvss_vector or "—"],
-        [get_label(profile, "finding_cve_id"), finding.cve_id or "—"],
     ]
+    if finding.cve_id:  # most findings have no CVE; an empty "—" row is just noise
+        rows.append([get_label(profile, "finding_cve_id"), finding.cve_id])
     tags = list(finding.classifications.all())
     if tags:
         rows += [[tag.taxonomy, tag.value] for tag in tags]
@@ -298,7 +299,7 @@ def _assessment_team_subdoc(tpl, engagement, profile, styles):
         return subdoc
     for entry in data:
         member = entry["member"]
-        _set_style_attr(subdoc.add_paragraph(f"{member} — {entry['role_name']}"), styles.get("heading_3"))
+        _set_style_attr(subdoc.add_paragraph(str(member)), styles.get("heading_3"))
         if entry["background"]:
             tiptap_docx.render_tiptap_into(subdoc, entry["background"], styles=styles)
         if entry["qualifications"]:
@@ -306,10 +307,10 @@ def _assessment_team_subdoc(tpl, engagement, profile, styles):
     return subdoc
 
 
-def _checklist_coverage_subdoc(tpl, engagement, findings, profile, styles):
+def _checklist_coverage_subdoc(tpl, engagement, findings, profile, styles, project_key=None):
     subdoc = tpl.new_subdoc()
     display_id_lookup = {f.id: f.display_id for f in findings}
-    data = assembly._checklist_coverage_data(engagement, display_id_lookup)
+    data = assembly._checklist_coverage_data(engagement, display_id_lookup, project_key)
     if not data:
         _set_style_attr(
             subdoc.add_paragraph("No checklist runs have been recorded for this engagement."),
@@ -456,7 +457,7 @@ def _text_block_context(tpl, profile, content, styles, *, is_remediation_report,
     return result
 
 
-def _base_context(tpl, *, profile, settings_obj, engagement, findings, content, styles, user, image_resolver, is_remediation_report):
+def _base_context(tpl, *, profile, settings_obj, engagement, findings, content, styles, user, image_resolver, is_remediation_report, project_key=None):
     placeholder_context = build_placeholder_context(engagement=engagement, user=user)
 
     def substitute(text):
@@ -478,7 +479,7 @@ def _base_context(tpl, *, profile, settings_obj, engagement, findings, content, 
         "approved_by": str(engagement.default_approver) if engagement.default_approver_id else "",
         "document_control": _document_control_subdoc(tpl, engagement, profile, styles),
         "assessment_team": _assessment_team_subdoc(tpl, engagement, profile, styles),
-        "checklist_coverage": _checklist_coverage_subdoc(tpl, engagement, findings, profile, styles),
+        "checklist_coverage": _checklist_coverage_subdoc(tpl, engagement, findings, profile, styles, project_key),
         "scan_imports": _scan_imports_subdoc(tpl, engagement, profile, styles),
         "breakdown_table": _breakdown_table_subdoc(
             tpl, findings, profile, content.get("breakdown") if isinstance(content, dict) else None, styles,
@@ -513,7 +514,7 @@ def build_docx(*, config, engagement, project_key, user) -> bytes:
     context, substitute = _base_context(
         tpl, profile=profile, settings_obj=settings_obj, engagement=engagement, findings=findings,
         content=content, styles=styles, user=user, image_resolver=image_resolver,
-        is_remediation_report=config.is_remediation_report,
+        is_remediation_report=config.is_remediation_report, project_key=project_key,
     )
 
     # "affects" is always available in the template as its own {{ finding.affects }}

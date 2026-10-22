@@ -31,7 +31,7 @@
 <details class="card mb-6 group">
     <summary class="cursor-pointer font-semibold text-slate-900 select-none list-none flex items-center justify-between">
         Scope of this engagement
-        <svg class="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
+        <svg class="h-4 w-4 text-slate-500 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
     </summary>
     <p class="whitespace-pre-wrap bg-slate-50 dark:bg-slate-50 border border-slate-100 dark:border-slate-200 rounded-md p-3 text-sm text-slate-700 mt-3">{{ engagement.scope }}</p>
 </details>
@@ -46,7 +46,7 @@
     {% for finding in findings %}
     <li>
         <a href="{% url 'clients_portal:finding_detail' engagement.pk finding.pk %}"
-           class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+           class="group flex items-center gap-4 rounded-lg border border-slate-200 bg-white dark:bg-slate-100
                   rail-severity pl-4 py-3.5 shadow-sm hover:shadow-md transition-all"
            style="{{ finding|severity_rail_style }}">
             <div class="min-w-0 flex-1">
@@ -58,8 +58,8 @@
                     <span class="{{ finding.retest_status|badge_class }}">{{ finding.get_retest_status_display }}</span>
                     {% endif %}
                     {% if finding.cvss_score %}<span class="text-xs font-mono text-slate-500">CVSS {{ finding.cvss_score }}</span>{% endif %}
-                    {% if finding.cve_id %}<span class="text-xs font-mono text-slate-400">{{ finding.cve_id }}</span>{% endif %}
-                    {% if finding.affects_list %}<span class="text-xs text-slate-400">{{ finding.affects_list|length }} affected asset{{ finding.affects_list|length|pluralize }}</span>{% endif %}
+                    {% if finding.cve_id %}<span class="text-xs font-mono text-slate-500">{{ finding.cve_id }}</span>{% endif %}
+                    {% if finding.affects_list %}<span class="text-xs text-slate-500">{{ finding.affects_list|length }} affected asset{{ finding.affects_list|length|pluralize }}</span>{% endif %}
                 </div>
             </div>
             <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
@@ -70,7 +70,7 @@
 {% else %}
 <div class="card text-center py-12">
     <p class="text-slate-500">No findings have been published for this engagement yet.</p>
-    <p class="text-sm text-slate-400 mt-1">Findings appear here once they've cleared internal QA review.</p>
+    <p class="text-sm text-slate-500 mt-1">Findings appear here once they've cleared internal QA review.</p>
 </div>
 {% endif %}
 {% endblock %}

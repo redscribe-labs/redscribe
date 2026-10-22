@@ -7,7 +7,7 @@ assignees: ""
 ---
 
 **RedScribe version**
-e.g. `0.4.0-alpha.1` — check the sidebar footer of a running instance, or
+e.g. `0.6.0-alpha` — check the sidebar footer of a running instance, or
 `cat VERSION` in the repo.
 
 **Install method**

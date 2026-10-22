@@ -1,17 +1,13 @@
 {% if breadcrumbs %}
-<nav aria-label="Breadcrumb" class="mb-3">
+<nav aria-label="Breadcrumb">
     <ol class="crumb-trail flex flex-wrap items-center gap-1.5">
-        <li class="flex items-center gap-1.5">
-            <a href="{% url 'accounts:dashboard' %}">~</a>
-            <span class="text-slate-300 dark:text-slate-700">/</span>
-        </li>
         {% for crumb in breadcrumbs %}
-        <li class="flex items-center gap-1.5">
+        <li class="flex items-center gap-1.5 min-w-0">
             {% if crumb.url and not forloop.last %}
-                <a href="{{ crumb.url }}">{{ crumb.label }}</a>
-                <span class="text-slate-300 dark:text-slate-700">/</span>
+                <a href="{{ crumb.url }}" class="hover:text-brand-700 dark:hover:text-brand-300 truncate">{{ crumb.label }}</a>
+                <span class="text-slate-300 dark:text-slate-400" aria-hidden="true">/</span>
             {% else %}
-                <span class="text-slate-600 dark:text-slate-500">{{ crumb.label }}</span>
+                <span class="text-slate-900 font-medium truncate" aria-current="page">{{ crumb.label }}</span>
             {% endif %}
         </li>
         {% endfor %}

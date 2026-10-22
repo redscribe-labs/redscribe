@@ -1,5 +1,6 @@
 from django import forms
 
+from apps.engagements.access import users_with_access
 from apps.findings.forms import MAX_IMPORT_FILE_SIZE, RichTextField
 
 from .models import ChecklistItem
@@ -45,13 +46,37 @@ class ChecklistImportForm(forms.Form):
 
 class ChecklistItemForm(forms.Form):
     status = forms.ChoiceField(choices=ChecklistItem.Status.choices)
+    blocked_reason = forms.CharField(
+        required=False, max_length=500, label="Why couldn't this be tested?",
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Shown in the report's coverage section as a testing limitation.",
+    )
+    scope_tested = forms.CharField(
+        required=False, max_length=5000, label="What was tested",
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "GET /search?q\nPOST /api/orders (id)"}),
+        help_text="One endpoint, URL or parameter per line. Used as Affects when you raise a finding from this check.",
+    )
     reference_info = RichTextField(required=False)
     test_results = RichTextField(required=False)
-    findings = forms.ModelMultipleChoiceField(queryset=None, required=False, label="Linked findings")
+    findings = forms.ModelMultipleChoiceField(
+        queryset=None, required=False, label="Linked findings", widget=forms.CheckboxSelectMultiple,
+    )
+    assignee = forms.ModelChoiceField(queryset=None, required=False, label="Assigned to", empty_label="Unassigned")
 
     def __init__(self, *args, engagement=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["findings"].queryset = engagement.findings.all() if engagement else None
+        # Only people who can open the engagement can own one of its checks.
+        self.fields["assignee"].queryset = users_with_access(engagement) if engagement else None
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("status") == ChecklistItem.Status.BLOCKED:
+            if not (cleaned.get("blocked_reason") or "").strip():
+                self.add_error("blocked_reason", "Say why this check couldn't be tested.")
+        else:
+            cleaned["blocked_reason"] = ""
+        return cleaned
 
 
 class ChecklistCommentForm(forms.Form):

@@ -1,4 +1,19 @@
 (function () {
+
+  // Toolbar buttons show a short glyph ("B", "H1", "+Row"); screen readers get
+  // the full name as hidden text instead, so the glyph isn't read out and the
+  // accessible name isn't a label that contradicts what's on screen.
+  function buttonFace(btn, glyph, name) {
+    const visible = document.createElement("span");
+    visible.setAttribute("aria-hidden", "true");
+    visible.textContent = glyph;
+    const spoken = document.createElement("span");
+    spoken.className = "sr-only";
+    spoken.textContent = name;
+    btn.replaceChildren(visible, spoken);
+    btn.title = name;
+  }
+
   function getCookie(name) {
     const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
     return match ? decodeURIComponent(match[2]) : null;
@@ -339,9 +354,7 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "rte-toolbar-btn";
-      btn.textContent = label;
-      btn.title = title;
-      btn.setAttribute("aria-label", title);
+      buttonFace(btn, label, title);
       btn.addEventListener("mousedown", (e) => e.preventDefault());
       btn.addEventListener("click", action);
       if (isActive) activeButtons.push([btn, isActive]);
@@ -492,9 +505,7 @@
     function addButton(label, title, action, { isActive, isEnabled, group } = {}) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.textContent = label;
-      btn.title = title;
-      btn.setAttribute("aria-label", title);
+      buttonFace(btn, label, title);
       btn.className = "rte-toolbar-btn";
       btn.tabIndex = -1;
       btn.addEventListener("click", action);
@@ -611,9 +622,7 @@
       addDivider();
       const imgBtn = document.createElement("button");
       imgBtn.type = "button";
-      imgBtn.textContent = "🖼";
-      imgBtn.title = "Insert image";
-      imgBtn.setAttribute("aria-label", "Insert image");
+      buttonFace(imgBtn, "🖼", "Insert image");
       imgBtn.className = "rte-toolbar-btn";
       imgBtn.tabIndex = -1;
       rovingButtons.push(imgBtn);
@@ -638,6 +647,7 @@
     stickyWrap.appendChild(bar);
     stickyWrap.appendChild(linkPopover.el);
     el.parentNode.insertBefore(stickyWrap, el);
+    if (scrollingAncestor(stickyWrap)) stickyWrap.style.top = "0px";
 
     const rovingToolbar = makeRovingToolbar(bar, rovingButtons);
 
@@ -653,6 +663,25 @@
     editor.on("transaction", refreshActiveStates);
     editor.on("selectionUpdate", refreshActiveStates);
     refreshActiveStates();
+  }
+
+  // The editable area is a contenteditable with role="textbox"; give it the
+  // field's name: data-rte-label, else the hidden input's <label>, else the
+  // heading of the panel it sits in.
+  function nameEditor(el, hiddenInput) {
+    const area = el.querySelector("[contenteditable]");
+    if (!area || area.hasAttribute("aria-label") || area.hasAttribute("aria-labelledby")) return;
+    let name = el.dataset.rteLabel;
+    if (!name && hiddenInput && hiddenInput.id) {
+      const label = document.querySelector(`label[for="${hiddenInput.id}"]`);
+      if (label) name = label.textContent.trim();
+    }
+    if (!name) {
+      const panel = el.closest("section, details, .panel, .card, fieldset");
+      const heading = panel && panel.querySelector("h2, h3, legend, summary, label");
+      if (heading) name = heading.textContent.trim().replace(/\s+/g, " ");
+    }
+    if (name) area.setAttribute("aria-label", name);
   }
 
   function initRichTextEditor(el) {
@@ -681,6 +710,7 @@
     });
 
     if (hiddenInput) hiddenInput.value = JSON.stringify(editor.getJSON());
+    nameEditor(el, hiddenInput);
 
     if (editable) {
       buildToolbar(editor, el, { imageUploadUrl: uploadUrl, fieldName, allowPageBreak: el.dataset.rtePageBreaks === "true" });
@@ -700,10 +730,32 @@
     return editor;
   }
 
+  // Pin toolbars just below all the sticky chrome above them: the topbar,
+  // then the page header (engagement tabs), which itself sticks below the
+  // topbar rather than at 0, so its own height alone isn't enough.
   function updateStickyOffset() {
+    const topbar = document.querySelector(".topbar");
     const header = document.getElementById("page-sticky-header");
-    const height = header ? header.getBoundingClientRect().height : 0;
-    document.documentElement.style.setProperty("--rte-sticky-top", height + "px");
+    let offset = topbar ? topbar.getBoundingClientRect().height : 0;
+    if (header && header.offsetHeight) {
+      offset = (parseFloat(getComputedStyle(header).top) || offset) + header.getBoundingClientRect().height;
+    }
+    document.documentElement.style.setProperty("--rte-sticky-top", offset + "px");
+
+    // A toolbar inside its own scrolling box (e.g. the xl rail, which scrolls
+    // independently) sticks to that box's top edge, not below the page chrome.
+    // Rechecked on resize since the rail only scrolls at xl.
+    for (const toolbar of document.querySelectorAll(".rte-toolbar-sticky")) {
+      toolbar.style.top = scrollingAncestor(toolbar) ? "0px" : "";
+    }
+  }
+
+  function scrollingAncestor(el) {
+    for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+      const overflowY = getComputedStyle(node).overflowY;
+      if (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") return node;
+    }
+    return null;
   }
 
   document.addEventListener("DOMContentLoaded", () => {

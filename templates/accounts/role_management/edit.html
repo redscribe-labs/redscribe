@@ -1,11 +1,11 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% load redscribe_extras %}
 {% block title %}Edit {{ target.name }} — RedScribe{% endblock %}
 
-{% block content %}
-<div class="max-w-lg mx-auto">
+{% block settings_content %}
+<div class="max-w-2xl">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ target.name }}</h1>
+        <h1 class="page-title mb-1">Edit {{ target.name }}</h1>
         {% if target.is_builtin %}
         <p class="text-sm text-slate-500 mb-4">
             This is a built-in role — it can't be deleted, but its name and

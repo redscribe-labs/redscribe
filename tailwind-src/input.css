@@ -96,6 +96,10 @@
     #sidebar ~ .flex-1 {
         @apply bg-slate-50 min-h-screen;
     }
+
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-brand-500;
+    }
 }
 
 @theme {
@@ -176,7 +180,7 @@
     --color-slate-200: #313435;
     --color-slate-300: #494d50;
     --color-slate-400: #62676a;
-    --color-slate-500: #7a8185;
+    --color-slate-500: #7e8589;
     --color-slate-600: #959a9d;
     --color-slate-700: #afb3b6;
     --color-slate-800: #cacdce;
@@ -185,23 +189,23 @@
 
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium
                transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
                bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-900/10;
     }
     .btn-secondary {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium
                transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
                bg-white dark:bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm;
     }
     .btn-danger {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium
                transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
                bg-white dark:bg-slate-100 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50
                hover:bg-red-50 dark:hover:bg-red-950/40 shadow-sm;
     }
     .btn-ghost {
-        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+        @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium
                transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap
                text-slate-600 hover:bg-slate-100;
     }
@@ -216,9 +220,11 @@
 
     /* A card with a title bar reads as a distinct "panel" rather than one
        more instance of the same rounded box — for content that has its own
-       clear heading (vs. .card used as a plain container). */
+       clear heading (vs. .card used as a plain container). Clipped rather
+       than overflow-hidden: hidden makes the panel a scroll container, which
+       traps sticky editor toolbars inside it and pins them over the editor. */
     .panel {
-        @apply bg-white dark:bg-slate-100 rounded-lg border border-slate-200 overflow-hidden;
+        @apply bg-white dark:bg-slate-100 rounded-lg border border-slate-200 overflow-clip;
     }
     .panel-header {
         @apply flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 bg-slate-50 dark:bg-slate-50;
@@ -299,24 +305,59 @@
     .badge-amber  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-400/30; }
     .badge-blue   { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-bell-50 text-bell-700 ring-bell-600/20 dark:bg-bell-950/50 dark:text-bell-300 dark:ring-bell-400/30; }
     .badge-green  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-950/50 dark:text-green-300 dark:ring-green-400/30; }
+    .badge-brand  { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-950/60 dark:text-brand-300 dark:ring-brand-400/30; }
+    .badge-mist   { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-mist-50 text-mist-800 ring-mist-600/20 dark:bg-mist-950/60 dark:text-mist-200 dark:ring-mist-400/30; }
     .badge-purple { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase ring-1 ring-inset bg-navy-50 text-navy-700 ring-navy-600/20 dark:bg-navy-950/50 dark:text-navy-300 dark:ring-navy-400/30; }
 
-    .badge-severity { @apply inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-wide uppercase; }
+    /* Solid chip, colour from the report profile's severity palette (see
+       the severity_*_style filters). Squarer than status pills so severity
+       and workflow state never read as the same kind of badge. */
+    .badge-severity { @apply inline-flex items-center rounded px-2 py-0.5 font-mono text-[0.6875rem] font-semibold tracking-wide uppercase; }
 
     .sidebar-link {
-        @apply flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-lg text-sm font-medium border-l-2 border-transparent
-               text-white/60 hover:bg-white/10 hover:text-white transition-colors [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:opacity-70;
+        @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium
+               text-twilight-200 hover:bg-twilight-800/70 hover:text-white transition-colors
+               [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:text-twilight-400;
     }
     .sidebar-link-active {
-        @apply flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-lg text-sm font-medium border-l-2 border-mist-300
-               bg-white/10 text-white transition-colors [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0;
+        @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-semibold
+               bg-twilight-800 text-white transition-colors
+               [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0 [&>svg]:text-brand-400;
     }
     .sidebar-group-label {
-        @apply px-3 pt-4 pb-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-widest text-white/35;
+        @apply px-2.5 pt-5 pb-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-widest text-twilight-400;
+    }
+    .sidebar-search {
+        @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm border border-twilight-800 bg-twilight-900
+               text-twilight-400 hover:text-twilight-200 hover:border-twilight-700 transition-colors
+               [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0;
+    }
+
+    /* White bar across the top of every signed-in page: breadcrumbs on the
+       left, the page's own actions (block topbar_actions) on the right. */
+    .topbar {
+        @apply sticky top-0 z-20 flex flex-wrap items-center gap-3 min-h-15 px-4 xl:px-8 py-2
+               bg-white dark:bg-slate-100 border-b border-slate-200;
+    }
+
+    /* Pages with no breadcrumbs and no actions get no empty white strip. */
+    .topbar:not(:has(nav, a, button, form)) {
+        @apply hidden;
+    }
+
+    .settings-nav-link {
+        @apply flex items-center min-h-9 px-2.5 rounded-md text-sm text-slate-700 hover:bg-slate-100 transition-colors;
+    }
+    .settings-nav-link-active {
+        @apply flex items-center min-h-9 px-2.5 rounded-md text-sm font-semibold bg-brand-50 text-brand-800
+               dark:bg-twilight-800 dark:text-white;
+    }
+    .settings-nav-label {
+        @apply px-2.5 pb-1 font-mono text-[0.6875rem] font-medium uppercase tracking-widest text-slate-500;
     }
 
     .crumb-trail {
-        @apply font-mono text-xs uppercase tracking-wider text-slate-400;
+        @apply text-[13px] text-slate-500;
     }
     .crumb-trail a {
         @apply hover:text-brand-600 dark:hover:text-brand-300 transition-colors;
@@ -413,6 +454,50 @@
         .toast-icon { @apply bg-mist-600 text-white; }
     }
 
+    /* Signed-out pages (sign in, MFA, password reset, setup) sit on the
+       twilight surface; the card stays dark in both themes so it reads as
+       part of that surface rather than a white box dropped on top of it. */
+    .auth-card {
+        @apply rounded-lg border border-twilight-800 bg-twilight-900 p-6 text-twilight-100 shadow-lg;
+        h1, h2, h3, strong { @apply text-white; }
+        .field-label { @apply text-twilight-200; }
+        .field-help, .text-slate-400, .text-slate-500, .text-slate-600 { @apply text-twilight-400; }
+        .text-slate-700, .text-slate-800, .text-slate-900 { @apply text-twilight-100; }
+        .field-input {
+            @apply border-twilight-700 bg-twilight-950 text-white placeholder:text-twilight-500
+                   focus:border-brand-400 focus:ring-brand-400;
+        }
+        .btn-secondary { @apply border-twilight-700 bg-twilight-950 text-twilight-100 hover:bg-twilight-800; }
+        a:not([class*="btn"]) { @apply text-brand-300 hover:text-brand-200; }
+    }
+
+    /* A checkbox drawn as an on/off switch (feature flags). Still a native
+       checkbox underneath, so forms and screen readers behave as before. */
+    .switch {
+        @apply relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-slate-300 transition-colors
+               dark:bg-slate-400 checked:bg-brand-600 dark:checked:bg-brand-500
+               before:absolute before:left-0.5 before:top-0.5 before:h-5 before:w-5 before:rounded-full before:bg-white
+               before:shadow before:transition-transform checked:before:translate-x-5;
+    }
+
+    /* Checklist posture map: one square per check. Fills pass colour-blind
+       separation and 3:1 contrast in both themes; the glyph inside carries
+       the meaning too (see checklist/_posture_cell_glyph.html). */
+    .posture-cell {
+        @apply inline-flex items-center justify-center rounded box-border transition-transform hover:scale-110;
+    }
+    .posture-cell-pass    { @apply bg-brand-600 text-white dark:bg-brand-500; }
+    .posture-cell-finding { @apply bg-orange-700 text-white dark:bg-orange-600; }
+    .posture-cell-na      { @apply bg-slate-100 border-[1.5px] border-dashed border-slate-400 dark:bg-slate-200 dark:border-slate-500; }
+    .posture-cell-blocked { @apply bg-slate-900 text-white dark:text-slate-50; }
+    .posture-cell-open    { @apply bg-white border-[1.5px] border-slate-500 dark:bg-slate-100 dark:border-slate-600; }
+    .posture-bar { @apply h-full rounded-sm; }
+
+    /* The Blocked reason box on a checklist item only shows while Blocked is
+       the selected outcome (or when it has an error to show). */
+    .blocked-reason { @apply hidden; }
+    form:has(input[name="status"][value="BLOCKED"]:checked) .blocked-reason { @apply block; }
+
     .theme-toggle {
         @apply inline-flex items-center justify-center h-8 w-8 rounded-md text-current/70 hover:text-current hover:bg-current/10 transition-colors cursor-pointer;
     }
@@ -421,4 +506,8 @@
 @keyframes toast-in {
     from { opacity: 0; transform: translateY(-6px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@layer components {
+    .kbd { @apply inline-flex min-w-[1.5rem] items-center justify-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[0.6875rem] font-medium text-slate-700 shadow-[inset_0_-1px_0_var(--color-slate-300)] dark:border-slate-300 dark:bg-slate-100; }
 }

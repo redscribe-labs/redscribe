@@ -43,7 +43,7 @@ block, finding section, or anywhere else — only in the Document body itself.
 | `{{ observations }}` | Free-form dynamic entries configured per-engagement (title + rich content), each as its own subsection | Empty/omitted entirely if none are configured — no placeholder text shown |
 | `{{ testing_phases }}` | Same pattern as observations — free-form per-engagement phase entries | Empty/omitted if none are configured |
 | `{{ assessment_team }}` | One subsection per user actually assigned to the engagement, showing their bio and qualifications | Omitted entirely if no one is assigned. Superadmins and anyone else with blanket instance-wide access are excluded unless they're specifically assigned to this engagement |
-| `{{ checklist_coverage }}` | The engagement's checklist run(s), grouped by category, showing item status and any linked findings | Shows a graceful "No checklist runs have been recorded for this engagement." message if none exist — never errors |
+| `{{ checklist_coverage }}` | The engagement's checklist run(s), grouped by category, showing item status and any linked findings. A Blocked check's status includes its reason ("Blocked: …"), so testing limitations appear in the report | Shows a graceful "No checklist runs have been recorded for this engagement." message if none exist — never errors |
 | `{{ scan_imports }}` | A table documenting each scanner import on this engagement (tool, filename, date, imported by, findings produced) | Metadata only — the original uploaded scan file itself is never stored, only this record of the import. Shows a graceful "No scanner imports have been recorded for this engagement." message if none exist |
 
 ### Finding sections inside `{{ finding_details }}`

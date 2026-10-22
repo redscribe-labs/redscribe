@@ -1,12 +1,12 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% load redscribe_extras %}
 {% block title %}Edit {{ target.username }} — RedScribe{% endblock %}
 {% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
 
-{% block content %}
-<div class="max-w-2xl mx-auto">
+{% block settings_content %}
+<div class="max-w-2xl">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ target.username }}</h1>
+        <h1 class="page-title mb-1">Edit {{ target.username }}</h1>
         <p class="text-sm text-slate-500 mb-5">Username and account type can't be changed here.</p>
         <form method="post">
             {% csrf_token %}

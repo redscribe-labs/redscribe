@@ -1,10 +1,10 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% block title %}Edit {{ company.name }} — RedScribe{% endblock %}
 
-{% block content %}
-<div class="max-w-lg mx-auto">
+{% block settings_content %}
+<div class="max-w-2xl">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit {{ company.name }}</h1>
+        <h1 class="page-title mb-1">Edit {{ company.name }}</h1>
         <p class="text-sm text-slate-500 mb-5">
             Setting a client inactive hides it from the "New client user" and
             engagement portal-company pickers — it doesn't remove existing links.

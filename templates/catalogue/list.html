@@ -1,114 +1,135 @@
 {% extends "base/base.html" %}
 {% load redscribe_extras %}
-{% block title %}Vulnerability catalogue — RedScribe{% endblock %}
+{% block title %}Finding catalogue — RedScribe{% endblock %}
 {% block extra_head %}{% include "base/_datepicker_head.html" %}{% endblock %}
 
+{% block topbar_actions %}
+{% if user|has_permission:"catalogue.bulk_manage" %}
+<a href="{% url 'catalogue:export' %}" class="btn-secondary">Export</a>
+<a href="{% url 'catalogue:import' %}" class="btn-secondary">Import</a>
+{% endif %}
+<a href="{% url 'catalogue:create' %}" class="btn-primary">New entry</a>
+{% endblock %}
+
 {% block page_header %}
-<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
-    <div>
-        <h1 class="page-title">Vulnerability catalogue</h1>
-        <p class="text-sm text-slate-500 mt-1">Reusable write-ups — copy one into a Draft finding instead of starting from scratch.</p>
-    </div>
-    <div class="flex gap-2">
-        {% if user|has_permission:"catalogue.bulk_manage" %}
-        <a href="{% url 'catalogue:export' %}" class="btn-secondary">Export</a>
-        <a href="{% url 'catalogue:import' %}" class="btn-secondary">Import</a>
-        {% endif %}
-        <a href="{% url 'catalogue:create' %}" class="btn-primary">New template</a>
-    </div>
+<div class="mb-6">
+    <p class="page-eyebrow">Library</p>
+    <h1 class="page-title">Finding catalogue</h1>
+    <p class="text-sm text-slate-500 mt-1 max-w-2xl">Reusable write-ups. Start a Draft finding from an approved entry instead of from scratch; edits go through QA before they replace the approved version.</p>
 </div>
+
+<nav aria-label="Catalogue status" class="flex gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
+    <a href="{% url 'catalogue:list' %}" class="{% if not status %}tab-link-active{% else %}tab-link{% endif %}"{% if not status %} aria-current="page"{% endif %}>All <span class="font-mono text-[0.6875rem] text-slate-500">{{ total_count }}</span></a>
+    {% for value, label in status_choices %}
+    {% with count=status_counts|dict_get:value %}
+    <a href="?status={{ value }}" class="{% if value == status %}tab-link-active{% else %}tab-link{% endif %}"{% if value == status %} aria-current="page"{% endif %}>{{ label }}
+        <span class="font-mono text-[0.6875rem] {% if value == 'PENDING_QA' and count %}rounded-full bg-amber-50 px-1.5 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300{% else %}text-slate-500{% endif %}">{{ count|default:0 }}</span></a>
+    {% endwith %}
+    {% endfor %}
+</nav>
+
+<form method="get" class="mb-4 space-y-3">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <div class="flex flex-wrap items-end gap-2">
+        <div class="relative flex-1 min-w-[14rem]">
+            <label for="catalogue-search" class="sr-only">Search</label>
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+            <input id="catalogue-search" type="search" name="q" value="{{ query|default:'' }}" placeholder="Search title or classification..."
+                   class="field-input pl-9 w-full">
+        </div>
+        <div>
+            <label for="catalogue-severity" class="sr-only">Severity</label>
+            <select id="catalogue-severity" name="severity" class="field-input w-auto">
+                <option value="">All severities</option>
+                {% for value, label in severity_choices %}
+                <option value="{{ value }}" {% if value == severity %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="catalogue-taxonomy" class="sr-only">Taxonomy</label>
+            <select id="catalogue-taxonomy" name="taxonomy" class="field-input w-auto">
+                <option value="">All taxonomies</option>
+                {% for t in taxonomy_choices %}
+                <option value="{{ t }}" {% if t == taxonomy %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="catalogue-created-by" class="sr-only">Created by</label>
+            <select id="catalogue-created-by" name="created_by" class="field-input w-auto">
+                <option value="">Created by anyone</option>
+                {% for id, username in creator_choices %}
+                <option value="{{ id }}" {% if id|stringformat:"s" == created_by %}selected{% endif %}>{{ username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn-secondary">Filter</button>
+        {% if query or status or severity or taxonomy or created_by or date_from or date_to %}
+        <a href="{% url 'catalogue:list' %}" class="btn-ghost">Clear filters</a>
+        {% endif %}
+    </div>
+    <details class="group"{% if date_from or date_to %} open{% endif %}>
+        <summary class="cursor-pointer select-none text-sm font-medium text-slate-600 hover:text-brand-700 dark:hover:text-brand-300">More filters</summary>
+        <div class="flex flex-wrap items-end gap-2 mt-2">
+            <div>
+                <label for="catalogue-from" class="field-label">Updated from</label>
+                <input id="catalogue-from" type="text" name="from" value="{{ date_from }}" data-redscribe-datepicker="true" autocomplete="off" class="field-input w-auto">
+            </div>
+            <div>
+                <label for="catalogue-to" class="field-label">To</label>
+                <input id="catalogue-to" type="text" name="to" value="{{ date_to }}" data-redscribe-datepicker="true" autocomplete="off" class="field-input w-auto">
+            </div>
+            <div>
+                <label for="catalogue-page-size" class="field-label">Per page</label>
+                <select id="catalogue-page-size" name="page_size" class="field-input w-auto">
+                    {% for size in page_size_choices %}
+                    <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </details>
+</form>
 {% endblock %}
 
 {% block content %}
-<form method="get" class="flex flex-wrap items-end gap-2 mb-4">
-    <div class="relative flex-1 min-w-[14rem]">
-        <label class="field-label">Search</label>
-        <svg class="absolute left-3 bottom-2.5 h-4 w-4 text-slate-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
-        <input type="search" name="q" value="{{ query|default:'' }}" placeholder="Search title or classification..."
-               class="field-input pl-9 w-full">
-    </div>
-    <div>
-        <label class="field-label">Status</label>
-        <select name="status" class="field-input w-auto">
-            <option value="">All statuses</option>
-            {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div>
-        <label class="field-label">Severity</label>
-        <select name="severity" class="field-input w-auto">
-            <option value="">All severities</option>
-            {% for value, label in severity_choices %}
-            <option value="{{ value }}" {% if value == severity %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div>
-        <label class="field-label">Taxonomy</label>
-        <select name="taxonomy" class="field-input w-auto">
-            <option value="">All taxonomies</option>
-            {% for t in taxonomy_choices %}
-            <option value="{{ t }}" {% if t == taxonomy %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div>
-        <label class="field-label">Created by</label>
-        <select name="created_by" class="field-input w-auto">
-            <option value="">Anyone</option>
-            {% for id, username in creator_choices %}
-            <option value="{{ id }}" {% if id|stringformat:"s" == created_by %}selected{% endif %}>{{ username }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div>
-        <label class="field-label">From</label>
-        <input type="text" name="from" value="{{ date_from }}" data-redscribe-datepicker="true"
-               autocomplete="off" class="field-input w-auto">
-    </div>
-    <div>
-        <label class="field-label">To</label>
-        <input type="text" name="to" value="{{ date_to }}" data-redscribe-datepicker="true"
-               autocomplete="off" class="field-input w-auto">
-    </div>
-    <div>
-        <label class="field-label">Per page</label>
-        <select name="page_size" class="field-input w-auto">
-            {% for size in page_size_choices %}
-            <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <button type="submit" class="btn-secondary">Filter</button>
-    {% if query or status or severity or taxonomy or created_by or date_from or date_to %}
-    <a href="{% url 'catalogue:list' %}" class="btn-secondary">Clear filters</a>
-    {% endif %}
-</form>
-
 {% if page_obj.object_list %}
-<ul class="space-y-2">
-    {% for template in page_obj.object_list %}
-    <li>
-        <a href="{% url 'catalogue:detail' template.pk %}"
-           class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
-                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all rail-severity"
-           style="{{ template.default_severity|severity_value_rail_style }}">
-            <div class="min-w-0 flex-1">
-                <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ template.title }}</p>
-                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    <span class="{{ template.status|badge_class }}">{{ template.get_status_display }}</span>
+<div class="relative overflow-x-auto rounded-lg border border-slate-200 bg-white dark:bg-slate-100">
+    <table class="w-full min-w-[44rem] text-sm">
+        <thead>
+            <tr class="text-left text-xs text-slate-500 border-b border-slate-200">
+                <th scope="col" class="px-4 py-3 font-semibold">Entry</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Default severity</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Classification</th>
+                <th scope="col" class="px-3 py-3 font-semibold">Status</th>
+                <th scope="col" class="px-3 py-3 font-semibold text-right">Used</th>
+                <th scope="col" class="px-4 py-3 font-semibold">Updated</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for template in page_obj.object_list %}
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-50">
+                <td class="px-4 py-3">
+                    <a href="{% url 'catalogue:detail' template.pk %}" class="font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ template.title }}</a>
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap">
                     <span class="badge-severity" style="{{ template.default_severity|severity_chip_style }}">{{ template.get_default_severity_display }}</span>
-                    {% for tag in template.classifications.all %}<span class="badge-slate" title="{{ tag.taxonomy }}">{{ tag.value }}</span>{% endfor %}
-                </div>
-            </div>
-            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
-        </a>
-    </li>
-    {% endfor %}
-</ul>
-
+                    {% if template.default_cvss_score %}<span class="font-mono text-xs text-slate-500 ml-1">{{ template.default_cvss_score }}</span>{% endif %}
+                </td>
+                <td class="px-3 py-3">
+                    <span class="flex flex-wrap gap-1">
+                    {% for tag in template.classifications.all %}<span class="badge-mist" title="{{ tag.taxonomy }}">{{ tag.value }}</span>{% empty %}<span class="text-slate-500">—</span>{% endfor %}
+                    </span>
+                </td>
+                <td class="px-3 py-3"><span class="{{ template.status|badge_class }}">{{ template.get_status_display }}</span></td>
+                <td class="px-3 py-3 text-right font-mono text-xs text-slate-700" title="Findings started from this entry">{{ template.used_count }}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-slate-500 tabular-nums">{{ template.updated_at|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% if page_obj.paginator.num_pages > 1 %}
 <nav aria-label="Pagination" class="flex flex-wrap items-center justify-between gap-3 mt-6">
     <p class="text-sm text-slate-500 whitespace-nowrap">
@@ -120,13 +141,13 @@
         <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page=1" class="btn-secondary" title="First page">&laquo;</a>
         <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn-secondary">Previous</a>
         {% else %}
-        <span class="btn-secondary opacity-50 pointer-events-none">&laquo;</span>
-        <span class="btn-secondary opacity-50 pointer-events-none">Previous</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">&laquo;</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Previous</span>
         {% endif %}
 
         {% for p in page_range %}
         {% if p == None %}
-        <span class="px-2 text-slate-400 select-none">&hellip;</span>
+        <span class="px-2 text-slate-500 select-none">&hellip;</span>
         {% elif p == page_obj.number %}
         <span class="btn-primary px-3" aria-current="page">{{ p }}</span>
         {% else %}
@@ -138,8 +159,8 @@
         <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.next_page_number }}" class="btn-secondary">Next</a>
         <a href="?{{ carry_querystring }}{% if carry_querystring %}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="btn-secondary" title="Last page">&raquo;</a>
         {% else %}
-        <span class="btn-secondary opacity-50 pointer-events-none">Next</span>
-        <span class="btn-secondary opacity-50 pointer-events-none">&raquo;</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Next</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">&raquo;</span>
         {% endif %}
     </div>
     <form method="get" class="flex items-center gap-1.5">
@@ -156,10 +177,10 @@
 {% else %}
 <div class="card text-center py-12">
     {% if query or status or severity or taxonomy or created_by or date_from or date_to %}
-    <p class="text-slate-500">No templates match your filters.</p>
+    <p class="text-slate-500">No entries match your filters.</p>
     {% else %}
-    <p class="text-slate-500">No templates yet.</p>
-    <a href="{% url 'catalogue:create' %}" class="btn-primary mt-4">New template</a>
+    <p class="text-slate-500">No catalogue entries yet.</p>
+    <a href="{% url 'catalogue:create' %}" class="btn-primary mt-4">New entry</a>
     {% endif %}
 </div>
 {% endif %}

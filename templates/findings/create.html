@@ -22,7 +22,13 @@
 {% url 'findings:list' engagement.pk as back_url %}
 <form method="post">
     {% csrf_token %}
-    <div class="card mb-6 max-w-5xl">
+    {% if from_check %}
+    <p class="mb-4 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-slate-700 dark:border-brand-900 dark:bg-brand-950/40">
+        Raising from checklist item <a href="{% url 'checklist:item_detail' engagement.pk from_check.pk %}" class="font-semibold text-brand-700 dark:text-brand-300 hover:underline">{% if from_check.code %}{{ from_check.code }} — {% endif %}{{ from_check.title }}</a>.
+        Its tested scope is copied into {{ form.affects.label|lower }}. Once saved, the finding is linked to the check{% if from_check.status == "NOT_TESTED" %} and the check is marked "Finding raised"{% endif %}.
+    </p>
+    {% endif %}
+    <div class="card mb-6">
         <label for="{{ form.title.id_for_label }}" class="field-label">{{ form.title.label }}</label>
         {{ form.title|add_class:"field-input" }}
         {% for error in form.title.errors %}<p class="field-error">{{ error }}</p>{% endfor %}

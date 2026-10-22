@@ -8,12 +8,12 @@
         {% if page_obj.has_previous %}
         <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn-secondary">Previous</a>
         {% else %}
-        <span class="btn-secondary opacity-50 pointer-events-none">Previous</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Previous</span>
         {% endif %}
         {% if page_obj.has_next %}
         <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}" class="btn-secondary">Next</a>
         {% else %}
-        <span class="btn-secondary opacity-50 pointer-events-none">Next</span>
+        <span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Next</span>
         {% endif %}
     </div>
 </nav>

@@ -1,18 +1,20 @@
 {% regroup permissions by category as permission_groups %}
-<div class="space-y-5">
+<div class="rounded-lg border border-slate-200 divide-y divide-slate-100 dark:divide-slate-200">
     {% for group in permission_groups %}
-    <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">{{ group.grouper }}</h3>
+    <fieldset class="px-4 py-3">
+        <legend class="sr-only">{{ group.grouper }}</legend>
+        <p class="settings-nav-label !px-0 !text-brand-700 dark:!text-brand-300 mb-2" aria-hidden="true">{{ group.grouper }}</p>
         <div class="space-y-2">
             {% for permission in group.list %}
             <label class="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer">
                 <input type="checkbox" name="permissions" value="{{ permission.codename }}"
-                       class="mt-0.5 h-4 w-4 rounded border-slate-300 accent-brand-600"
+                       class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-brand-600"
                        {% if permission.codename in selected_codenames %}checked{% endif %}>
-                <span>{{ permission.label }}</span>
+                <span class="flex-1">{{ permission.label }}</span>
+                <code class="hidden sm:inline font-mono text-[0.6875rem] text-slate-500">{{ permission.codename }}</code>
             </label>
             {% endfor %}
         </div>
-    </div>
+    </fieldset>
     {% endfor %}
 </div>

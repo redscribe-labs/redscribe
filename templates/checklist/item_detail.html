@@ -1,5 +1,6 @@
 {% extends "base/base.html" %}
-{% load redscribe_extras %}
+{% block html_attrs %} data-focus-page{% endblock %}
+{% load redscribe_extras static %}
 {% block title %}{{ item.title }} — {{ engagement.client_name }}{% endblock %}
 {% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
 
@@ -7,86 +8,156 @@
 {% include "engagements/_subnav.html" with engagement=engagement active="checklist" %}
 {% endblock %}
 
-{% block page_header %}
-<div class="mb-6">
-    <div class="flex items-center justify-between gap-2 mb-1">
-        <p class="page-eyebrow !mb-0">{{ engagement.client_name }} &middot; {{ item.run.label }} &middot; {{ item.category }}</p>
-        <span class="text-xs text-slate-400 shrink-0">Item {{ position }} of {{ total }}</span>
-    </div>
-    <div class="flex flex-wrap items-center gap-2 mt-1">
-        <h1 class="text-xl font-bold text-slate-900 break-words min-w-0">
-            {% if item.code %}<span class="text-slate-400 font-mono text-base mr-1">{{ item.code }}</span>{% endif %}
-            {{ item.title }}
-        </h1>
-        <span class="{{ item.status|badge_class }} shrink-0">{{ item.get_status_display }}</span>
-    </div>
-    <div class="flex items-center justify-between gap-2 mt-3 text-sm">
-        {% if prev_item %}
-        <a href="{% url 'checklist:item_detail' engagement.pk prev_item.pk %}" class="text-slate-500 hover:text-brand-700 dark:hover:text-brand-300 truncate">&larr; {% if prev_item.code %}{{ prev_item.code }} — {% endif %}{{ prev_item.title }}</a>
-        {% else %}
-        <span></span>
-        {% endif %}
-        {% if next_item %}
-        <a href="{% url 'checklist:item_detail' engagement.pk next_item.pk %}" class="text-slate-500 hover:text-brand-700 dark:hover:text-brand-300 truncate text-right">{% if next_item.code %}{{ next_item.code }} — {% endif %}{{ next_item.title }} &rarr;</a>
-        {% endif %}
-    </div>
-</div>
+{% block topbar_actions %}
+<span class="text-xs text-slate-500 tabular-nums">Item {{ position }} of {{ total }}</span>
+{% if prev_item %}<a href="{% url 'checklist:item_detail' engagement.pk prev_item.pk %}" data-shortcut="k" data-shortcut-label="Previous check (without saving)" class="btn-secondary !px-2.5" aria-label="Previous check: {{ prev_item.title }}" title="Previous: {{ prev_item.title }}">&larr;</a>{% endif %}
+{% if next_item %}<a href="{% url 'checklist:item_detail' engagement.pk next_item.pk %}" data-shortcut="j" data-shortcut-label="Next check (without saving)" class="btn-secondary !px-2.5" aria-label="Next check: {{ next_item.title }}" title="Next: {{ next_item.title }}">&rarr;</a>{% endif %}
 {% endblock %}
 
+{% block page_header %}{% endblock %}
+
 {% block content %}
-<div>
-    <div class="card space-y-5">
-        <form method="post">
+<div class="flex flex-col 2xl:flex-row 2xl:items-start gap-6">
+    <aside aria-label="Checks in this run" class="hidden 2xl:block 2xl:w-72 2xl:shrink-0 2xl:sticky 2xl:top-36 panel max-h-[calc(100vh-10rem)] overflow-y-auto">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 dark:bg-slate-50">
+            <a href="{% url 'checklist:list' engagement.pk %}?run={{ item.run.pk }}" class="text-sm font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ item.run.label }}</a>
+            <p class="font-mono text-[0.6875rem] text-slate-500 mt-0.5">{{ tested_total }} of {{ total }} have an outcome</p>
+            <a href="?{% if not mine_only %}mine=1{% endif %}" class="mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs {% if mine_only %}border-brand-300 bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300 font-semibold{% else %}border-slate-300 text-slate-600{% endif %}"{% if mine_only %} aria-current="true"{% endif %}>Only mine<span class="sr-only">{% if mine_only %} (on, select to show every check){% else %} (off){% endif %}</span></a>
+            <div class="mt-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-300 overflow-hidden" aria-hidden="true"><div class="h-full rounded-full bg-brand-600" style="width: {% widthratio tested_total total 100 %}%"></div></div>
+        </div>
+        {% include "checklist/_navigator.html" %}
+    </aside>
+
+    <div class="min-w-0 flex-1 space-y-5">
+        <details class="panel 2xl:hidden">
+            <summary class="panel-header cursor-pointer select-none !border-b-0">
+                <span class="text-sm font-semibold text-slate-900">All checks in {{ item.run.label }}</span>
+                <span class="font-mono text-xs text-slate-500">{{ tested_total }}/{{ total }}</span>
+            </summary>
+            <div class="border-t border-slate-200 max-h-96 overflow-y-auto">{% include "checklist/_navigator.html" %}</div>
+        </details>
+
+        <form method="post" class="space-y-5" {% if not conflict %}data-autosave-url="{% url 'checklist:item_autosave' engagement.pk item.pk %}"{% endif %}>
             {% csrf_token %}
-            <div class="mb-4">
-                <label for="{{ form.status.id_for_label }}" class="field-label">Status</label>
-                {{ form.status|add_class:"field-input max-w-xs" }}
-            </div>
-
-            <div class="mb-4">
-                <label class="field-label">Reference info</label>
-                <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
-                <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
-            </div>
-
-            <div class="mb-4">
-                <label class="field-label">Test results / test data</label>
-                <div class="rte-editor" data-rte-field="test_results" data-rte-editable="true" data-rte-initial='{{ form.test_results.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
-                <input type="hidden" name="test_results" id="{{ form.test_results.id_for_label }}" data-rte-hidden="test_results">
-            </div>
-
-            <div class="mb-4">
-                <label class="field-label">Linked findings</label>
-                <div class="max-h-40 overflow-y-auto border border-slate-300 rounded-md p-3 space-y-1 text-sm bg-white dark:bg-slate-50">
-                    {{ form.findings }}
+            <input type="hidden" name="version" value="{{ version }}" data-autosave-version>
+            {% if conflict %}
+            <div role="alert" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                <p class="font-semibold">{{ last_event.actor|default:"Someone else" }} saved this check after you opened it{% if last_event %} ({{ last_event.created_at|date:"H:i" }}){% endif %}.</p>
+                <p class="mt-1">Your changes are below and haven't been saved. Keep them to replace the other version, or discard them and load what's saved now.</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="submit" name="save_item" value="overwrite" class="btn-primary">Keep my changes</button>
+                    <a href="{{ request.path }}" class="btn-secondary">Discard mine and reload</a>
                 </div>
             </div>
+            {% endif %}
+            <section class="card space-y-5">
+                <div>
+                    <p class="text-xs text-slate-500">{{ item.category }} &middot; {{ item.run.label }}{% if item.tested_at %} &middot; Marked {{ item.get_status_display }} by {{ item.tested_by|default:"a former user" }} on {{ item.tested_at|date:"d/m/Y H:i" }}{% endif %}</p>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight mt-1 break-words">
+                        {% if item.code %}<span class="font-mono text-base font-medium text-slate-500 mr-1.5">{{ item.code }}</span>{% endif %}{{ item.title }}
+                    </h1>
+                </div>
+                <div class="max-w-xs">
+                    <label for="{{ form.assignee.id_for_label }}" class="field-label">{{ form.assignee.label }}</label>
+                    {{ form.assignee|add_class:"field-input" }}
+                    {% for error in form.assignee.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+                <fieldset>
+                    <legend class="field-label">Outcome</legend>
+                    <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                        {% for value, label in status_choices %}
+                        <label class="relative flex cursor-pointer items-center gap-2.5 rounded-lg border-[1.5px] px-3 py-3 text-sm font-medium transition-colors has-[:checked]:font-semibold has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-500
+                            {% if value == 'TESTED_FINDING_RAISED' %}border-slate-200 has-[:checked]:border-orange-700 has-[:checked]:bg-orange-50 dark:has-[:checked]:bg-orange-950/40
+                            {% elif value == 'TESTED_NO_FINDING' %}border-slate-200 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 dark:has-[:checked]:bg-brand-950/50
+                            {% else %}border-slate-200 has-[:checked]:border-slate-700 has-[:checked]:bg-slate-100{% endif %} bg-white dark:bg-slate-100 text-slate-800">
+                            <input type="radio" name="{{ form.status.html_name }}" value="{{ value }}" class="sr-only" data-shortcut="{{ forloop.counter }}" data-shortcut-label="Outcome: {{ label }}" {% if form.status.value == value %}checked{% endif %}>
+                            {% if value == "TESTED_NO_FINDING" %}{% include "checklist/_posture_cell_glyph.html" with key="pass" size="h-5 w-5" %}
+                            {% elif value == "TESTED_FINDING_RAISED" %}{% include "checklist/_posture_cell_glyph.html" with key="finding" size="h-5 w-5" %}
+                            {% elif value == "NOT_APPLICABLE" %}{% include "checklist/_posture_cell_glyph.html" with key="na" size="h-5 w-5" %}
+                            {% elif value == "BLOCKED" %}{% include "checklist/_posture_cell_glyph.html" with key="blocked" size="h-5 w-5" %}
+                            {% else %}{% include "checklist/_posture_cell_glyph.html" with key="open" size="h-5 w-5" %}{% endif %}
+                            <span class="flex-1">{{ label }}</span>
+                            <kbd class="kbd hidden xl:inline-flex self-start" aria-hidden="true">{{ forloop.counter }}</kbd>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% for error in form.status.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </fieldset>
+                <div class="blocked-reason{% if form.blocked_reason.errors %} !block{% endif %} rounded-lg border-[1.5px] border-dashed border-slate-500 p-4">
+                    <label for="{{ form.blocked_reason.id_for_label }}" class="field-label">{{ form.blocked_reason.label }}</label>
+                    {{ form.blocked_reason|add_class:"field-input" }}
+                    <p class="field-help">{{ form.blocked_reason.help_text }}</p>
+                    {% for error in form.blocked_reason.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+            </section>
 
-            <div class="flex flex-wrap gap-2">
-                {% if prev_item %}
-                <button type="submit" name="save_item" value="prev" class="btn-secondary">&larr; Save &amp; Previous</button>
-                {% endif %}
+            <details class="panel" {% if form.reference_info.value %}open{% endif %}>
+                <summary class="panel-header cursor-pointer select-none !bg-mist-50 dark:!bg-mist-950/40">
+                    <span class="font-semibold text-sm text-mist-900 dark:text-mist-100">Reference</span>
+                    <span class="text-xs text-mist-800 dark:text-mist-200">From the template &middot; editable for this run</span>
+                </summary>
+                <div class="panel-body">
+                    <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
+                    <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
+                </div>
+            </details>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <label for="{{ form.scope_tested.id_for_label }}" class="font-semibold text-sm text-slate-900">{{ form.scope_tested.label }}</label>
+                    <span class="text-xs text-slate-500">Encrypted</span>
+                </div>
+                <div class="panel-body !py-4">
+                    {{ form.scope_tested|add_class:"field-input font-mono text-xs" }}
+                    <p class="field-help">{{ form.scope_tested.help_text }}</p>
+                    {% for error in form.scope_tested.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2 class="font-semibold text-sm text-slate-900">Test results &amp; evidence</h2>
+                    <span class="text-xs text-slate-500">Encrypted</span>
+                </div>
+                <div class="panel-body">
+                    <div class="rte-editor" data-rte-field="test_results" data-rte-editable="true" data-rte-initial='{{ form.test_results.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
+                    <input type="hidden" name="test_results" id="{{ form.test_results.id_for_label }}" data-rte-hidden="test_results">
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2 class="font-semibold text-sm text-slate-900">Linked findings</h2>
+                    <a href="{% url 'findings:create' engagement.pk %}?from_check={{ item.pk }}" class="text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">+ Raise from this check</a>
+                </div>
+                <div class="panel-body !py-4">
+                    <div role="group" aria-label="Linked findings" class="max-h-48 overflow-y-auto space-y-1 text-sm [&_label]:flex [&_label]:items-center [&_label]:gap-2 [&_label]:py-1">
+                        {% if form.fields.findings.queryset.exists %}{{ form.findings }}{% else %}<p class="text-slate-500">No findings in this engagement yet.</p>{% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <div class="sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 pt-4 pb-6">
+                <a href="{% url 'checklist:list' engagement.pk %}?run={{ item.run.pk }}" class="text-sm text-slate-500 hover:text-brand-700 dark:hover:text-brand-300">&larr; Back to checklist</a>
+                <button type="button" class="hidden lg:inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-700 dark:hover:text-brand-300" data-shortcuts-open>Shortcuts <kbd class="kbd">?</kbd></button>
+                <p class="mr-auto text-xs text-slate-500" aria-live="polite" data-autosave-status></p>
+                {% if prev_item %}<button type="submit" name="save_item" value="prev" class="btn-secondary">&larr; Save &amp; previous</button>{% endif %}
                 <button type="submit" name="save_item" value="stay" class="btn-secondary">Save</button>
-                <button type="submit" name="save_item" value="next" class="btn-primary flex-1">
-                    Save &amp; {% if next_item %}Next &rarr;{% else %}Finish{% endif %}
-                </button>
+                <button type="submit" name="save_item" value="next" class="btn-primary" data-shortcut="mod+enter" data-shortcut-label="Save and {% if next_item %}go to the next check{% else %}finish{% endif %}">Save &amp; {% if next_item %}next &rarr;{% else %}finish{% endif %}</button>
             </div>
         </form>
     </div>
-
-    {% url 'checklist:list' engagement.pk as back_url %}
-    {% include "base/_back_link.html" with url=back_url label="Back to checklist" %}
 </div>
 {% endblock %}
 
 {% block side_panel %}
-<div class="rail-panel-wide">
+<div class="rail-panel">
     <h2 class="font-semibold text-slate-900 mb-3">Comments</h2>
     {% if comments %}
     <ul class="divide-y divide-slate-100 mb-4">
         {% for c in comments %}
         <li class="py-3">
-            <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+            <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
                 <span class="font-medium text-slate-600">{{ c.author|default:"Unknown" }}</span>
                 <span>{{ c.created_at|date:"d/m/Y H:i" }}</span>
             </div>
@@ -95,15 +166,40 @@
         {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-slate-400 mb-4">No comments yet.</p>
+    <p class="text-sm text-slate-500 mb-4">No comments yet.</p>
     {% endif %}
 
     <form method="post" action="{% url 'checklist:item_comment_create' engagement.pk item.pk %}">
         {% csrf_token %}
-        <div class="rte-editor" data-rte-field="new_comment" data-rte-editable="true" data-rte-initial=""></div>
+        <div class="rte-editor" data-rte-field="new_comment" data-rte-label="New comment" data-rte-editable="true" data-rte-initial=""></div>
         <input type="hidden" name="body" id="{{ comment_form.body.id_for_label }}" data-rte-hidden="new_comment">
         <button type="submit" class="btn-secondary mt-2">Add comment</button>
     </form>
+
+    <section aria-labelledby="activity-heading" class="pt-6 mt-6 border-t border-slate-200">
+        <h2 id="activity-heading" class="font-semibold text-slate-900 mb-3">Activity</h2>
+        {% if events %}
+        <ol class="space-y-2.5 text-sm">
+            {% for event in events %}
+            <li class="flex gap-2">
+                <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true"></span>
+                <div class="min-w-0">
+                    <p class="text-slate-800">
+                        <span class="font-medium">{{ event.actor|default:"Someone" }}</span>
+                        {% if event.kind == "STATUS" %}changed the outcome {% if event.from_value %}from {{ event.from_value }} {% endif %}to <span class="font-medium">{{ event.to_value }}</span>
+                        {% elif event.kind == "ASSIGNEE" %}assigned it to <span class="font-medium">{{ event.to_value }}</span>
+                        {% elif event.kind == "FINDINGS" %}changed linked findings ({{ event.from_value }} &rarr; {{ event.to_value }})
+                        {% else %}{{ event.get_kind_display|lower }}{% endif %}
+                    </p>
+                    <p class="text-xs text-slate-500">{{ event.created_at|date:"d/m/Y H:i" }}</p>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-sm text-slate-500">Nothing yet. Outcome, assignee, evidence and comment changes show up here.</p>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}
-{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}<script src="{% static 'js/redscribe-autosave.js' %}"></script>{% endblock %}

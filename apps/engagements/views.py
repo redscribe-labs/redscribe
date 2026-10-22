@@ -1,9 +1,11 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -41,21 +43,42 @@ def _grant_access_for_default_roles(engagement: Engagement, *, granted_by) -> No
 
 @login_required
 def engagement_list(request):
+    from .metrics import checklist_pct, severity_counts, with_metrics
+
     query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
     engagements = visible_engagements(request.user)
     if query:
         engagements = engagements.filter(
             Q(client_name__icontains=query) | Q(reference_number__icontains=query)
         )
 
-    page_obj = Paginator(engagements, PAGE_SIZE).get_page(request.GET.get("page"))
+    counts = dict(engagements.order_by().values_list("status").annotate(n=Count("id")))
+    pipeline = [
+        {"value": value, "label": label, "count": counts.get(value, 0)}
+        for value, label in Engagement.Status.choices
+    ]
+    if status in Engagement.Status.values:
+        engagements = engagements.filter(status=status)
 
+    # Explicit: the GROUP BY in with_metrics() drops Meta.ordering.
+    page_obj = Paginator(with_metrics(engagements).order_by("-created_at", "pk"), PAGE_SIZE).get_page(request.GET.get("page"))
+    for engagement in page_obj.object_list:
+        engagement.severity_counts = severity_counts(engagement)
+        engagement.open_total = sum(count for *_, count in engagement.severity_counts)
+        engagement.checklist_pct = checklist_pct(engagement)
+
+    carry = {key: value for key, value in (("q", query), ("status", status)) if value}
     return render(
         request,
         "engagements/list.html",
         {
             "page_obj": page_obj,
             "query": query,
+            "status": status,
+            "pipeline": pipeline,
+            "total_count": sum(counts.values()),
+            "carry_querystring": urlencode(carry),
             "can_create": can_create_engagement(request.user),
             "breadcrumbs": [{"label": "Engagements"}],
         },
@@ -95,6 +118,12 @@ def engagement_create(request):
                 EngagementMembership.objects.create(
                     user=request.user, engagement=engagement, added_by=request.user
                 )
+
+            checklist_template = form.cleaned_data.get("checklist_template")
+            if checklist_template is not None:
+                from apps.checklist.services import instantiate_checklist
+
+                instantiate_checklist(engagement, template=checklist_template, created_by=request.user)
 
             messages.success(request, f"Engagement '{engagement.client_name}' created.")
             return redirect("engagements:detail", engagement_id=engagement.pk)

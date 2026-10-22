@@ -6,34 +6,35 @@
 {% include "engagements/_subnav.html" with engagement=engagement active="findings" %}
 {% endblock %}
 
+{% block topbar_actions %}
+{% if feature_flags.scan_import %}
+<a href="{% url 'findings:import' engagement.pk %}" class="btn-secondary">Import scan</a>
+{% endif %}
+<a href="{% url 'catalogue:list' %}?status=APPROVED" class="btn-secondary">From catalogue</a>
+<a href="{% url 'findings:create' engagement.pk %}" class="btn-primary">New finding</a>
+{% endblock %}
+
 {% block page_header %}
-<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
-    <div>
-        <p class="page-eyebrow">{{ engagement.client_name }}</p>
-        <h1 class="page-title">Findings</h1>
-    </div>
-    <div class="flex gap-2">
-        {% if feature_flags.scan_import %}
-        <a href="{% url 'findings:import' engagement.pk %}" class="btn-secondary">Import scan</a>
-        {% endif %}
-        <a href="{% url 'findings:create' engagement.pk %}" class="btn-primary">New finding</a>
-    </div>
+<div class="mb-5">
+    <p class="page-eyebrow">{{ engagement.client_name }}</p>
+    <h1 class="page-title">Findings</h1>
 </div>
 {% endblock %}
 
 {% block content %}
-
 {% if is_manager and awaiting_review_count or my_review_count or is_manager and awaiting_qa_count or my_qa_count %}
-<div class="card mb-6">
-    <h2 class="font-semibold text-slate-900 mb-1">Bulk review / QA</h2>
-    <p class="text-xs text-slate-500 mb-4">Act on every eligible finding in this engagement at once, instead of one at a time.</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<details class="panel mb-5 group">
+    <summary class="panel-header cursor-pointer select-none !border-b-0 group-open:!border-b">
+        <span class="font-semibold text-slate-900 text-sm">Bulk review / QA</span>
+        <span class="text-xs text-slate-500">Act on every eligible finding in this engagement at once</span>
+    </summary>
+    <div class="panel-body grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="space-y-2">
             {% if is_manager and awaiting_review_count %}
             <form method="post" action="{% url 'findings:bulk_assign_reviewer' engagement.pk %}" class="flex flex-col gap-2">
                 {% csrf_token %}
-                <label class="field-label !mb-0">Assign reviewer to {{ awaiting_review_count }} draft finding{{ awaiting_review_count|pluralize }}</label>
-                <select name="reviewer" class="field-input">
+                <label for="bulk-reviewer" class="field-label !mb-0">Assign reviewer to {{ awaiting_review_count }} draft finding{{ awaiting_review_count|pluralize }}</label>
+                <select id="bulk-reviewer" name="reviewer" class="field-input">
                     {% for candidate in bulk_reviewer_candidates %}
                     <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
                     {% endfor %}
@@ -53,8 +54,8 @@
             {% if is_manager and awaiting_qa_count %}
             <form method="post" action="{% url 'findings:bulk_assign_qa' engagement.pk %}" class="flex flex-col gap-2">
                 {% csrf_token %}
-                <label class="field-label !mb-0">Assign QA to {{ awaiting_qa_count }} reviewed finding{{ awaiting_qa_count|pluralize }}</label>
-                <select name="qa_reviewer" class="field-input">
+                <label for="bulk-qa" class="field-label !mb-0">Assign QA to {{ awaiting_qa_count }} reviewed finding{{ awaiting_qa_count|pluralize }}</label>
+                <select id="bulk-qa" name="qa_reviewer" class="field-input">
                     {% for candidate in bulk_qa_candidates %}
                     <option value="{{ candidate.pk }}">{{ candidate }} ({{ candidate.role.name }})</option>
                     {% endfor %}
@@ -71,62 +72,124 @@
             {% endif %}
         </div>
     </div>
-</div>
+</details>
 {% endif %}
 
-{% include "base/_search_box.html" with query=query placeholder="Search by title or CVE ID" %}
+<form method="get" class="flex flex-wrap items-center gap-2 mb-3">
+    {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
+    <div class="relative flex-1 min-w-[14rem]">
+        <label for="finding-search" class="sr-only">Search findings</label>
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M17 17l-4-4"/></svg>
+        <input id="finding-search" type="search" name="q" value="{{ query }}" placeholder="Search by title or CVE ID" class="field-input pl-9">
+    </div>
+    <label for="finding-severity" class="sr-only">Severity</label>
+    <select id="finding-severity" name="severity" class="field-input w-auto">
+        <option value="">All severities</option>
+        {% for value, label in severity_choices %}<option value="{{ value }}" {% if value == severity %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label for="finding-workflow" class="sr-only">Workflow status</label>
+    <select id="finding-workflow" name="workflow" class="field-input w-auto">
+        <option value="">Any workflow status</option>
+        {% for value, label in workflow_choices %}<option value="{{ value }}" {% if value == workflow %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label class="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer {% if mine %}border-brand-300 bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300 font-semibold{% else %}border-slate-300 bg-white dark:bg-slate-100 text-slate-700{% endif %}">
+        <input type="checkbox" name="mine" value="1" {% if mine %}checked{% endif %}> Needs me
+    </label>
+    <button type="submit" class="btn-secondary">Filter</button>
+    {% if query or severity or workflow or mine %}<a href="?{% if show_archived %}archived=1{% endif %}" class="btn-ghost">Clear</a>{% endif %}
+</form>
 
 {% if archived_count %}
 <p class="text-xs text-slate-500 mb-3">
     {% if show_archived %}
     Showing {{ archived_count }} archived finding{{ archived_count|pluralize }} too.
-    <a href="?{% if query %}q={{ query }}&{% endif %}" class="text-brand-600 dark:text-brand-300 hover:underline">Hide archived</a>
+    <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}" class="text-brand-700 dark:text-brand-300 hover:underline">Hide archived</a>
     {% else %}
     {{ archived_count }} archived finding{{ archived_count|pluralize }} hidden.
-    <a href="?{% if query %}q={{ query }}&{% endif %}archived=1" class="text-brand-600 dark:text-brand-300 hover:underline">Show archived</a>
+    <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}archived=1" class="text-brand-700 dark:text-brand-300 hover:underline">Show archived</a>
     {% endif %}
 </p>
 {% endif %}
 
 {% if findings %}
-<ul class="space-y-2">
-    {% for finding in findings %}
-    <li>
-        <a href="{% url 'findings:detail' engagement.pk finding.pk %}"
-           class="group flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-200 bg-white dark:bg-slate-100
-                  px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all rail-severity {% if finding.archived %}opacity-60{% endif %}"
-           style="{{ finding|severity_rail_style }}">
-            <div class="min-w-0 flex-1">
-                <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ finding.title }}</p>
-                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    <span class="badge-severity" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
-                    <span class="{{ finding.status|badge_class }}">{{ finding.get_status_display }}</span>
-                    <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
-                    {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
-                    {% if finding.assigned_reviewer %}
-                    <span class="text-xs text-slate-400 flex items-center gap-1">
-                        <span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>
-                        Reviewer: {{ finding.assigned_reviewer }}
-                    </span>
-                    {% endif %}
-                    {% if finding.assigned_qa %}
-                    <span class="text-xs text-slate-400 flex items-center gap-1">
-                        <span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>
-                        QA: {{ finding.assigned_qa }}
-                    </span>
-                    {% endif %}
+<div class="flex flex-col lg:flex-row lg:items-start gap-6">
+    <div class="min-w-0 flex-1">
+        <ul class="panel divide-y divide-slate-100 dark:divide-slate-200">
+            {% for finding in findings %}
+            <li class="flex items-center gap-3 px-4 py-3 {% if selected and finding.pk == selected.pk %}bg-brand-50/70 dark:bg-brand-950/40 [&_.text-slate-500]:text-slate-600{% endif %} {% if finding.archived %}opacity-60{% endif %}">
+                <span class="badge-severity w-28 shrink-0 justify-center" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+                <div class="min-w-0 flex-1">
+                    <a href="{% url 'findings:detail' engagement.pk finding.pk %}" class="block truncate text-sm font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
+                        <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+                        {% if finding.status == "CLOSED" %}<span class="badge-slate">Closed</span>{% endif %}
+                        {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
+                        {% if finding.cvss_score %}<span class="font-mono">CVSS {{ finding.cvss_score }}</span>{% endif %}
+                        {% if finding.assigned_reviewer %}<span>Reviewer: {{ finding.assigned_reviewer }}</span>{% endif %}
+                        {% if finding.assigned_qa %}<span>QA: {{ finding.assigned_qa }}</span>{% endif %}
+                    </div>
                 </div>
+                <a href="?{% if page_querystring %}{{ page_querystring }}&{% endif %}selected={{ finding.pk }}" class="btn-ghost !px-2 hidden lg:inline-flex shrink-0"{% if selected and finding.pk == selected.pk %} aria-current="true"{% endif %}>Preview<span class="sr-only"> {{ finding.title }}</span></a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Pagination" class="flex items-center justify-between mt-6">
+            <p class="text-sm text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} result{{ page_obj.paginator.count|pluralize }}</p>
+            <div class="flex items-center gap-2">
+                {% if page_obj.has_previous %}<a href="?{% if carry_querystring %}{{ carry_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}" class="btn-secondary">Previous</a>{% else %}<span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Previous</span>{% endif %}
+                {% if page_obj.has_next %}<a href="?{% if carry_querystring %}{{ carry_querystring }}&{% endif %}page={{ page_obj.next_page_number }}" class="btn-secondary">Next</a>{% else %}<span class="btn-secondary opacity-50 pointer-events-none" aria-disabled="true">Next</span>{% endif %}
             </div>
-            <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
-        </a>
-    </li>
-    {% endfor %}
-</ul>
-{% include "base/_pagination.html" %}
+        </nav>
+        {% endif %}
+    </div>
+
+    {% if selected %}
+    <aside aria-label="Finding preview" class="hidden lg:block lg:w-[26rem] lg:shrink-0 lg:sticky lg:top-36 card !p-5 space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+            {% if selected.display_id %}<span class="font-mono text-xs text-slate-500">{{ selected.display_id }}</span>{% endif %}
+            <span class="badge-severity" style="{{ selected|severity_style }}">{{ selected.get_severity_display }}</span>
+            {% if selected.cvss_score %}<span class="font-mono text-xs text-slate-700">CVSS {{ selected.cvss_score }}</span>{% endif %}
+            <a href="{% url 'findings:detail' engagement.pk selected.pk %}" class="ml-auto text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">Open finding</a>
+        </div>
+        <h2 class="text-lg font-bold text-slate-900 leading-snug">{{ selected.title }}</h2>
+        <div class="rounded-md border border-navy-200 dark:border-navy-800 bg-navy-50 dark:bg-navy-950/40 px-4 py-3 text-sm text-navy-900 dark:text-navy-100">
+            <span class="{{ selected.workflow_status|badge_class }}">{{ selected.get_workflow_status_display }}</span>
+            <p class="mt-2 text-xs">Review and QA decisions are made on the finding itself.</p>
+            <a href="{% url 'findings:detail' engagement.pk selected.pk %}" class="btn-primary mt-3">Open finding</a>
+        </div>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt class="text-slate-500">Status</dt><dd class="text-slate-800">{{ selected.get_status_display }}</dd>
+            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800">{{ selected.assigned_reviewer|default:"—" }}</dd>
+            <dt class="text-slate-500">QA</dt><dd class="text-slate-800">{{ selected.assigned_qa|default:"—" }}</dd>
+            {% if feature_flags.retest_workflow %}<dt class="text-slate-500">Retest</dt><dd class="text-slate-800">{{ selected.get_retest_status_display }}</dd>{% endif %}
+            {% if selected.cve_id %}<dt class="text-slate-500">CVE</dt><dd class="font-mono text-xs text-slate-800">{{ selected.cve_id }}</dd>{% endif %}
+            <dt class="text-slate-500">Written by</dt><dd class="text-slate-800">{{ selected.created_by|default:"—" }}</dd>
+            <dt class="text-slate-500">Updated</dt><dd class="text-slate-800">{{ selected.updated_at|date:"d/m/Y H:i" }}</dd>
+        </dl>
+        {% if selected.classifications.all %}
+        <div>
+            <h3 class="text-xs font-semibold text-slate-700 mb-1.5">Classification</h3>
+            <div class="flex flex-wrap gap-1.5">{% for tag in selected.classifications.all %}<span class="badge-mist" title="{{ tag.taxonomy }}">{{ tag.value }}</span>{% endfor %}</div>
+        </div>
+        {% endif %}
+        {% with checks=selected.checklist_items.all %}
+        {% if checks %}
+        <div>
+            <h3 class="text-xs font-semibold text-slate-700 mb-1.5">Linked checklist checks</h3>
+            <ul class="space-y-1 text-sm">
+                {% for item in checks %}<li><a href="{% url 'checklist:item_detail' engagement.pk item.pk %}" class="hover:text-brand-700 dark:hover:text-brand-300">{% if item.code %}<span class="font-mono text-xs text-slate-500 mr-1.5">{{ item.code }}</span>{% endif %}{{ item.title }}</a></li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </aside>
+    {% endif %}
+</div>
 {% else %}
 {% url 'findings:create' engagement.pk as create_url %}
-{% if query %}
-{% include "base/_empty_state.html" with icon="search" title="No matches" message="No finding titles or CVE IDs match your search." %}
+{% if query or severity or workflow or mine %}
+{% include "base/_empty_state.html" with icon="search" title="No matches" message="No finding matches these filters." %}
 {% else %}
 {% include "base/_empty_state.html" with icon="document" title="No findings yet" message="Write one up directly, or import results from a scanner." action_url=create_url action_label="New finding" %}
 {% endif %}

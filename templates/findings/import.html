@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load static redscribe_extras %}
 {% block title %}Import scan — {{ engagement.client_name }}{% endblock %}
 
 {% block engagement_subnav %}
@@ -6,20 +7,41 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto">
+<div class="max-w-2xl mx-auto">
     <div class="card">
         <h1 class="text-xl font-bold text-slate-900 mb-1">Import scan results</h1>
         <p class="text-sm text-slate-500 mb-5">
             Creates one Draft finding per result — nothing is published automatically, everything
             goes through the normal review/QA flow from there.
         </p>
-        <form method="post" enctype="multipart/form-data">
+        {% if import_target %}
+        <p class="text-sm text-slate-600 mb-5">
+            Each result's details go into the <strong>{{ import_target.label }}</strong> section.
+        </p>
+        {% else %}
+        <div class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-3 py-3 mb-5" role="note">
+            <p class="text-sm font-medium text-amber-900 dark:text-amber-300">Scan details won't be kept</p>
+            <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                No active finding section is set as the scan import target, so each result's description and
+                technical details will be dropped. Findings still get their title, severity, affected assets,
+                CVE ID, and tags.
+                {% if user|has_permission:"field_visibility.manage" %}
+                Tick <strong>Scan import</strong> on a section in <a href="{% url 'field_visibility:edit' %}" class="underline font-medium">Finding structure</a> to keep them.
+                {% else %}
+                Ask an administrator to set a scan import section in Finding structure to keep them.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" data-import-preview>
             {% csrf_token %}
             {% include "base/_generic_form_fields.html" %}
-            <button type="submit" class="btn-primary w-full">Import</button>
+            <div class="mb-4 empty:hidden" aria-live="polite" data-preview-target></div>
+            <button type="submit" class="btn-primary w-full" data-import-submit>Import</button>
         </form>
     </div>
     {% url 'findings:list' engagement.pk as back_url %}
     {% include "base/_back_link.html" with url=back_url label="Back to findings" %}
 </div>
 {% endblock %}
+{% block extra_body %}<script src="{% static 'js/redscribe-import-preview.js' %}"></script>{% endblock %}

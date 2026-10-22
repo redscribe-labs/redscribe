@@ -7,9 +7,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto">
+<div class="max-w-2xl">
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Edit engagement</h1>
+        <h1 class="page-title mb-1">Engagement settings</h1>
         <p class="text-sm text-slate-500 mb-5">
             Scope isn't edited here — propose a scope change from the engagement
             page instead; it takes effect once a Team Lead approves it.
@@ -17,7 +17,7 @@
         <form method="post">
             {% csrf_token %}
             {% include "base/_generic_form_fields.html" %}
-            <button type="submit" class="btn-primary w-full">Save</button>
+            <div class="flex justify-end"><button type="submit" class="btn-primary">Save</button></div>
         </form>
     </div>
     {% url 'engagements:detail' engagement.pk as back_url %}

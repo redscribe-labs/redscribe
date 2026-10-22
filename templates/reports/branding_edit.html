@@ -3,43 +3,79 @@
 {% block title %}Firm branding — RedScribe{% endblock %}
 
 {% block page_header %}
-{% include "base/_page_header.html" with title="Firm branding" subtitle="Shown in the sidebar, the login page, and every report's cover page — the logo takes priority over the name when both are set." %}
+<div class="mb-6">
+    <p class="page-eyebrow">Reporting</p>
+    <h1 class="page-title">Firm branding</h1>
+    <p class="text-sm text-slate-500 mt-1 max-w-2xl">Shown in the sidebar, the login page, and every report's cover page — the logo takes priority over the name when both are set.</p>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto">
-    <div class="card mb-6">
-        <h2 class="font-semibold text-slate-900 text-sm mb-3">Current logo</h2>
-        {% if has_logo %}
-        <img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="Current logo" class="max-h-24 max-w-full rounded-md border border-slate-200 bg-white p-2">
-        {% else %}
-        <p class="text-sm text-slate-400">No logo uploaded — the sidebar, login page, and report cover currently show the company name (if set) or "RedScribe".</p>
-        {% endif %}
-    </div>
-
-    <form method="post" enctype="multipart/form-data">
+<div class="flex flex-col lg:flex-row lg:items-start gap-6">
+    <form method="post" enctype="multipart/form-data" class="card space-y-5 lg:max-w-xl lg:flex-1">
         {% csrf_token %}
-        <div class="card space-y-4">
-            <div>
-                <label for="{{ form.firm_name.id_for_label }}" class="field-label">{{ form.firm_name.label }}</label>
-                {{ form.firm_name|add_class:"field-input" }}
-                {% if form.firm_name.help_text %}<p class="field-help">{{ form.firm_name.help_text }}</p>{% endif %}
-                {% for error in form.firm_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-            </div>
-            <div>
-                <label for="{{ form.logo.id_for_label }}" class="field-label">{{ form.logo.label }}</label>
-                {{ form.logo|add_class:"field-input-file" }}
-                {% if form.logo.help_text %}<p class="field-help">{{ form.logo.help_text }}</p>{% endif %}
-                {% for error in form.logo.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-            </div>
+        <div>
+            <p class="field-label">Current logo</p>
             {% if has_logo %}
-            <div class="flex items-center gap-2">
-                {{ form.remove_logo }}
-                <label for="{{ form.remove_logo.id_for_label }}" class="text-sm text-slate-700">{{ form.remove_logo.label }}</label>
-            </div>
+            <img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="Current logo" class="max-h-24 max-w-full rounded-md border border-slate-200 bg-white p-2">
+            {% else %}
+            <p class="text-sm text-slate-500">No logo uploaded — the sidebar, login page, and report cover currently show the company name (if set) or "RedScribe".</p>
             {% endif %}
         </div>
-        <button type="submit" class="btn-primary w-full mt-6">Save</button>
+        <div>
+            <label for="{{ form.firm_name.id_for_label }}" class="field-label">{{ form.firm_name.label }}</label>
+            {{ form.firm_name|add_class:"field-input" }}
+            {% if form.firm_name.help_text %}<p class="field-help">{{ form.firm_name.help_text }}</p>{% endif %}
+            {% for error in form.firm_name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+            <label for="{{ form.logo.id_for_label }}" class="field-label">{{ form.logo.label }}</label>
+            {{ form.logo|add_class:"field-input-file" }}
+            {% if form.logo.help_text %}<p class="field-help">{{ form.logo.help_text }}</p>{% endif %}
+            {% for error in form.logo.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        {% if has_logo %}
+        <div class="flex items-center gap-2">
+            {{ form.remove_logo }}
+            <label for="{{ form.remove_logo.id_for_label }}" class="text-sm text-slate-700">{{ form.remove_logo.label }}</label>
+        </div>
+        {% endif %}
+        <div class="flex justify-end">
+            <button type="submit" class="btn-primary">Save</button>
+        </div>
     </form>
+
+    <section aria-labelledby="branding-preview-heading" class="lg:flex-1 space-y-3">
+        <h2 id="branding-preview-heading" class="font-semibold text-slate-900 text-sm">Where it appears</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <figure class="space-y-1.5">
+                <div class="twilight-surface rounded-lg h-28 p-4 flex items-start">
+                    {% if has_logo %}<img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="" class="h-7 max-w-[9rem] object-contain">
+                    {% elif branding.firm_name %}<span class="font-mono font-semibold text-white truncate">{{ branding.firm_name }}</span>
+                    {% else %}<span class="font-mono font-semibold text-white">Red<span class="text-mist-300">Scribe</span></span>{% endif %}
+                </div>
+                <figcaption class="text-xs text-slate-500">Sidebar</figcaption>
+            </figure>
+            <figure class="space-y-1.5">
+                <div class="twilight-surface rounded-lg h-28 flex items-center justify-center">
+                    {% if has_logo %}<img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="" class="h-9 max-w-[10rem] object-contain">
+                    {% elif branding.firm_name %}<span class="font-mono font-semibold text-xl text-white truncate px-3">{{ branding.firm_name }}</span>
+                    {% else %}<span class="font-mono font-semibold text-xl text-white">Red<span class="text-mist-300">Scribe</span></span>{% endif %}
+                </div>
+                <figcaption class="text-xs text-slate-500">Sign-in page</figcaption>
+            </figure>
+            <figure class="space-y-1.5 sm:col-span-2">
+                <div class="rounded-lg bg-twilight-100 dark:bg-slate-200 h-36 flex items-center justify-center">
+                    <div class="bg-white w-24 h-32 shadow-md p-2.5 flex flex-col gap-2">
+                        {% if has_logo %}<img src="{% url 'branding:logo' %}?v={% now 'U' %}" alt="" class="h-4 max-w-[4rem] object-contain object-left">
+                        {% else %}<span class="text-[0.5rem] font-semibold text-slate-900 truncate">{{ branding.firm_name|default:"RedScribe" }}</span>{% endif %}
+                        <span class="mt-6 h-1.5 w-4/5 rounded bg-slate-900"></span>
+                        <span class="h-1 w-1/2 rounded bg-slate-300"></span>
+                    </div>
+                </div>
+                <figcaption class="text-xs text-slate-500">Report cover</figcaption>
+            </figure>
+        </div>
+    </section>
 </div>
 {% endblock %}

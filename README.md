@@ -9,7 +9,7 @@
 Self-hosted engagement, finding, checklist, and report management<br>
 for penetration testing teams.
 
-[![Version](https://img.shields.io/badge/version-0.2.0--alpha.3-669966?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0--alpha-669966?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-source--available-68609f?style=flat-square)](#license)
 [![Docs](https://img.shields.io/badge/docs-docs.redscribe.app-6c9390?style=flat-square)](https://docs.redscribe.app)
 [![Python](https://img.shields.io/badge/python-3.13-7a8185?style=flat-square)](requirements.txt)
@@ -27,11 +27,11 @@ for penetration testing teams.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png">
-  <img alt="RedScribe dashboard showing engagement counts, the review and QA queues, findings by severity, and recent engagements" src="docs/screenshots/dashboard.png">
+  <img alt="RedScribe home page showing engagement and finding counts, everything waiting on you, your findings by severity, and active engagements" src="docs/screenshots/dashboard.png">
 </picture>
 
 > [!WARNING]
-> **This is alpha software** (`0.2.0-alpha.4`), not yet production-ready.
+> **This is alpha software** (`0.6.0-alpha`), not yet production-ready.
 > Expect rough edges and breaking changes between releases; see
 > [Alpha status](#alpha-status) before relying on it for a real engagement.
 
@@ -78,8 +78,9 @@ docs for the complete feature set.
 - **Security:** per-engagement AES-256-GCM encryption at rest, dynamic RBAC,
   TOTP MFA, and an append-only, hash-chained audit log.
 - **Clients and coverage:** a read-only client portal, checklist runs (OWASP
-  WSTG and your own templates) with Nmap/Burp Suite/Nuclei scanner import,
-  and cross-engagement trend reporting.
+  WSTG and your own templates) with a testing posture view per engagement,
+  Nmap/Burp Suite/Nuclei scanner import with a preview step, and
+  cross-engagement trend reporting.
 - **Operations:** server-side encrypted backup/restore, and Docker Compose
   deployment with automated Tailscale TLS or a bring-your-own certificate.
 
@@ -92,8 +93,8 @@ image for the full-size version.
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/engagement-detail.png"><img alt="Engagement overview with status, checklist progress, team access, and review roles" src="docs/screenshots/engagement-detail.png"></a>
-      <br><b>Engagement overview</b>: status lifecycle, scope, checklist progress, team access, and default reviewer/QA.
+      <a href="docs/screenshots/engagement-detail.png"><img alt="Engagement overview with a status bar across every stage, a Ready to publish checklist, scope, team, and access" src="docs/screenshots/engagement-detail.png"></a>
+      <br><b>Engagement overview</b>: status lifecycle, what's left before publishing, scope, team access, and default reviewer/QA.
     </td>
     <td width="50%" valign="top">
       <a href="docs/screenshots/finding-editor.png"><img alt="Finding editor with rich-text description and CVSS v4.0 calculator" src="docs/screenshots/finding-editor.png"></a>
@@ -106,8 +107,8 @@ image for the full-size version.
       <br><b>Review and QA</b>: draft → review → QA with inline, anchored comment threads.
     </td>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/checklist-run.png"><img alt="OWASP WSTG checklist run showing progress and suggested next checks" src="docs/screenshots/checklist-run.png"></a>
-      <br><b>Checklists</b>: OWASP WSTG (or your own template) runs, linked to the findings they raise.
+      <a href="docs/screenshots/checklist-run.png"><img alt="Testing posture page: a grid of checklist outcomes per category, an outcome breakdown, and where the risk is" src="docs/screenshots/checklist-run.png"></a>
+      <br><b>Testing posture</b>: coverage per category for each checklist run, with blocked checks and the findings they raised.
     </td>
   </tr>
   <tr>
@@ -126,8 +127,8 @@ image for the full-size version.
       <br><b>Trends</b>: severity over time, mean time to remediate, and repeat findings by client.
     </td>
     <td width="50%" valign="top">
-      <a href="docs/screenshots/audit-log.png"><img alt="Audit log filtered to state-changing requests, showing actor, action, and status" src="docs/screenshots/audit-log.png"></a>
-      <br><b>Audit log</b>: append-only, hash-chained record of every request, filterable by actor, method, and date.
+      <a href="docs/screenshots/audit-log.png"><img alt="Audit log with filters and a CSV export, showing time, actor, action, method, status, and path" src="docs/screenshots/audit-log.png"></a>
+      <br><b>Audit log</b>: append-only, hash-chained record of every request, filterable by actor, method, and date, and exportable as CSV.
     </td>
   </tr>
 </table>
@@ -210,7 +211,7 @@ Issues are welcome; pull requests aren't.
 ## Versioning
 
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`, with a
-`-alpha.N` / `-beta.N` / `-rc.N` pre-release suffix before the first
+`-alpha` / `-beta` / `-rc` pre-release suffix before the first
 `1.0.0`. The current version lives in `VERSION` (repo root) and is tagged
 in git as `v<version>`. `CHANGELOG.md` follows
 [Keep a Changelog](https://keepachangelog.com/), and every release gets a
@@ -223,7 +224,7 @@ normal during alpha, not a mistake.
 
 ## Alpha status
 
-RedScribe is early alpha (`0.2.0-alpha.4`). Expect rough edges and
+RedScribe is early alpha (`0.6.0-alpha`). Expect rough edges and
 breaking changes between releases. Worth knowing before relying on it for a
 real engagement (full list in the
 [docs](https://docs.redscribe.app/start/alpha-status/)):

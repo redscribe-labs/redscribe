@@ -9,7 +9,7 @@ FONTS_DIR = pathlib.Path(__file__).resolve().parent.parent / "seed_data" / "font
 # rows seeded, same as 0026 did for the original Open Sans/JetBrains Mono
 # defaults. This is a NEW migration rather than editing 0026 in place,
 # because 0026 may have already run against an existing install (this repo's
-# own tagged v0.1.0-alpha.1 release included it) — Django won't re-run an
+# own tagged v0.1.0-alpha release included it) — Django won't re-run an
 # already-applied migration, so seeding here is the only way every install
 # (fresh or upgrading) ends up with the new default font cached. The
 # existing Open Sans rows are deliberately left alone: any ReportProfile row

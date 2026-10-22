@@ -1,8 +1,8 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% load redscribe_extras %}
 {% block title %}{{ company.name }} — RedScribe{% endblock %}
 
-{% block page_header %}
+{% block settings_header %}
 <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
     <div>
         <div class="flex items-center gap-3">
@@ -32,7 +32,7 @@
 </div>
 {% endblock %}
 
-{% block content %}
+{% block settings_content %}
 <div class="space-y-6">
     <div class="card">
         <h2 class="font-semibold text-slate-900 mb-3">Linked engagements</h2>
@@ -57,7 +57,7 @@
             {% for target in portal_users %}
             <li class="flex items-center justify-between py-2 text-sm gap-3">
                 <a href="{% url 'clients:user_detail' target.uuid %}" class="text-slate-700 hover:text-brand-700 dark:hover:text-brand-300 truncate">
-                    {{ target.get_full_name|default:target.username }} <span class="text-slate-400">({{ target.username }})</span>
+                    {{ target.get_full_name|default:target.username }} <span class="text-slate-500">({{ target.username }})</span>
                 </a>
                 {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
             </li>

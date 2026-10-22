@@ -3,10 +3,11 @@
 {% block title %}{{ profile.name }} — Report Profiles{% endblock %}
 {% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
 {% block content %}
-<div class="max-w-5xl mx-auto space-y-6">
+<div class="max-w-5xl space-y-6">
     <div>
-        <h1 class="text-xl font-bold text-slate-900 mb-1">{{ profile.name }}</h1>
-        <p class="text-sm text-slate-500">
+        <p class="page-eyebrow">Report profile{% if profile.is_default %} &middot; default{% endif %}</p>
+        <h1 class="page-title mb-1">{{ profile.name }}</h1>
+        <p class="text-sm text-slate-500 max-w-3xl">
             Everything about how a report built from this profile is structured and how it looks — manage its
             tags, then write the document, then set its cover details and appearance below.
         </p>
@@ -44,7 +45,7 @@
                         {% for error in form.template.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
                     </div>
 
-                    <aside class="text-xs text-slate-500 space-y-4">
+                    <aside aria-label="Available tags" class="text-xs text-slate-500 space-y-4">
                         <div>
                             <h3 class="font-semibold text-slate-700 mb-1">Computed blocks</h3>
                             <p class="mb-2">
@@ -63,7 +64,7 @@
                             <h3 class="font-semibold text-slate-700 mb-1">Text blocks</h3>
                             <p class="mb-2">
                                 This profile's own starting text, one "Edit content" link per tag.
-                                <a href="#section-manage-text-blocks" class="text-brand-600 hover:underline" data-tab-target="section-manage-text-blocks">Manage the set of tags</a>.
+                                <a href="#section-manage-text-blocks" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200" data-tab-target="section-manage-text-blocks">Manage the set of tags</a>.
                             </p>
                             <ul class="space-y-1 font-mono">
                                 {% for block in custom_tags %}<li>{% templatetag openvariable %} {{ block.slug }} {% templatetag closevariable %}</li>{% empty %}<li class="italic">None yet.</li>{% endfor %}

@@ -7,163 +7,31 @@
 {% endblock %}
 
 {% block page_header %}
-<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
-    <div>
-        <h1 class="page-title">{{ engagement.client_name }}</h1>
-        <div class="flex flex-wrap items-center gap-2 mt-2">
-            <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
-            {% if engagement.archived %}<span class="badge-red">Archived {{ engagement.archived_at|date:"d/m/Y" }}</span>{% endif %}
-            {% if engagement.client %}
-                {% if engagement.client_release_approved %}
-                <span class="badge-green">Released to client</span>
-                {% else %}
-                <span class="badge-slate">Not released to client</span>
-                {% endif %}
-            {% endif %}
-            {% if engagement.reference_number %}<span class="text-sm text-slate-500 font-mono">{{ engagement.reference_number }}</span>{% endif %}
-            <span class="text-sm text-slate-500">{{ engagement.start_date|default:"—" }} – {{ engagement.end_date|default:"—" }}</span>
-        </div>
-    </div>
-    {% if is_manager %}
-    <div class="flex gap-2 shrink-0">
-        {% if not engagement.archived %}
-        <a href="{% url 'engagements:archive' engagement.pk %}" class="btn-danger">Archive</a>
-        {% else %}
-        <form method="post" action="{% url 'engagements:unarchive' engagement.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn-secondary">Unarchive</button>
-        </form>
-        {% if user.is_superadmin_role %}
-        <a href="{% url 'engagements:permanent_delete' engagement.pk %}" class="btn-danger">Permanently delete&hellip;</a>
-        {% endif %}
-        {% endif %}
-    </div>
-    {% endif %}
-</div>
-{% endblock %}
-
-{% block side_panel %}
-<div class="rail-panel">
-    <h2 class="font-semibold text-slate-900 mb-1">Who has access</h2>
-    <p class="text-xs text-slate-500 mb-3">
-        Superadmin always has access. Team Lead has blanket access while not archived.
-        Everyone else below has been explicitly granted membership.
-    </p>
-    <ul class="divide-y divide-slate-100 dark:divide-slate-200">
-        {% for m in members %}
-        <li class="py-2 flex items-center justify-between text-sm gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-                <span class="avatar !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ m.user|initials }}</span>
-                <div class="min-w-0">
-                    <p class="font-medium text-slate-800 truncate">{{ m.user }}</p>
-                    <p class="text-xs text-slate-400">{{ m.user.role.name }}</p>
-                </div>
+<div class="mb-8 space-y-5">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+            <h1 class="page-title">{{ engagement.client_name }}</h1>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-sm text-slate-500">
+                {% if engagement.reference_number %}<span class="font-mono">{{ engagement.reference_number }}</span>{% endif %}
+                {% if engagement.test_type %}<span>{{ engagement.get_test_type_display }}</span>{% endif %}
+                <span>Testing {{ engagement.start_date|default:"—" }} – {{ engagement.end_date|default:"—" }}</span>
+                {% if engagement.archived %}<span class="badge-red">Archived {{ engagement.archived_at|date:"d/m/Y" }}</span>{% endif %}
             </div>
+        </div>
+        <div class="flex flex-wrap gap-2 min-w-0">
             {% if is_manager %}
-            <form method="post" action="{% url 'engagements:member_remove' engagement.pk m.pk %}">
-                {% csrf_token %}<button type="submit" class="text-xs text-red-600 dark:text-red-400 hover:underline shrink-0">Remove</button>
-            </form>
-            {% endif %}
-        </li>
-        {% empty %}
-        <li class="py-2 text-sm text-slate-400">No explicit members yet.</li>
-        {% endfor %}
-    </ul>
-
-    {% if is_manager %}
-    <form method="post" action="{% url 'engagements:member_add' engagement.pk %}" class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-200 flex gap-2 items-end">
-        {% csrf_token %}
-        <div class="flex-1">
-            <label for="{{ add_member_form.user.id_for_label }}" class="field-label">{{ add_member_form.user.label }}</label>
-            {{ add_member_form.user|add_class:"field-input" }}
-        </div>
-        <button type="submit" class="btn-secondary">Add</button>
-    </form>
-    {% endif %}
-
-    {% if engagement.default_reviewer or engagement.default_qa or engagement.default_approver %}
-    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-200">
-        <h2 class="font-semibold text-slate-900 mb-1">Review roles</h2>
-        <p class="text-xs text-slate-500 mb-3">
-            Auto-assigned to findings (or notified) as this engagement reaches each stage.
-            {% if is_manager %}<a href="{% url 'engagements:edit' engagement.pk %}" class="text-brand-600 dark:text-brand-300 hover:underline">Change</a>{% endif %}
-        </p>
-        <ul class="space-y-2 text-sm">
-            {% if engagement.default_reviewer %}
-            <li class="flex items-center gap-2">
-                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_reviewer|initials }}</span>
-                <span class="min-w-0 truncate"><span class="text-slate-400">Reviewer</span> · {{ engagement.default_reviewer }}</span>
-            </li>
-            {% endif %}
-            {% if engagement.default_qa %}
-            <li class="flex items-center gap-2">
-                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_qa|initials }}</span>
-                <span class="min-w-0 truncate"><span class="text-slate-400">QA</span> · {{ engagement.default_qa }}</span>
-            </li>
-            {% endif %}
-            {% if engagement.default_approver %}
-            <li class="flex items-center gap-2">
-                <span class="avatar !h-6 !w-6 !text-[0.65rem] !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ engagement.default_approver|initials }}</span>
-                <span class="min-w-0 truncate"><span class="text-slate-400">Approver</span> · {{ engagement.default_approver }}</span>
-            </li>
-            {% endif %}
-        </ul>
-    </div>
-    {% endif %}
-</div>
-{% endblock %}
-
-{% block content %}
-
-<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-    <a href="{% url 'findings:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6.5a3 3 0 0 1 3 3v3a3 3 0 1 1-6 0v-3a3 3 0 0 1 3-3Z"/><path d="M10 6.5V5M7.5 8H4M12.5 8H16M7.5 12H4M12.5 12H16M8 4 7 3M12 4l1-1"/></svg>
-        </span>
-        <div class="min-w-0">
-            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ findings_summary.total }}</span>
-            <p class="text-xs text-slate-500 mt-0.5">Findings{% if findings_summary.open %} <span class="text-red-600 dark:text-red-400 font-medium">&middot; {{ findings_summary.open }} open</span>{% endif %}</p>
-        </div>
-    </a>
-    <a href="{% url 'checklist:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="10" height="13" rx="1.5"/><path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h1A1.5 1.5 0 0 1 12 3.5V4"/><path d="M7.5 10.5 9 12l3.5-3.5"/></svg>
-        </span>
-        <div class="min-w-0 flex-1">
-            {% if checklist_summary.started %}
-            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ checklist_summary.tested }}<span class="text-sm font-medium text-slate-400">/{{ checklist_summary.total }}</span></span>
-            <p class="text-xs text-slate-500 mt-0.5">Checklist tested</p>
-            <div class="mt-1.5 bg-slate-100 dark:bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                <div class="bg-brand-600 h-full rounded-full" style="width: {{ checklist_summary.pct }}%"></div>
-            </div>
+            {% if not engagement.archived %}
+            <a href="{% url 'engagements:archive' engagement.pk %}" class="btn-danger">Archive</a>
             {% else %}
-            <span class="text-2xl font-bold text-slate-300 tabular-nums">—</span>
-            <p class="text-xs text-slate-500 mt-0.5">Checklist not started</p>
+            <form method="post" action="{% url 'engagements:unarchive' engagement.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-secondary">Unarchive</button>
+            </form>
+            {% if user.is_superadmin_role %}
+            <a href="{% url 'engagements:permanent_delete' engagement.pk %}" class="btn-danger">Permanently delete&hellip;</a>
             {% endif %}
-        </div>
-    </a>
-    <a href="{% url 'reports:options' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
-        <span class="stat-tile-icon">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v3h3"/></svg>
-        </span>
-        <div class="min-w-0">
-            <span class="text-2xl font-bold text-slate-900 tabular-nums">{{ findings_summary.publishable|default:0 }}</span>
-            <p class="text-xs text-slate-500 mt-0.5">Ready to publish</p>
-        </div>
-    </a>
-</div>
-
-{% if transition_options %}
-{{ transition_options|json_script:"transition-options-data" }}
-<div class="card mb-8">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h2 class="font-semibold text-slate-900 mb-0.5">Status</h2>
-            <p class="text-xs text-slate-500">
-                Currently <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
-            </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
+            {% endif %}
+            {% endif %}
             {% for option in transition_options %}
             <button type="button"
                     class="{% if option.style == 'primary' %}btn-primary{% else %}btn-secondary{% endif %}"
@@ -175,16 +43,246 @@
             {% endfor %}
         </div>
     </div>
+
+    <ol aria-label="Engagement status" class="grid grid-cols-4 lg:grid-cols-8 gap-x-1.5 gap-y-3">
+        {% for stage in engagement|status_stages %}
+        <li class="flex flex-col gap-1.5"{% if stage.state == "current" %} aria-current="step"{% endif %}>
+            <span class="h-1 rounded-full {% if stage.state == 'done' %}bg-brand-600{% elif stage.state == 'current' %}bg-brand-500{% else %}bg-slate-200 dark:bg-slate-300{% endif %}"></span>
+            <span class="text-[0.6875rem] leading-tight {% if stage.state == 'current' %}font-bold text-slate-900{% elif stage.state == 'done' %}text-brand-700 dark:text-brand-300{% else %}text-slate-500{% endif %}">
+                {{ stage.label }}{% if stage.state == "done" %}<span class="sr-only"> (done)</span>{% elif stage.state == "current" %}<span class="sr-only"> (current)</span>{% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+{% endblock %}
+
+{% block side_panel %}
+<div class="rail-panel">
+    <section class="card !p-5">
+        <div class="flex items-baseline justify-between gap-2 mb-1">
+            <h2 class="font-semibold text-slate-900">Team</h2>
+            {% if is_manager %}<a href="{% url 'engagements:edit' engagement.pk %}" class="text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">Change</a>{% endif %}
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Auto-assigned to findings, or notified, as the engagement reaches each stage.</p>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800 truncate">{{ engagement.default_reviewer|default:"—" }}</dd>
+            <dt class="text-slate-500">QA</dt><dd class="text-slate-800 truncate">{{ engagement.default_qa|default:"—" }}</dd>
+            <dt class="text-slate-500">Approver</dt><dd class="text-slate-800 truncate">{{ engagement.default_approver|default:"—" }}</dd>
+        </dl>
+    </section>
+
+    <section class="card !p-5">
+        <h2 class="font-semibold text-slate-900 mb-1">Who has access</h2>
+        <p class="text-xs text-slate-500 mb-3">
+            Superadmin always has access. Team Lead has blanket access while not archived.
+            Everyone else below has been explicitly granted membership.
+        </p>
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for m in members %}
+            <li class="py-2 flex items-center justify-between text-sm gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="avatar !bg-navy-50 !text-navy-700 dark:!bg-navy-950 dark:!text-navy-300">{{ m.user|initials }}</span>
+                    <div class="min-w-0">
+                        <p class="font-medium text-slate-800 truncate">{{ m.user }}</p>
+                        <p class="text-xs text-slate-500">{{ m.user.role.name }}</p>
+                    </div>
+                </div>
+                {% if is_manager %}
+                <form method="post" action="{% url 'engagements:member_remove' engagement.pk m.pk %}">
+                    {% csrf_token %}<button type="submit" class="text-xs text-red-700 dark:text-red-400 hover:underline shrink-0">Remove</button>
+                </form>
+                {% endif %}
+            </li>
+            {% empty %}
+            <li class="py-2 text-sm text-slate-500">No explicit members yet.</li>
+            {% endfor %}
+        </ul>
+        {% if is_manager %}
+        <form method="post" action="{% url 'engagements:member_add' engagement.pk %}" class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-200 flex gap-2 items-end">
+            {% csrf_token %}
+            <div class="flex-1 min-w-0">
+                <label for="{{ add_member_form.user.id_for_label }}" class="field-label">{{ add_member_form.user.label }}</label>
+                {{ add_member_form.user|add_class:"field-input" }}
+            </div>
+            <button type="submit" class="btn-secondary">Add</button>
+        </form>
+        {% endif %}
+    </section>
+
+    {% if engagement.client %}
+    <section class="rounded-lg border border-navy-200 dark:border-navy-800 bg-navy-50 dark:bg-navy-950/40 p-5">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <h2 class="font-semibold text-navy-900 dark:text-navy-100">Client portal</h2>
+            {% if engagement.client_release_approved %}<span class="badge-green">Released</span>{% else %}<span class="badge-slate">Not released</span>{% endif %}
+        </div>
+        {% if engagement.client_release_approved %}
+        <p class="text-xs text-navy-800 dark:text-navy-200">
+            Released by {{ engagement.client_release_approved_by|default:"—" }} on {{ engagement.client_release_approved_at|date:"d/m/Y" }}.
+            QA Approved findings are visible to {{ engagement.client.name }}'s portal users.
+        </p>
+        {% else %}
+        <p class="text-xs text-navy-800 dark:text-navy-200">
+            {{ engagement.client.name }}'s portal users can't see this engagement or any of its findings,
+            however many are QA Approved, until it's explicitly released.
+        </p>
+        {% endif %}
+        {% if can_release_to_client %}
+        <div class="mt-3">
+            {% if engagement.client_release_approved %}
+            <form method="post" action="{% url 'engagements:revoke_client_release' engagement.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger w-full">Revoke client release</button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'engagements:release_to_client' engagement.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-primary w-full">Release to client portal</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <section class="card">
+        <h2 class="font-semibold text-slate-900 mb-3">Ready to publish?</h2>
+        <ul class="space-y-1">
+            <li class="flex items-center gap-3 py-1.5 text-sm">
+                {% if findings_summary.total and findings_summary.publishable == findings_summary.total %}
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" class="fill-brand-600"/><path d="M5.5 9.3 7.8 11.5 12.5 6.8" fill="none" stroke="#fff" stroke-width="1.8"/></svg>
+                <span class="sr-only">Done:</span>
+                {% else %}
+                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="9" r="7.5"/></svg>
+                <span class="sr-only">Not yet:</span>
+                {% endif %}
+                <span class="flex-1 text-slate-800">Findings ready to publish</span>
+                <a href="{% url 'findings:list' engagement.pk %}" class="font-mono text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline">{{ findings_summary.publishable|default:0 }} of {{ findings_summary.total }}</a>
+            </li>
+            <li class="flex items-center gap-3 py-1.5 text-sm">
+                {% if checklist_summary.started and checklist_summary.tested == checklist_summary.total %}
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" class="fill-brand-600"/><path d="M5.5 9.3 7.8 11.5 12.5 6.8" fill="none" stroke="#fff" stroke-width="1.8"/></svg>
+                <span class="sr-only">Done:</span>
+                {% else %}
+                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="9" r="7.5"/></svg>
+                <span class="sr-only">Not yet:</span>
+                {% endif %}
+                <span class="flex-1 text-slate-800">Checklist has an outcome for every check</span>
+                <a href="{% url 'checklist:list' engagement.pk %}" class="font-mono text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline">{% if checklist_summary.started %}{{ checklist_summary.tested }} of {{ checklist_summary.total }}{% else %}Not started{% endif %}</a>
+            </li>
+            {% if engagement.client %}
+            <li class="flex items-center gap-3 py-1.5 text-sm">
+                {% if engagement.client_release_approved %}
+                <svg class="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" class="fill-brand-600"/><path d="M5.5 9.3 7.8 11.5 12.5 6.8" fill="none" stroke="#fff" stroke-width="1.8"/></svg>
+                <span class="sr-only">Done:</span>
+                {% else %}
+                <svg class="h-[18px] w-[18px] shrink-0 text-slate-500" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="9" r="7.5"/></svg>
+                <span class="sr-only">Not yet:</span>
+                {% endif %}
+                <span class="flex-1 text-slate-800">Released to the client portal</span>
+                <span class="text-xs text-slate-500">{% if engagement.client_release_approved %}{{ engagement.client_release_approved_at|date:"d/m/Y" }}{% else %}Not released{% endif %}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </section>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <a href="{% url 'findings:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+            <div class="min-w-0">
+                <span class="stat-tile-value">{{ findings_summary.total }}</span>
+                <p class="text-xs text-slate-500 mt-0.5">Findings{% if findings_summary.open %} <span class="text-red-700 dark:text-red-400 font-medium">&middot; {{ findings_summary.open }} open</span>{% endif %}</p>
+            </div>
+        </a>
+        <a href="{% url 'checklist:list' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+            <div class="min-w-0 flex-1">
+                {% if checklist_summary.started %}
+                <span class="stat-tile-value">{{ checklist_summary.pct }}%</span>
+                <p class="text-xs text-slate-500 mt-0.5">Checklist · {{ checklist_summary.tested }}/{{ checklist_summary.total }} tested</p>
+                <div class="mt-1.5 bg-slate-100 dark:bg-slate-200 rounded-full h-1.5 overflow-hidden" aria-hidden="true">
+                    <div class="bg-brand-600 h-full rounded-full" style="width: {{ checklist_summary.pct }}%"></div>
+                </div>
+                {% else %}
+                <span class="stat-tile-value !text-slate-500">—</span>
+                <p class="text-xs text-slate-500 mt-0.5">Checklist not started</p>
+                {% endif %}
+            </div>
+        </a>
+        <a href="{% url 'reports:options' engagement.pk %}" class="stat-tile hover:border-brand-300 hover:shadow-md">
+            <div class="min-w-0">
+                <span class="stat-tile-value">{{ findings_summary.publishable|default:0 }}</span>
+                <p class="text-xs text-slate-500 mt-0.5">Ready to publish</p>
+            </div>
+        </a>
+    </div>
+
+    <section class="card">
+        <h2 class="font-semibold text-slate-900 mb-2">Scope</h2>
+        <p class="whitespace-pre-wrap bg-slate-50 dark:bg-slate-50 border border-slate-100 dark:border-slate-200 rounded-md p-3 text-sm text-slate-700">{{ engagement.scope|default:"No scope recorded yet." }}</p>
+
+        <details class="mt-3 group">
+            <summary class="cursor-pointer text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline select-none">Propose a scope change</summary>
+            <form method="post" action="{% url 'engagements:scope_change_create' engagement.pk %}" class="mt-2">
+                {% csrf_token %}
+                {{ scope_change_form.proposed_scope|add_class:"field-input" }}
+                <button type="submit" class="btn-secondary mt-2">Submit for Team Lead approval</button>
+            </form>
+        </details>
+
+        {% if scope_requests %}
+        <h3 class="font-medium text-slate-800 mt-5 mb-2 text-sm">Scope change requests</h3>
+        <div class="divide-y divide-slate-100 dark:divide-slate-200 border-t border-slate-100 dark:border-slate-200">
+            {% for sr in scope_requests %}
+            <div class="py-3">
+                <div class="flex items-center justify-between">
+                    <div class="text-xs text-slate-500">
+                        {{ sr.requested_by|default:"—" }} &middot; {{ sr.created_at|date:"d/m/Y H:i" }}
+                    </div>
+                    <span class="{{ sr.status|badge_class }}">{{ sr.get_status_display }}</span>
+                </div>
+                <p class="text-sm text-slate-700 whitespace-pre-wrap mt-1">{{ sr.proposed_scope }}</p>
+                {% if sr.status != "PENDING" and sr.reviewed_by %}
+                <div class="text-xs text-slate-500 mt-1">
+                    {{ sr.get_status_display }} by {{ sr.reviewed_by }} &middot; {{ sr.reviewed_at|date:"d/m/Y H:i" }}
+                </div>
+                {% endif %}
+                {% if is_manager and sr.status == "PENDING" %}
+                <div class="flex gap-2 mt-2">
+                    <form method="post" action="{% url 'engagements:scope_change_approve' engagement.pk sr.pk %}">
+                        {% csrf_token %}<button type="submit" class="btn-primary">Approve</button>
+                    </form>
+                    <form method="post" action="{% url 'engagements:scope_change_reject' engagement.pk sr.pk %}">
+                        {% csrf_token %}<button type="submit" class="btn-danger">Reject</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% if is_manager %}
+    <p class="text-xs text-slate-500">
+        RedScribe doesn't offer permanent deletion of engagements — actions here are kept in an append-only audit
+        trail, so removal is archival (see the Archive button above) rather than deletion.
+    </p>
+    {% endif %}
 </div>
 
+{% if transition_options %}
+{{ transition_options|json_script:"transition-options-data" }}
 <style>
     #transition-modal[open] {
         position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0;
     }
 </style>
-<dialog id="transition-modal" class="p-0 border-0 bg-transparent w-full max-w-md backdrop:bg-black/40">
+<dialog id="transition-modal" class="p-0 border-0 bg-transparent w-full max-w-md backdrop:bg-black/40" aria-labelledby="transition-modal-title">
     <div class="card !m-0">
-        <h2 class="text-lg font-bold text-slate-900 mb-2">Change status?</h2>
+        <h2 id="transition-modal-title" class="text-lg font-bold text-slate-900 mb-2">Change status?</h2>
         <p class="text-sm text-slate-600 mb-3">
             Move "<strong>{{ engagement.client_name }}</strong>" from
             <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
@@ -198,93 +296,6 @@
         </form>
     </div>
 </dialog>
-{% endif %}
-
-<div class="card">
-    <h2 class="font-semibold text-slate-900 mb-2">Scope</h2>
-    <p class="whitespace-pre-wrap bg-slate-50 dark:bg-slate-50 border border-slate-100 dark:border-slate-200 rounded-md p-3 text-sm text-slate-700">{{ engagement.scope|default:"No scope recorded yet." }}</p>
-
-    <details class="mt-3 group">
-        <summary class="cursor-pointer text-sm text-brand-600 dark:text-brand-300 hover:underline select-none">Propose a scope change</summary>
-        <form method="post" action="{% url 'engagements:scope_change_create' engagement.pk %}" class="mt-2">
-            {% csrf_token %}
-            {{ scope_change_form.proposed_scope|add_class:"field-input" }}
-            <button type="submit" class="btn-secondary mt-2">Submit for Team Lead approval</button>
-        </form>
-    </details>
-
-    {% if scope_requests %}
-    <h3 class="font-medium text-slate-800 mt-5 mb-2 text-sm">Scope change requests</h3>
-    <div class="divide-y divide-slate-100 dark:divide-slate-200 border-t border-slate-100 dark:border-slate-200">
-        {% for sr in scope_requests %}
-        <div class="py-3">
-            <div class="flex items-center justify-between">
-                <div class="text-xs text-slate-500">
-                    {{ sr.requested_by|default:"—" }} &middot; {{ sr.created_at|date:"d/m/Y H:i" }}
-                </div>
-                <span class="{{ sr.status|badge_class }}">{{ sr.get_status_display }}</span>
-            </div>
-            <p class="text-sm text-slate-700 whitespace-pre-wrap mt-1">{{ sr.proposed_scope }}</p>
-            {% if sr.status != "PENDING" and sr.reviewed_by %}
-            <div class="text-xs text-slate-500 mt-1">
-                {{ sr.get_status_display }} by {{ sr.reviewed_by }} &middot; {{ sr.reviewed_at|date:"d/m/Y H:i" }}
-            </div>
-            {% endif %}
-            {% if is_manager and sr.status == "PENDING" %}
-            <div class="flex gap-2 mt-2">
-                <form method="post" action="{% url 'engagements:scope_change_approve' engagement.pk sr.pk %}">
-                    {% csrf_token %}<button type="submit" class="btn-primary">Approve</button>
-                </form>
-                <form method="post" action="{% url 'engagements:scope_change_reject' engagement.pk sr.pk %}">
-                    {% csrf_token %}<button type="submit" class="btn-danger">Reject</button>
-                </form>
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
-
-{% if is_manager %}
-<p class="text-xs text-slate-400 mt-4">
-    RedScribe doesn't offer permanent deletion of engagements — actions here are kept in an append-only audit
-    trail, so removal is archival (see the Archive button above) rather than deletion.
-</p>
-{% endif %}
-
-{% if engagement.client %}
-<div class="card mt-8 flex flex-wrap items-center justify-between gap-4">
-    <div class="min-w-0">
-        <h2 class="font-semibold text-slate-900 mb-1">Client portal</h2>
-        {% if engagement.client_release_approved %}
-        <p class="text-xs text-slate-500">
-            Released by {{ engagement.client_release_approved_by|default:"—" }} on {{ engagement.client_release_approved_at|date:"d/m/Y" }}.
-            QA Approved findings are visible to {{ engagement.client.name }}'s portal users.
-        </p>
-        {% else %}
-        <p class="text-xs text-slate-500">
-            Not yet released — {{ engagement.client.name }}'s portal users can't see this engagement or any
-            of its findings, no matter how many are QA Approved, until it's explicitly released.
-        </p>
-        {% endif %}
-    </div>
-    {% if can_release_to_client %}
-    <div class="shrink-0">
-        {% if engagement.client_release_approved %}
-        <form method="post" action="{% url 'engagements:revoke_client_release' engagement.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn-danger">Revoke client release</button>
-        </form>
-        {% else %}
-        <form method="post" action="{% url 'engagements:release_to_client' engagement.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="btn-primary">Release to client portal</button>
-        </form>
-        {% endif %}
-    </div>
-    {% endif %}
-</div>
 {% endif %}
 
 {% url 'engagements:list' as back_url %}

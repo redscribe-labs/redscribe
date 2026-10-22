@@ -1,4 +1,5 @@
 import json
+import re
 import os
 
 from django.contrib.auth import get_user_model
@@ -1273,6 +1274,46 @@ class CatalogueTests(TestCase):
         template.delete()
         finding.refresh_from_db()
         self.assertEqual(finding.title, "Reflected XSS")
+
+    def test_finding_remembers_its_source_entry_without_syncing(self):
+        template = VulnerabilityTemplate.objects.create(
+            title="Open redirect", default_severity=Finding.Severity.LOW,
+            status=VulnerabilityTemplate.Status.APPROVED,
+        )
+        client = Client()
+        login(client, self.consultant)
+        data = {
+            "title": "Open redirect", "cvss_score": "", "cvss_vector": "", "severity": Finding.Severity.LOW,
+            "cve_id": "", "status": Finding.Status.OPEN, "affects": "",
+            "classification_taxonomy": [self.tag.taxonomy], "classification_value": [self.tag.value],
+        }
+        for name in ["vulnerability_description", "business_impact", "testing_summary", "technical_details",
+                     "recommendations", "references"]:
+            data[section_post_key(name)] = doc_json("")
+        data[section_post_key("note")] = ""
+        data[section_post_key("remediation_testing")] = ""
+        url = reverse("findings:create", args=[self.engagement.pk]) + f"?from_template={template.pk}"
+        self.assertEqual(client.post(url, data).status_code, 302)
+        finding = Finding.objects.get(title="Open redirect")
+        self.assertEqual(finding.source_template, template)
+
+        list_resp = client.get(reverse("catalogue:list"))
+        used = {t.pk: t.used_count for t in list_resp.context["page_obj"].object_list}
+        self.assertEqual(used[template.pk], 1)
+
+        template.title = "Renamed"
+        template.save()
+        finding.refresh_from_db()
+        self.assertEqual(finding.title, "Open redirect")
+        template.delete()
+        finding.refresh_from_db()
+        self.assertIsNone(finding.source_template)
+
+    def test_bad_from_template_is_ignored(self):
+        client = Client()
+        login(client, self.consultant)
+        resp = client.get(reverse("findings:create", args=[self.engagement.pk]) + "?from_template=not-a-uuid")
+        self.assertEqual(resp.status_code, 404)
 
     def test_create_without_from_template_is_blank(self):
         client = Client()
@@ -2943,3 +2984,212 @@ class DisplayIdAssignmentTests(TestCase):
         finding.refresh_from_db()
         self.assertEqual(finding.display_id, "")
 
+
+
+class ImportPreviewTests(TestCase):
+    """The confirm step: preview=1 shows what would be created without saving,
+    and selection=1 + include=<index> imports just the ticked rows."""
+
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.consultant = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=self.consultant, engagement=self.engagement)
+        self.superadmin = make_user(User.Role.SUPERADMIN)
+        self.client = Client()
+        self.url = reverse("findings:import", args=[self.engagement.pk])
+
+    def scan(self, **extra):
+        return {"format": "NMAP", "file": SimpleUploadedFile("scan.xml", NMAP_SAMPLE, content_type="text/xml"), **extra}
+
+    def test_scan_preview_lists_results_without_saving(self):
+        from .models import ScanImportRecord
+
+        login(self.client, self.consultant)
+        resp = self.client.post(self.url, self.scan(preview="1"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'name="include"', count=2)
+        self.assertContains(resp, 'name="selection"')
+        self.assertFalse(Finding.objects.filter(engagement=self.engagement).exists())
+        self.assertFalse(ScanImportRecord.objects.exists())
+
+    def test_scan_preview_flags_results_already_in_the_engagement(self):
+        from .scan_import import parse_scan
+
+        first = parse_scan(NMAP_SAMPLE, "NMAP")[0]
+        Finding.objects.create(
+            engagement=self.engagement, title=first.title[:255], severity=first.severity,
+            affects=first.affects, created_by=self.consultant,
+        )
+        login(self.client, self.consultant)
+        resp = self.client.post(self.url, self.scan(preview="1"))
+        self.assertContains(resp, "Already in this engagement", count=1)
+        # Duplicates start unticked; the other row is ticked.
+        html = resp.content.decode()
+        boxes = re.findall(r'<input type="checkbox" name="include" value="(\d)"[^>]*?(checked)?>', html)
+        self.assertEqual(boxes, [("0", ""), ("1", "checked")])
+
+    def test_scan_preview_reports_a_bad_file(self):
+        login(self.client, self.consultant)
+        upload = SimpleUploadedFile("scan.xml", b"<not-nmap", content_type="text/xml")
+        resp = self.client.post(self.url, {"format": "NMAP", "file": upload, "preview": "1"})
+        self.assertEqual(resp.status_code, 400)
+        self.assertContains(resp, 'role="alert"', status_code=400)
+
+    def test_scan_import_creates_only_ticked_results(self):
+        login(self.client, self.consultant)
+        resp = self.client.post(self.url, self.scan(selection="1", include=["1"]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.filter(engagement=self.engagement).count(), 1)
+
+    def test_scan_import_with_nothing_ticked_is_refused(self):
+        login(self.client, self.consultant)
+        resp = self.client.post(self.url, self.scan(selection="1"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Tick at least one result")
+        self.assertFalse(Finding.objects.filter(engagement=self.engagement).exists())
+
+    def test_scan_preview_needs_engagement_access(self):
+        login(self.client, make_user(User.Role.CONSULTANT))
+        resp = self.client.post(self.url, self.scan(preview="1"))
+        self.assertNotEqual(resp.status_code, 200)
+
+    def catalogue_file(self):
+        payload = json.dumps([
+            {"title": "Existing entry", "default_severity": "LOW"},
+            {"title": "New entry", "default_severity": "HIGH"},
+        ])
+        return SimpleUploadedFile("catalogue.json", payload.encode(), content_type="application/json")
+
+    def test_catalogue_preview_flags_matching_titles_without_saving(self):
+        VulnerabilityTemplate.objects.create(title="existing ENTRY", default_severity=Finding.Severity.LOW)
+        login(self.client, self.superadmin)
+        resp = self.client.post(reverse("catalogue:import"), {"file": self.catalogue_file(), "preview": "1"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Title already in the catalogue", count=1)
+        self.assertEqual(VulnerabilityTemplate.objects.count(), 1)
+
+    def test_catalogue_import_creates_only_ticked_entries(self):
+        login(self.client, self.superadmin)
+        resp = self.client.post(reverse("catalogue:import"), {"file": self.catalogue_file(), "selection": "1", "include": ["1"]})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(list(VulnerabilityTemplate.objects.values_list("title", flat=True)), ["New entry"])
+
+    def test_catalogue_preview_is_superadmin_only(self):
+        login(self.client, make_user(User.Role.TEAM_LEAD))
+        resp = self.client.post(reverse("catalogue:import"), {"file": self.catalogue_file(), "preview": "1"})
+        self.assertEqual(resp.status_code, 403)
+
+
+class SectionGapWarningTests(TestCase):
+    """Imports that would silently lose section content: no scan import
+    target, more than one, and catalogue sections this instance lacks."""
+
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.consultant = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=self.consultant, engagement=self.engagement)
+        self.superadmin = make_user(User.Role.SUPERADMIN)
+        self.client = Client()
+        # The module seed ticks "technical-details"; each test sets its own target.
+        ContentSectionDefinition.objects.update(is_import_target=False)
+
+    def section(self, label, **kwargs):
+        return ContentSectionDefinition.objects.create(slug=label.lower(), label=label, **kwargs)
+
+    def structure_post(self, ticked):
+        sections = list(ContentSectionDefinition.objects.all())
+        data = {
+            "form-TOTAL_FORMS": str(len(sections)), "form-INITIAL_FORMS": str(len(sections)),
+            "form-MIN_NUM_FORMS": "0", "form-MAX_NUM_FORMS": "1000",
+        }
+        for i, section in enumerate(sections):
+            data[f"form-{i}-id"] = str(section.pk)
+            data[f"form-{i}-label"] = section.label
+            data[f"form-{i}-is_active"] = "on"
+            if section.label in ticked:
+                data[f"form-{i}-is_import_target"] = "on"
+        login(self.client, self.superadmin)
+        return self.client.post(reverse("field_visibility:edit"), data)
+
+    def test_scan_import_page_warns_when_no_import_target(self):
+        self.section("Description")
+        login(self.client, self.consultant)
+        resp = self.client.get(reverse("findings:import", args=[self.engagement.pk]))
+        self.assertContains(resp, "Scan details won't be kept")
+
+    def test_scan_import_page_warns_when_import_target_is_retired(self):
+        self.section("Description", is_import_target=True, is_active=False)
+        login(self.client, self.consultant)
+        resp = self.client.get(reverse("findings:import", args=[self.engagement.pk]))
+        self.assertContains(resp, "Scan details won't be kept")
+
+    def test_scan_import_page_names_the_import_target(self):
+        self.section("Description", is_import_target=True)
+        login(self.client, self.consultant)
+        resp = self.client.get(reverse("findings:import", args=[self.engagement.pk]))
+        self.assertNotContains(resp, "Scan details won't be kept")
+        self.assertContains(resp, "go into the <strong>Description</strong> section", html=False)
+
+    def test_structure_refuses_two_import_targets(self):
+        self.section("Description")
+        self.section("Impact")
+        resp = self.structure_post(ticked={"Description", "Impact"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Only one section can be the scan import target", count=2)
+        self.assertFalse(ContentSectionDefinition.objects.filter(is_import_target=True).exists())
+
+    def test_structure_accepts_one_import_target(self):
+        self.section("Description")
+        self.section("Impact")
+        resp = self.structure_post(ticked={"Impact"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            list(ContentSectionDefinition.objects.filter(is_import_target=True).values_list("label", flat=True)),
+            ["Impact"],
+        )
+
+    def test_structure_refuses_affected_assets_as_import_target(self):
+        affects = ContentSectionDefinition.objects.get(slug="affects")
+        resp = self.structure_post(ticked={affects.label})
+        self.assertContains(resp, "can&#x27;t be the scan import target")
+        affects.refresh_from_db()
+        self.assertFalse(affects.is_import_target)
+
+    def test_new_section_cannot_become_a_second_import_target(self):
+        self.section("Description", is_import_target=True)
+        login(self.client, self.superadmin)
+        resp = self.client.post(reverse("field_visibility:edit"), {
+            "action": "create", "create-label": "Impact", "create-is_active": "on", "create-is_import_target": "on",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "&#x27;Description&#x27; is already the scan import target")
+        self.assertFalse(ContentSectionDefinition.objects.filter(label="Impact").exists())
+
+    def test_catalogue_preview_names_missing_and_retired_sections(self):
+        self.section("Description")
+        self.section("Legacy", is_active=False)
+        payload = json.dumps([
+            {"title": "A", "default_severity": "LOW", "sections": {"description": "x", "impact": "y", "legacy": "z"}},
+            {"title": "B", "default_severity": "LOW", "sections": {"impact": "y", "references": None}},
+        ])
+        login(self.client, self.superadmin)
+        resp = self.client.post(reverse("catalogue:import"), {
+            "file": SimpleUploadedFile("catalogue.json", payload.encode(), content_type="application/json"),
+            "preview": "1",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "will be skipped: &#x27;impact&#x27; (2 entries)")
+        self.assertNotContains(resp, "&#x27;references&#x27;")  # empty content isn't worth a warning
+        self.assertContains(resp, "re-activated: &#x27;Legacy&#x27; (1 entry)")
+
+    def test_catalogue_preview_has_no_notice_when_every_section_matches(self):
+        self.section("Description")
+        payload = json.dumps([{"title": "A", "default_severity": "LOW", "sections": {"description": "x"}}])
+        login(self.client, self.superadmin)
+        resp = self.client.post(reverse("catalogue:import"), {
+            "file": SimpleUploadedFile("catalogue.json", payload.encode(), content_type="application/json"),
+            "preview": "1",
+        })
+        self.assertNotContains(resp, 'role="note"')

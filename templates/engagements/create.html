@@ -2,14 +2,16 @@
 {% block title %}New engagement — RedScribe{% endblock %}
 {% block extra_head %}{% include "base/_datepicker_head.html" %}{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl">
+    <div class="mb-6">
+        <h1 class="page-title">New engagement</h1>
+        <p class="text-sm text-slate-500 mt-1">Starts In Progress immediately. Everything here can be changed later from the engagement's Settings tab.</p>
+    </div>
     <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">New engagement</h1>
-        <p class="text-sm text-slate-500 mb-5">Starts In Progress immediately</p>
         <form method="post">
             {% csrf_token %}
             {% include "base/_generic_form_fields.html" %}
-            <button type="submit" class="btn-primary w-full">Create engagement</button>
+            <div class="flex justify-end"><button type="submit" class="btn-primary">Create engagement</button></div>
         </form>
     </div>
     {% url 'engagements:list' as back_url %}

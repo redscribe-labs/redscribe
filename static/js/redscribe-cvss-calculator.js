@@ -165,6 +165,90 @@
   const METRIC_ORDER_V3_1 = ["AV", "AC", "PR", "UI", "S", "C", "I", "A"];
   const METRIC_ORDER_V4_0 = ["AV", "AC", "AT", "PR", "UI", "VC", "VI", "VA", "SC", "SI", "SA"];
 
+  // Section layout for the calculator, after FIRST's own calculators. Labels
+  // here are the short in-section names; METRICS_* keep the full names.
+  const GROUPS_V3_1 = [
+    { title: "Exploitability", metrics: [["AV", "Attack Vector"], ["AC", "Attack Complexity"], ["PR", "Privileges Required"], ["UI", "User Interaction"]] },
+    { title: "Scope", metrics: [["S", "Scope"]] },
+    { title: "Impact", metrics: [["C", "Confidentiality"], ["I", "Integrity"], ["A", "Availability"]] },
+  ];
+  const GROUPS_V4_0 = [
+    { title: "Exploitability", metrics: [["AV", "Attack Vector"], ["AC", "Attack Complexity"], ["AT", "Attack Requirements"], ["PR", "Privileges Required"], ["UI", "User Interaction"]] },
+    { title: "Vulnerable system impact", metrics: [["VC", "Confidentiality"], ["VI", "Integrity"], ["VA", "Availability"]] },
+    { title: "Subsequent system impact", metrics: [["SC", "Confidentiality"], ["SI", "Integrity"], ["SA", "Availability"]] },
+  ];
+
+  // Hover help for each metric ("_") and value, condensed from the FIRST specs.
+  const CIA_HELP = {
+    H: "Total loss, or a serious loss with a direct, serious consequence.",
+    L: "Some loss, but limited in scope or without a serious consequence.",
+    N: "No loss.",
+  };
+  const HELP_V3_1 = {
+    AV: {
+      _: "The context in which exploitation is possible.",
+      N: "Exploitable remotely across the network, e.g. over the internet.",
+      A: "Limited to a logically adjacent network, e.g. the same subnet or Bluetooth.",
+      L: "Needs local access or a local session, or relies on a user to open something.",
+      P: "Needs physical access to the device.",
+    },
+    AC: {
+      _: "Conditions outside the attacker's control that must exist for the attack to work.",
+      L: "No special conditions; the attack works repeatably.",
+      H: "Depends on conditions the attacker doesn't control, e.g. winning a race or a MITM position.",
+    },
+    PR: {
+      _: "The privileges the attacker needs before exploiting.",
+      N: "Unauthenticated.",
+      L: "Basic user privileges.",
+      H: "Significant (e.g. administrative) privileges.",
+    },
+    UI: {
+      _: "Whether someone other than the attacker has to take part.",
+      N: "No user interaction needed.",
+      R: "A user must take some action, e.g. click a link.",
+    },
+    S: {
+      _: "Whether impact reaches beyond the vulnerable component's security authority.",
+      U: "Impact is limited to the vulnerable component.",
+      C: "Impact reaches components beyond it, e.g. a VM escape or stored XSS hitting the browser.",
+    },
+    C: Object.assign({ _: "Impact on the confidentiality of information." }, CIA_HELP),
+    I: Object.assign({ _: "Impact on the integrity (trustworthiness) of information." }, CIA_HELP),
+    A: Object.assign({ _: "Impact on the availability of the component." }, CIA_HELP),
+  };
+  const HELP_V4_0 = {
+    AV: HELP_V3_1.AV,
+    AC: {
+      _: "Security-enhancing conditions the attacker must evade or overcome.",
+      L: "No target-specific evasion or reconnaissance needed.",
+      H: "Must evade or circumvent active protections (e.g. ASLR, DEP) or obtain target-specific secrets.",
+    },
+    AT: {
+      _: "Deployment or execution conditions on the target that the attack depends on.",
+      N: "Works against all or most instances of the vulnerable system.",
+      P: "Depends on specific conditions, e.g. a race condition or a network injection position.",
+    },
+    PR: HELP_V3_1.PR,
+    UI: {
+      _: "Whether a human user other than the attacker has to take part.",
+      N: "No user interaction needed.",
+      P: "Limited, involuntary interaction, e.g. visiting a crafted page.",
+      A: "Specific, conscious actions, e.g. importing a file or dismissing a warning.",
+    },
+    VC: Object.assign({ _: "Confidentiality impact on the vulnerable system." }, CIA_HELP),
+    VI: Object.assign({ _: "Integrity impact on the vulnerable system." }, CIA_HELP),
+    VA: Object.assign({ _: "Availability impact on the vulnerable system." }, CIA_HELP),
+    SC: Object.assign({ _: "Confidentiality impact on systems beyond the vulnerable one." }, CIA_HELP),
+    SI: Object.assign({ _: "Integrity impact on systems beyond the vulnerable one." }, CIA_HELP),
+    SA: Object.assign({ _: "Availability impact on systems beyond the vulnerable one." }, CIA_HELP),
+  };
+
+  // Same colours as the app's severity badges (badge_class in redscribe_extras).
+  const SEVERITY_BADGES = {
+    CRITICAL: "badge-red", HIGH: "badge-orange", MEDIUM: "badge-amber", LOW: "badge-mist", INFORMATIONAL: "badge-slate",
+  };
+
   function roundup(input) {
     const intInput = Math.round(input * 100000);
     if (intInput % 10000 === 0) {
@@ -317,7 +401,10 @@
       if (!severitySelect) return;
       const severity = severityFromScore(score);
       if (severity && [...severitySelect.options].some((o) => o.value === severity)) {
-        severitySelect.value = severity;
+        if (severitySelect.value !== severity) {
+          severitySelect.value = severity;
+          severitySelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
       }
     }
 
@@ -325,225 +412,263 @@
       applySeverity(scoreInput.value);
     });
 
-    const calculatorContainer = document.createElement("div");
-    calculatorContainer.className = "card space-y-4 mb-4";
-
-    const titleDiv = document.createElement("div");
-    titleDiv.className = "flex items-center justify-between";
-
-    const titleSpan = document.createElement("h3");
-    titleSpan.className = "font-semibold text-slate-900";
-    titleSpan.textContent = "CVSS Calculator";
-    titleDiv.appendChild(titleSpan);
-
-    const toggleDiv = document.createElement("div");
-    toggleDiv.className = "flex gap-2";
-
-    const btn31 = document.createElement("button");
-    btn31.type = "button";
-    btn31.className = "btn-primary px-3 py-1 text-sm";
-    btn31.textContent = "v3.1";
-    btn31.setAttribute("data-version", "3.1");
-    btn31.setAttribute("aria-pressed", "true");
-
-    const btn40 = document.createElement("button");
-    btn40.type = "button";
-    btn40.className = "btn-secondary px-3 py-1 text-sm";
-    btn40.textContent = "v4.0";
-    btn40.setAttribute("data-version", "4.0");
-    btn40.setAttribute("aria-pressed", "false");
-
-    toggleDiv.setAttribute("role", "group");
-    toggleDiv.setAttribute("aria-label", "CVSS version");
-    toggleDiv.appendChild(btn31);
-    toggleDiv.appendChild(btn40);
-    titleDiv.appendChild(toggleDiv);
-    calculatorContainer.appendChild(titleDiv);
-
-    const gridDiv31 = document.createElement("div");
-    gridDiv31.className = "grid grid-cols-2 gap-3";
-    gridDiv31.setAttribute("data-grid", "3.1");
-    calculatorContainer.appendChild(gridDiv31);
-
-    const gridDiv40 = document.createElement("div");
-    gridDiv40.className = "grid grid-cols-2 gap-3 hidden";
-    gridDiv40.setAttribute("data-grid", "4.0");
-    calculatorContainer.appendChild(gridDiv40);
-
-    const selects31 = {};
-    const selects40 = {};
-
-    for (const metric of METRIC_ORDER_V3_1) {
-      const metricDef = METRICS_V3_1[metric];
-
-      const selectDiv = document.createElement("div");
-      selectDiv.className = "flex flex-col";
-
-      const label = document.createElement("label");
-      label.className = "field-label";
-      label.textContent = metricDef.name;
-      label.htmlFor = `cvss-3-1-${metric}`;
-      selectDiv.appendChild(label);
-
-      const select = document.createElement("select");
-      select.id = `cvss-3-1-${metric}`;
-      select.className = "field-input";
-      select.setAttribute("data-cvss-metric", metric);
-      select.setAttribute("data-cvss-version", "3.1");
-
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "—";
-      select.appendChild(emptyOption);
-
-      for (const [code, label_text] of Object.entries(metricDef.values)) {
-        const option = document.createElement("option");
-        option.value = code;
-        option.textContent = `${code} – ${label_text}`;
-        select.appendChild(option);
-      }
-
-      select.addEventListener("change", updateScoreV3_1);
-      selectDiv.appendChild(select);
-      gridDiv31.appendChild(selectDiv);
-      selects31[metric] = select;
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
     }
 
-    for (const metric of METRIC_ORDER_V4_0) {
-      const metricDef = METRICS_V4_0[metric];
+    // The calculator lives in a modal appended to <body>, outside the form, so
+    // picking metrics doesn't touch the form until "Apply" writes the result.
+    const modal = el("dialog", "p-0 border-0 bg-transparent w-[calc(100%-2rem)] max-w-3xl backdrop:bg-black/40");
+    modal.id = "cvss-calculator-modal";
+    modal.setAttribute("aria-labelledby", "cvss-calculator-title");
+    modal.style.position = "fixed";
+    modal.style.top = "50%";
+    modal.style.left = "50%";
+    modal.style.transform = "translate(-50%, -50%)";
+    modal.style.margin = "0";
 
-      const selectDiv = document.createElement("div");
-      selectDiv.className = "flex flex-col";
+    // Header (title, version, live score) and footer (actions) stay put; only
+    // the metric list between them scrolls.
+    const panel = el("div", "card !m-0 !p-0 flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden");
+    modal.appendChild(panel);
 
-      const label = document.createElement("label");
-      label.className = "field-label";
-      label.textContent = metricDef.name;
-      label.htmlFor = `cvss-4-0-${metric}`;
-      selectDiv.appendChild(label);
+    const header = el("div", "px-5 pt-5 pb-4 border-b border-slate-200 space-y-4");
+    panel.appendChild(header);
 
-      const select = document.createElement("select");
-      select.id = `cvss-4-0-${metric}`;
-      select.className = "field-input";
-      select.setAttribute("data-cvss-metric", metric);
-      select.setAttribute("data-cvss-version", "4.0");
+    const titleRow = el("div", "flex items-center justify-between gap-3");
+    const title = el("h2", "text-lg font-semibold text-slate-900", "CVSS Calculator");
+    title.id = "cvss-calculator-title";
+    titleRow.appendChild(title);
 
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = "—";
-      select.appendChild(emptyOption);
+    const toggle = el("div", "inline-flex rounded-md border border-slate-300 p-0.5 bg-slate-50");
+    toggle.setAttribute("role", "group");
+    toggle.setAttribute("aria-label", "CVSS version");
+    const versionButtons = {};
+    for (const v of ["3.1", "4.0"]) {
+      const btn = el("button", "rounded px-3 py-1 text-sm font-medium transition-colors", `v${v}`);
+      btn.type = "button";
+      btn.setAttribute("data-version", v);
+      btn.addEventListener("click", function () { showVersion(v); });
+      toggle.appendChild(btn);
+      versionButtons[v] = btn;
+    }
+    titleRow.appendChild(toggle);
+    header.appendChild(titleRow);
 
-      for (const [code, label_text] of Object.entries(metricDef.values)) {
-        const option = document.createElement("option");
-        option.value = code;
-        option.textContent = `${code} – ${label_text}`;
-        select.appendChild(option);
+    const scoreRow = el("div", "flex items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3");
+    const scoreValue = el("div", "font-mono text-3xl font-semibold tabular-nums text-slate-900 w-16 shrink-0 text-center");
+    scoreValue.setAttribute("aria-live", "polite");
+    const scoreMeta = el("div", "min-w-0 space-y-1");
+    const scoreSeverity = el("div", "flex items-center gap-2 text-sm text-slate-600");
+    const scoreVector = el("p", "font-mono text-xs text-slate-500 break-all");
+    scoreMeta.appendChild(scoreSeverity);
+    scoreMeta.appendChild(scoreVector);
+    scoreRow.appendChild(scoreValue);
+    scoreRow.appendChild(scoreMeta);
+    header.appendChild(scoreRow);
+
+    const body = el("div", "overflow-y-auto px-5 py-4");
+    panel.appendChild(body);
+
+    const footer = el("div", "flex items-center gap-2 px-5 py-4 border-t border-slate-200");
+    const applyBtn = el("button", "btn-primary", "Apply");
+    applyBtn.type = "button";
+    const cancelBtn = el("button", "btn-secondary", "Cancel");
+    cancelBtn.type = "button";
+    const clearBtn = el("button", "ml-auto text-sm text-slate-500 hover:text-slate-700 hover:underline", "Clear all");
+    clearBtn.type = "button";
+    footer.appendChild(applyBtn);
+    footer.appendChild(cancelBtn);
+    footer.appendChild(clearBtn);
+    panel.appendChild(footer);
+
+    // One section per metric group; each metric is a radio group drawn as a
+    // row of toggle buttons (native radios, so arrow keys and forms behave).
+    function buildVersion(version, groups, metrics, help) {
+      const container = el("div", "space-y-5");
+      const radios = {};
+      const idPrefix = `cvss-${version.replace(".", "-")}`;
+      for (const group of groups) {
+        const section = el("section", "space-y-3");
+        section.appendChild(el("h3", "text-xs font-semibold uppercase tracking-wide text-slate-500", group.title));
+        for (const [metric, label] of group.metrics) {
+          const fieldset = el("fieldset", "sm:grid sm:grid-cols-[11rem_1fr] sm:items-center gap-x-4");
+          const legend = el("legend", "contents");
+          const legendText = el("span", "block text-sm font-medium text-slate-700 mb-1.5 sm:mb-0 cursor-help", `${label} (${metric})`);
+          legendText.title = help[metric]._;
+          legend.appendChild(legendText);
+          fieldset.appendChild(legend);
+
+          const options = el("div", "flex flex-wrap gap-1.5");
+          radios[metric] = {};
+          for (const [code, valueLabel] of Object.entries(metrics[metric].values)) {
+            const id = `${idPrefix}-${metric}-${code}`;
+            const wrap = el("span", "relative");
+            const input = el("input", "peer sr-only");
+            input.type = "radio";
+            input.name = `${idPrefix}-${metric}`;
+            input.id = id;
+            input.value = code;
+            input.addEventListener("change", updatePreview);
+            const optionLabel = el(
+              "label",
+              "inline-flex cursor-pointer select-none items-center gap-1 rounded-md border border-slate-300 bg-white dark:bg-slate-100 " +
+              "px-3 py-1.5 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50 " +
+              "peer-checked:border-brand-600 peer-checked:bg-brand-600 peer-checked:text-white peer-checked:hover:bg-brand-700 " +
+              "peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 peer-focus-visible:ring-offset-1"
+            );
+            optionLabel.htmlFor = id;
+            optionLabel.title = help[metric][code] || "";
+            optionLabel.appendChild(document.createTextNode(valueLabel));
+            optionLabel.appendChild(el("span", "font-mono text-xs opacity-70", `(${code})`));
+            wrap.appendChild(input);
+            wrap.appendChild(optionLabel);
+            options.appendChild(wrap);
+            radios[metric][code] = input;
+          }
+          fieldset.appendChild(options);
+          section.appendChild(fieldset);
+        }
+        container.appendChild(section);
       }
-
-      select.addEventListener("change", updateScoreV4_0);
-      selectDiv.appendChild(select);
-      gridDiv40.appendChild(selectDiv);
-      selects40[metric] = select;
+      body.appendChild(container);
+      return { container, radios };
     }
 
-    const hintDiv = document.createElement("p");
-    hintDiv.className = "field-help text-xs";
-    hintDiv.textContent =
-      "Auto-fills from the calculator above, or enter/paste a vector manually.";
-    calculatorContainer.appendChild(hintDiv);
+    const calc = {
+      "3.1": Object.assign(buildVersion("3.1", GROUPS_V3_1, METRICS_V3_1, HELP_V3_1), { order: METRIC_ORDER_V3_1, compute: computeScoreV3_1, parse: parseVectorV3_1 }),
+      "4.0": Object.assign(buildVersion("4.0", GROUPS_V4_0, METRICS_V4_0, HELP_V4_0), { order: METRIC_ORDER_V4_0, compute: computeScoreV4_0, parse: parseVectorV4_0 }),
+    };
+
+    document.body.appendChild(modal);
+
+    const openBtn = el("button", "btn-secondary w-full text-sm", "Open CVSS calculator");
+    openBtn.type = "button";
 
     const scoreFieldDiv = scoreInput.closest("div");
-    scoreFieldDiv.parentElement.insertBefore(calculatorContainer, scoreFieldDiv);
+    scoreFieldDiv.parentElement.insertBefore(openBtn, scoreFieldDiv);
 
     const vectorFieldDiv = vectorInput.closest("div");
     const existingHelp = vectorFieldDiv.querySelector(".field-help");
     if (!existingHelp) {
-      const newHint = document.createElement("p");
-      newHint.className = "field-help";
-      newHint.textContent =
-        "Auto-fills from the calculator above, or enter/paste a vector manually.";
+      const newHint = el("p", "field-help", "Set it with the CVSS calculator, or enter/paste a vector manually.");
       vectorFieldDiv.appendChild(newHint);
     }
 
-    btn31.addEventListener("click", function (e) {
-      e.preventDefault();
-      gridDiv31.classList.remove("hidden");
-      gridDiv40.classList.add("hidden");
-      btn31.classList.remove("btn-secondary");
-      btn31.classList.add("btn-primary");
-      btn40.classList.remove("btn-primary");
-      btn40.classList.add("btn-secondary");
-      btn31.setAttribute("aria-pressed", "true");
-      btn40.setAttribute("aria-pressed", "false");
-    });
+    let version = "3.1";
 
-    btn40.addEventListener("click", function (e) {
-      e.preventDefault();
-      gridDiv31.classList.add("hidden");
-      gridDiv40.classList.remove("hidden");
-      btn40.classList.remove("btn-secondary");
-      btn40.classList.add("btn-primary");
-      btn31.classList.remove("btn-primary");
-      btn31.classList.add("btn-secondary");
-      btn40.setAttribute("aria-pressed", "true");
-      btn31.setAttribute("aria-pressed", "false");
-    });
-
-    function updateScoreV3_1() {
-      const values = {};
-      for (const metric of METRIC_ORDER_V3_1) {
-        values[metric] = selects31[metric].value || null;
+    function showVersion(v) {
+      version = v;
+      for (const [key, c] of Object.entries(calc)) {
+        const active = key === v;
+        c.container.classList.toggle("hidden", !active);
+        const btn = versionButtons[key];
+        btn.setAttribute("aria-pressed", String(active));
+        btn.classList.toggle("bg-brand-600", active);
+        btn.classList.toggle("text-white", active);
+        btn.classList.toggle("shadow-sm", active);
+        btn.classList.toggle("text-slate-600", !active);
+        btn.classList.toggle("hover:text-slate-900", !active);
       }
-
-      const result = computeScoreV3_1(values);
-      if (result.score !== null) {
-        scoreInput.value = result.score;
-        vectorInput.value = result.vector;
-        applySeverity(result.score);
-      }
+      updatePreview();
     }
 
-    function updateScoreV4_0() {
+    function selectedValues(c) {
       const values = {};
-      for (const metric of METRIC_ORDER_V4_0) {
-        values[metric] = selects40[metric].value || null;
+      for (const metric of c.order) {
+        const checked = Object.values(c.radios[metric]).find((r) => r.checked);
+        values[metric] = checked ? checked.value : null;
       }
-
-      const result = computeScoreV4_0(values);
-      if (result.score !== null) {
-        scoreInput.value = result.score;
-        vectorInput.value = result.vector;
-        applySeverity(result.score);
-      }
+      return values;
     }
 
-    if (vectorInput.value) {
-      const parsedV3_1 = parseVectorV3_1(vectorInput.value);
-      if (parsedV3_1) {
-        for (const metric of METRIC_ORDER_V3_1) {
-          if (parsedV3_1[metric]) {
-            selects31[metric].value = parsedV3_1[metric];
-          }
-        }
+    function currentResult() {
+      const c = calc[version];
+      return c.compute(selectedValues(c));
+    }
+
+    function updatePreview() {
+      const c = calc[version];
+      const values = selectedValues(c);
+      const result = c.compute(values);
+      scoreSeverity.replaceChildren();
+      if (result.score === null) {
+        const set = c.order.filter((m) => values[m]).length;
+        scoreValue.textContent = "—";
+        scoreSeverity.textContent = `${set} of ${c.order.length} metrics set`;
+        scoreVector.textContent = "Pick a value for every metric to get a score.";
+        applyBtn.disabled = true;
         return;
       }
+      const severity = severityFromScore(result.score);
+      scoreValue.textContent = result.score;
+      if (severity) {
+        scoreSeverity.appendChild(el("span", SEVERITY_BADGES[severity], severity === "INFORMATIONAL" ? "None" : severity));
+      }
+      scoreVector.textContent = result.vector;
+      applyBtn.disabled = false;
+    }
 
-      const parsedV4_0 = parseVectorV4_0(vectorInput.value);
-      if (parsedV4_0) {
-        for (const metric of METRIC_ORDER_V4_0) {
-          if (parsedV4_0[metric]) {
-            selects40[metric].value = parsedV4_0[metric];
-          }
+    function clearAll() {
+      for (const c of Object.values(calc)) {
+        for (const group of Object.values(c.radios)) {
+          for (const radio of Object.values(group)) radio.checked = false;
         }
-        gridDiv31.classList.add("hidden");
-        gridDiv40.classList.remove("hidden");
-        btn40.classList.remove("btn-secondary");
-        btn40.classList.add("btn-primary");
-        btn31.classList.remove("btn-primary");
-        btn31.classList.add("btn-secondary");
-        btn40.setAttribute("aria-pressed", "true");
-        btn31.setAttribute("aria-pressed", "false");
       }
     }
+
+    clearBtn.addEventListener("click", function () {
+      for (const group of Object.values(calc[version].radios)) {
+        for (const radio of Object.values(group)) radio.checked = false;
+      }
+      updatePreview();
+    });
+
+    // Sync the calculator to whatever is in the vector field right now, since
+    // it may have been pasted or edited by hand since the modal last closed.
+    function loadFromVector() {
+      clearAll();
+      for (const [key, c] of Object.entries(calc)) {
+        const parsed = c.parse(vectorInput.value);
+        if (parsed) {
+          for (const metric of c.order) {
+            if (parsed[metric]) c.radios[metric][parsed[metric]].checked = true;
+          }
+          showVersion(key);
+          return;
+        }
+      }
+      showVersion(version);
+    }
+
+    openBtn.addEventListener("click", function () {
+      loadFromVector();
+      modal.showModal();
+      const c = calc[version];
+      const first = c.radios[c.order[0]];
+      (Object.values(first).find((r) => r.checked) || Object.values(first)[0]).focus();
+    });
+
+    applyBtn.addEventListener("click", function () {
+      const result = currentResult();
+      if (result.score === null) return;
+      scoreInput.value = result.score;
+      vectorInput.value = result.vector;
+      // Fire input events so autosave and validation see the change; the
+      // score listener above also syncs the severity.
+      scoreInput.dispatchEvent(new Event("input", { bubbles: true }));
+      vectorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      modal.close();
+      openBtn.focus();
+    });
+
+    cancelBtn.addEventListener("click", function () { modal.close(); });
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) modal.close();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", setupCalculator);

@@ -1,8 +1,9 @@
 {% extends "base/base.html" %}
+{% load static %}
 {% block title %}Import catalogue — RedScribe{% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto">
+<div class="max-w-2xl mx-auto">
     <div class="card">
         <h1 class="text-xl font-bold text-slate-900 mb-1">Import catalogue</h1>
         <p class="text-sm text-slate-500 mb-5">
@@ -11,13 +12,15 @@
             against or overwrites an existing entry, and approval status is never carried over, so each one needs
             reviewing and approving again here.
         </p>
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" data-import-preview>
             {% csrf_token %}
             {% include "base/_generic_form_fields.html" %}
-            <button type="submit" class="btn-primary w-full">Import</button>
+            <div class="mb-4 empty:hidden" aria-live="polite" data-preview-target></div>
+            <button type="submit" class="btn-primary w-full" data-import-submit>Import</button>
         </form>
     </div>
     {% url 'catalogue:list' as back_url %}
     {% include "base/_back_link.html" with url=back_url label="Back to catalogue" %}
 </div>
 {% endblock %}
+{% block extra_body %}<script src="{% static 'js/redscribe-import-preview.js' %}"></script>{% endblock %}

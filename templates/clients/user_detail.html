@@ -1,8 +1,8 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
 {% load redscribe_extras %}
 {% block title %}{{ target.username }} — RedScribe{% endblock %}
 
-{% block page_header %}
+{% block settings_header %}
 <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
     <div>
         <div class="flex items-center gap-3">
@@ -55,15 +55,15 @@
 </div>
 {% endblock %}
 
-{% block content %}
+{% block settings_content %}
 <div class="card">
     <h2 class="font-semibold text-slate-900 mb-3">Account</h2>
     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div><dt class="text-slate-400">Client company</dt><dd class="text-slate-700">{{ target.client.name|default:"—" }}</dd></div>
-        <div><dt class="text-slate-400">Joined</dt><dd class="text-slate-700">{{ target.date_joined|date:"d/m/Y" }}</dd></div>
-        <div><dt class="text-slate-400">Last login</dt><dd class="text-slate-700">{{ target.last_login|date:"d/m/Y H:i"|default:"Never" }}</dd></div>
-        <div><dt class="text-slate-400">MFA enrolled</dt><dd class="text-slate-700">{{ target.mfa_enrolled_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
-        <div><dt class="text-slate-400">Deactivated</dt><dd class="text-slate-700">{{ target.deactivated_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+        <div><dt class="text-slate-500">Client company</dt><dd class="text-slate-700">{{ target.client.name|default:"—" }}</dd></div>
+        <div><dt class="text-slate-500">Joined</dt><dd class="text-slate-700">{{ target.date_joined|date:"d/m/Y" }}</dd></div>
+        <div><dt class="text-slate-500">Last login</dt><dd class="text-slate-700">{{ target.last_login|date:"d/m/Y H:i"|default:"Never" }}</dd></div>
+        <div><dt class="text-slate-500">MFA enrolled</dt><dd class="text-slate-700">{{ target.mfa_enrolled_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
+        <div><dt class="text-slate-500">Deactivated</dt><dd class="text-slate-700">{{ target.deactivated_at|date:"d/m/Y H:i"|default:"—" }}</dd></div>
     </dl>
 </div>
 

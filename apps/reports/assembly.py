@@ -1,9 +1,11 @@
 import base64
 import json
 from dataclasses import dataclass
+from functools import partial
 from html import escape
 
 from apps.checklist.models import ChecklistItem
+from apps.checklist.services import decrypt_item_text
 from apps.findings.display_id import assign_display_ids
 from apps.findings.models import ContentSectionDefinition, Finding
 from apps.findings.scan_import import FORMAT_LABELS
@@ -315,8 +317,9 @@ def _finding_metadata_table(finding: Finding, profile: ReportProfile) -> TableBl
         [get_label(profile, "finding_id_row"), finding.display_id],
         [get_label(profile, "finding_cvss_score"), finding.cvss_score or "—"],
         [get_label(profile, "finding_cvss_vector"), finding.cvss_vector or "—"],
-        [get_label(profile, "finding_cve_id"), finding.cve_id or "—"],
     ]
+    if finding.cve_id:  # most findings have no CVE; an empty "—" row is just noise
+        rows.append([get_label(profile, "finding_cve_id"), finding.cve_id])
     tags = list(finding.classifications.all())
     if tags:
         rows += [[tag.taxonomy, tag.value] for tag in tags]
@@ -402,11 +405,13 @@ def _assessment_team_data(engagement) -> list[dict]:
     # that access helper here leaked management-only accounts (e.g.
     # superadmin) into the report even though they were never assigned.
     members = (
-        engagement.memberships.select_related("user", "user__role").order_by("user__username")
+        engagement.memberships.select_related("user").order_by("user__username")
     )
+    # Names only: a member's app role is their access level in RedScribe, not
+    # their part in the engagement, so it isn't printed in the report.
     return [
         {
-            "member": membership.user, "role_name": membership.user.role.name,
+            "member": membership.user,
             "background": membership.user.background,
             "qualifications": membership.user.qualifications,
         }
@@ -430,13 +435,23 @@ def _assessment_team_section(engagement, profile: ReportProfile) -> Section | No
         if qualifications_html:
             blocks.append(RichTextBlock(qualifications_html))
         children.append(Section(
-            key=f"team:{member.uuid}", title=f"{member} — {entry['role_name']}",
+            key=f"team:{member.uuid}", title=str(member),
             numbered=False, blocks=blocks,
         ))
     return Section(key="assessment_team", title=get_label(profile, "assessment_team"), children=children)
 
 
-def _checklist_coverage_data(engagement, display_id_lookup: dict) -> list[dict]:
+def _checklist_status_text(item, status_labels, project_key):
+    label = status_labels.get(item.status, item.status)
+    if item.status == ChecklistItem.Status.BLOCKED and project_key is not None:
+        reason = decrypt_item_text(item, "blocked_reason", project_key)
+        if reason:
+            return f"{label}: {reason}"
+    return label
+
+
+def _checklist_coverage_data(engagement, display_id_lookup: dict, project_key=None) -> list[dict]:
+    """project_key, when given, adds each Blocked check's reason to its status text."""
     status_labels = dict(ChecklistItem.Status.choices)
     data = []
     for run in engagement.checklist_runs.prefetch_related("items__findings").all():
@@ -453,16 +468,16 @@ def _checklist_coverage_data(engagement, display_id_lookup: dict) -> list[dict]:
                     linked_display = ", ".join(display_id_lookup.get(f.id, f.title) for f in linked)
                 else:
                     linked_display = "—"
-                rows.append([item.code or "—", item.title, status_labels.get(item.status, item.status), linked_display])
+                rows.append([item.code or "—", item.title, _checklist_status_text(item, status_labels, project_key), linked_display])
             category_rows.append({"category": category or "Uncategorized", "rows": rows})
 
         data.append({"run_id": run.id, "run_label": run.label, "categories": category_rows})
     return data
 
 
-def _checklist_coverage_section(engagement, display_id_lookup: dict, profile: ReportProfile) -> Section:
+def _checklist_coverage_section(engagement, display_id_lookup: dict, profile: ReportProfile, project_key=None) -> Section:
     coverage_title = get_label(profile, "testing_methodology_coverage")
-    data = _checklist_coverage_data(engagement, display_id_lookup)
+    data = _checklist_coverage_data(engagement, display_id_lookup, project_key)
     if not data:
         return Section(
             key="checklist_coverage", title=coverage_title,
@@ -600,7 +615,7 @@ def build_report_document(*, config, engagement, project_key, user) -> ReportDoc
         document_control_builder=_document_control_table,
         assessment_team_builder=_assessment_team_section,
         dict_rows=_dict_rows,
-        checklist_builder=_checklist_coverage_section,
+        checklist_builder=partial(_checklist_coverage_section, project_key=project_key),
         scan_imports_builder=_scan_imports_section,
         substitute=substitute,
     )

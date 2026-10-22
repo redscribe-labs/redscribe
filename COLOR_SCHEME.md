@@ -82,12 +82,20 @@ carrying a blue-violet cast into most of the app's surface area:
 --color-slate-200: #313435;   (twilight-800)
 --color-slate-300: #494d50;   (twilight-700)
 --color-slate-400: #62676a;   (twilight-600)
---color-slate-500: #7a8185;   (twilight-500)
+--color-slate-500: #7e8589;   (twilight-500, lifted slightly; see below)
 --color-slate-600: #959a9d;   (twilight-400)
 --color-slate-700: #afb3b6;   (twilight-300)
 --color-slate-800: #cacdce;   (twilight-200)
 --color-slate-900: #f2f2f3;   (twilight-50)
 ```
+
+The one deviation: `slate-500` is `#7e8589` rather than twilight-500's
+`#7a8185`. It's the muted-text step (secondary labels, timestamps, table
+headers), and at `#7a8185` it measured 4.41:1 against the dark card surface
+(`slate-100`, `#181a1b`), just under WCAG AA's 4.5:1 for body text. The same
+hue lifted by four steps per channel gives 4.66:1. `twilight-500` itself is
+unchanged, and `static/css/editor.css`'s dark comment timestamps use the
+lifted value too.
 
 ### Sidebar / auth surface
 

@@ -1,56 +1,64 @@
-{% extends "base/base.html" %}
+{% extends "base/settings_base.html" %}
+{% load redscribe_extras %}
 {% block title %}Feature flags — RedScribe{% endblock %}
-{% block content %}
-<div class="max-w-lg mx-auto">
-    <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Feature flags</h1>
-        <p class="text-sm text-slate-500 mb-5">
-            Turn optional features on or off instance-wide. Turning a feature off hides its UI and blocks its
-            actions — it never deletes data already on file.
-        </p>
-        <form method="post">
-            {% csrf_token %}
+
+{% block settings_header %}
+<div class="mb-6">
+    <h1 class="page-title">Feature flags</h1>
+    <p class="text-sm text-slate-500 mt-1 max-w-2xl">
+        Turn optional features on or off instance-wide. Turning a feature off hides its UI and blocks its
+        actions — it never deletes data already on file.
+    </p>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<form method="post" class="max-w-3xl space-y-6">
+    {% csrf_token %}
+    <section class="panel">
+        <div class="panel-header"><h2 class="settings-nav-label !p-0 !text-red-700 dark:!text-red-400">Security</h2></div>
+        <div class="flex items-start gap-4 px-5 py-4">
+            <div class="min-w-0 flex-1">
+                <label for="{{ form.mfa_required.id_for_label }}" class="text-sm font-semibold text-slate-900">{{ form.mfa_required.label }}</label>
+                <p class="text-sm text-slate-500 mt-0.5">{{ form.mfa_required.help_text }}</p>
+                {% for error in form.mfa_required.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {{ form.mfa_required|add_class:"switch" }}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header"><h2 class="settings-nav-label !p-0 !text-red-700 dark:!text-red-400">Client portal</h2></div>
+        <div class="flex items-start gap-4 px-5 py-4">
+            <div class="min-w-0 flex-1">
+                <label for="{{ form.client_portal_enabled.id_for_label }}" class="text-sm font-semibold text-slate-900">{{ form.client_portal_enabled.label }}</label>
+                <p class="text-sm text-slate-500 mt-0.5">{{ form.client_portal_enabled.help_text }}</p>
+                {% for error in form.client_portal_enabled.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+            </div>
+            {{ form.client_portal_enabled|add_class:"switch" }}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header"><h2 class="settings-nav-label !p-0">Features</h2></div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-200">
             {% for field in form %}
             {% if field.name != "mfa_required" and field.name != "client_portal_enabled" %}
-            <div class="mb-4 flex items-start gap-3 py-2 border-b border-slate-100 dark:border-slate-200 last:border-0">
-                {{ field }}
-                <div class="min-w-0">
-                    <label for="{{ field.id_for_label }}" class="text-sm font-medium text-slate-800">{{ field.label }}</label>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ field.help_text }}</p>
+            <div class="flex items-start gap-4 px-5 py-4">
+                <div class="min-w-0 flex-1">
+                    <label for="{{ field.id_for_label }}" class="text-sm font-semibold text-slate-900">{{ field.label }}</label>
+                    <p class="text-sm text-slate-500 mt-0.5">{{ field.help_text }}</p>
                     {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
                 </div>
+                {{ field|add_class:"switch" }}
             </div>
             {% endif %}
             {% endfor %}
+        </div>
+    </section>
 
-            <div class="mt-6 pt-5 border-t-2 border-red-200 dark:border-red-900">
-                <h2 class="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">Security</h2>
-                <div class="flex items-start gap-3 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 px-3 py-3">
-                    {{ form.mfa_required }}
-                    <div class="min-w-0">
-                        <label for="{{ form.mfa_required.id_for_label }}" class="text-sm font-medium text-red-900 dark:text-red-300">{{ form.mfa_required.label }}</label>
-                        <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">{{ form.mfa_required.help_text }}</p>
-                        {% for error in form.mfa_required.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-6 pt-5 border-t-2 border-red-200 dark:border-red-900">
-                <h2 class="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">Client portal</h2>
-                <div class="flex items-start gap-3 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 px-3 py-3">
-                    {{ form.client_portal_enabled }}
-                    <div class="min-w-0">
-                        <label for="{{ form.client_portal_enabled.id_for_label }}" class="text-sm font-medium text-red-900 dark:text-red-300">{{ form.client_portal_enabled.label }}</label>
-                        <p class="text-xs text-red-700 dark:text-red-400 mt-0.5">{{ form.client_portal_enabled.help_text }}</p>
-                        {% for error in form.client_portal_enabled.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <button type="submit" class="btn-primary w-full mt-5">Save</button>
-        </form>
+    <div class="flex justify-end">
+        <button type="submit" class="btn-primary">Save</button>
     </div>
-    {% url 'accounts:dashboard' as back_url %}
-    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
-</div>
+</form>
 {% endblock %}

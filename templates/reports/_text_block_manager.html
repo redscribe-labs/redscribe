@@ -21,12 +21,12 @@
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                     <div class="flex-1 min-w-0">
                         {{ form.label|add_class:"field-input" }}
-                        <p class="mt-1 font-mono text-xs text-slate-400 truncate">{% templatetag openvariable %} {{ form.instance.slug }} {% templatetag closevariable %}</p>
+                        <p class="mt-1 font-mono text-xs text-slate-500 truncate">{% templatetag openvariable %} {{ form.instance.slug }} {% templatetag closevariable %}</p>
                     </div>
-                    <div class="flex items-center gap-4 shrink-0 pl-0 sm:pl-2">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 shrink-0 pl-0 sm:pl-2">
                         <label class="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap">{{ form.is_active }} Active</label>
                         <label class="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap">{{ form.include_in_remediation_report_only }} Remediation only</label>
-                        <a href="{% url 'report_profiles:profile_text_block_edit' profile.pk form.instance.pk %}" class="text-brand-600 hover:underline text-xs shrink-0">Edit content</a>
+                        <a href="{% url 'report_profiles:profile_text_block_edit' profile.pk form.instance.pk %}" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200 text-xs shrink-0">Edit content</a>
                         <button type="button" class="text-red-600 hover:underline text-xs shrink-0" data-block-delete-trigger
                                 data-action="{% url 'report_profiles:text_block_delete' form.instance.pk %}"
                                 data-label="{{ form.instance.label }}" data-slug="{{ form.instance.slug }}">Delete</button>

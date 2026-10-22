@@ -1,4 +1,6 @@
 {% extends "base/base.html" %}
+{% block html_attrs %} data-focus-page{% endblock %}
+{% load redscribe_extras %}
 {% block title %}Configure report — {{ engagement.client_name }}{% endblock %}
 
 {% block engagement_subnav %}
@@ -6,7 +8,7 @@
 {% endblock %}
 
 {% block page_header %}
-{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Configure report" subtitle="Changes on the left update the preview on the right as you type." %}
+{% include "base/_page_header.html" with eyebrow=engagement.client_name title="Report builder" subtitle="Changes on the left update the preview on the right as you type." %}
 {% endblock %}
 
 {% block extra_head %}
@@ -40,12 +42,27 @@
 {% endblock %}
 
 {% block content %}
-<form method="post" id="config-form" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+<form method="post" id="config-form" class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-[12rem_minmax(0,1fr)_minmax(0,1fr)] gap-6 items-start">
     {% csrf_token %}
     <input type="hidden" name="content_json" id="content_json">
 
+    <nav aria-label="Report outline" class="hidden 2xl:block sticky top-36">
+        <p class="settings-nav-label mb-1">Outline</p>
+        <ol class="space-y-0.5">
+            <li><a href="#report-type" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Report type</a></li>
+            <li><a href="#report-profile" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Report profile</a></li>
+            <li><a href="#report-cover" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Cover page</a></li>
+            <li><a href="#report-document-control" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Document control</a></li>
+            <li><a href="#report-breakdown" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Breakdown of findings</a></li>
+            <li><a href="#report-blocks" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Content blocks</a></li>
+            <li><a href="#report-observations" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Observations</a></li>
+            <li><a href="#report-phases" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Testing phases</a></li>
+            <li><a href="#report-findings" class="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 hover:text-brand-700 dark:hover:text-brand-300">Findings</a></li>
+        </ol>
+    </nav>
+
     <div class="space-y-6">
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-type">
             <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
                 <input type="checkbox" id="is_remediation_report" name="is_remediation_report" {% if is_remediation_report %}checked{% endif %}>
                 Remediation report
@@ -53,7 +70,7 @@
             <p class="field-help mt-1">When on, each included finding's Remediation testing subsection is shown (only where remediation data exists).</p>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-profile">
             <label for="report_profile" class="field-label">Report profile</label>
             <select class="field-input" id="report_profile" name="report_profile">
                 <option value="">(Default)</option>
@@ -65,7 +82,7 @@
             <p class="field-help mt-1">Where cover page, document control, disclaimers, and table of contents appear (or don't) is set once in the profile's own template, via the {% templatetag openvariable %} cover_page {% templatetag closevariable %}, {% templatetag openvariable %} document_control {% templatetag closevariable %}, {% templatetag openvariable %} disclaimers {% templatetag closevariable %}, and {% templatetag openvariable %} table_of_contents {% templatetag closevariable %} tags. Their actual content for this one report can be overridden below.</p>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-cover">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Cover page</h2>
             <p class="field-help mb-3">Leave blank to use the report profile's default. Only affects this report.</p>
             <div class="space-y-3">
@@ -84,7 +101,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-document-control">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Document control</h2>
             <p class="field-help mb-3">Optional commentary shown before the document control history table wherever {% templatetag openvariable %} document_control {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
             <div class="rte-editor" data-rte-field="document_control_notes" data-rte-editable="true"
@@ -92,7 +109,7 @@
             <input type="hidden" data-rte-hidden="document_control_notes" id="document_control_notes">
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-breakdown">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Breakdown of findings</h2>
             <p class="field-help mb-3">Controls the severity chart and vulnerabilities table wherever {% templatetag openvariable %} breakdown_of_findings {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
             <label class="flex items-center gap-2 text-sm font-medium text-slate-800 mb-3">
@@ -111,13 +128,13 @@
                     </label>
                 </div>
                 <div>
-                    <label class="field-label mb-1">Intro <span class="text-slate-400 font-normal">(optional — rendered above the chart)</span></label>
+                    <label class="field-label mb-1">Intro <span class="text-slate-500 font-normal">(optional — rendered above the chart)</span></label>
                     <div class="rte-editor" data-rte-field="breakdown_intro" data-rte-editable="true"
                          data-rte-initial='{{ content.breakdown.intro|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="breakdown_intro" id="breakdown_intro">
                 </div>
                 <div>
-                    <label class="field-label mb-1">Commentary <span class="text-slate-400 font-normal">(optional — rendered between the chart and the table)</span></label>
+                    <label class="field-label mb-1">Commentary <span class="text-slate-500 font-normal">(optional — rendered between the chart and the table)</span></label>
                     <div class="rte-editor" data-rte-field="breakdown_notes" data-rte-editable="true"
                          data-rte-initial='{{ content.breakdown.notes|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="breakdown_notes" id="breakdown_notes">
@@ -149,7 +166,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-blocks">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Report content blocks</h2>
             <p class="field-help mb-3">Pre-filled from the selected report profile's default text — edit freely, this copy only affects this report. Supports tables.</p>
             <div class="space-y-4">
@@ -164,7 +181,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-observations">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Observations</h2>
             <p class="field-help mb-3">One heading per item. Supports tables.</p>
             <div id="observations-list">
@@ -183,7 +200,7 @@
             <button type="button" class="btn-secondary text-sm" data-add-item="observations" data-item-prefix="obs">+ Add observation</button>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-phases">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Testing phases</h2>
             <p class="field-help mb-3">One heading per phase. Supports tables.</p>
             <div id="testing_phases-list">
@@ -202,7 +219,7 @@
             <button type="button" class="btn-secondary text-sm" data-add-item="testing_phases" data-item-prefix="phase">+ Add phase</button>
         </div>
 
-        <div class="card">
+        <div class="card scroll-mt-36" id="report-findings">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Findings included (in report order)</h2>
             <label class="flex items-center gap-2 text-sm mb-3">
                 <input type="checkbox" id="toggle_page_break_per_finding" checked> Start each finding on a new page
@@ -214,7 +231,7 @@
                 {% for f in publishable_findings %}
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" class="finding-checkbox" value="{{ f.id }}" {% if f.id|stringformat:"s" in content.findings.included_ids %}checked{% endif %}>
-                    <span class="badge-slate">{{ f.get_severity_display }}</span>
+                    <span class="badge-severity" style="{{ f|severity_style }}">{{ f.get_severity_display }}</span>
                     {{ f.title }}
                 </label>
                 {% endfor %}
@@ -226,9 +243,9 @@
         {% include "base/_form_action_bar.html" with submit_label="Save configuration" %}
     </div>
 
-    <div class="card lg:sticky lg:top-6">
-        <h2 class="font-semibold text-slate-900 text-sm mb-3">Live preview</h2>
-        <div id="report-preview-pane">{{ preview_html|safe }}</div>
+    <div class="card lg:sticky lg:top-36">
+        <h2 class="font-semibold text-slate-900 text-sm mb-3">Live preview <span class="font-normal text-xs text-slate-500">&middot; updates as you type</span></h2>
+        <div id="report-preview-pane" tabindex="0" role="region" aria-label="Report preview">{{ preview_html|safe }}</div>
     </div>
 </form>
 {% endblock %}

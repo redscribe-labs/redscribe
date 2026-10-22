@@ -1,46 +1,40 @@
 {% extends "base/base.html" %}
 {% load redscribe_extras %}
 {% block title %}My review queue — RedScribe{% endblock %}
-{% block content %}
-<h1 class="text-2xl font-bold text-slate-900 mb-1">My review queue</h1>
-<p class="text-sm text-slate-500 mb-6">Only findings explicitly assigned to you — there's no open pool to browse.</p>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="card">
-        <h2 class="font-semibold text-slate-900 mb-3">Awaiting your review</h2>
-        {% if to_review %}
-        <ul class="divide-y divide-slate-100">
-            {% for finding in to_review %}
-            <li class="py-2.5 flex items-center justify-between">
-                <div>
-                    <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
-                    <p class="text-xs text-slate-400">{{ finding.engagement.client_name }}</p>
-                </div>
-                <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}<p class="text-sm text-slate-400">Nothing to review right now.</p>{% endif %}
-    </div>
-
-    <div class="card">
-        <h2 class="font-semibold text-slate-900 mb-3">Awaiting your QA</h2>
-        {% if to_qa %}
-        <ul class="divide-y divide-slate-100">
-            {% for finding in to_qa %}
-            <li class="py-2.5 flex items-center justify-between">
-                <div>
-                    <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}" class="text-sm font-medium text-slate-800 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
-                    <p class="text-xs text-slate-400">{{ finding.engagement.client_name }}</p>
-                </div>
-                <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}<p class="text-sm text-slate-400">Nothing to QA right now.</p>{% endif %}
-    </div>
+{% block page_header %}
+<div class="mb-6">
+    <h1 class="page-title">My review queue</h1>
+    <p class="text-sm text-slate-500 mt-1">Only findings explicitly assigned to you — there's no open pool to browse. Oldest first, so nothing waits too long.</p>
 </div>
+{% endblock %}
 
-{% url 'accounts:dashboard' as back_url %}
-{% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+{% block content %}
+<div class="max-w-5xl space-y-6">
+    {% for group in groups %}
+    <section class="panel" aria-labelledby="queue-group-{{ forloop.counter }}">
+        <div class="panel-header">
+            <h2 id="queue-group-{{ forloop.counter }}" class="font-semibold text-slate-900">{{ group.title }}</h2>
+            <span class="{{ group.tone }}">{{ group.findings|length }}</span>
+        </div>
+        {% if group.findings %}
+        <ul class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% for finding in group.findings %}
+            <li class="flex flex-wrap items-center gap-3 px-5 py-3">
+                <span class="badge-severity min-w-[6.5rem] justify-center" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
+                <div class="min-w-0 flex-1 basis-60">
+                    <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}" class="block truncate text-sm font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
+                    <p class="text-xs text-slate-500 truncate">{{ finding.engagement.client_name }}{% if finding.engagement.reference_number %} &middot; {{ finding.engagement.reference_number }}{% endif %}</p>
+                </div>
+                <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+                <span class="w-24 text-right text-xs text-slate-500">{{ finding.updated_at|timesince }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-5 py-6 text-sm text-slate-500">{{ group.empty }}</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+</div>
 {% endblock %}

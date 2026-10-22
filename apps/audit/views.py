@@ -1,11 +1,15 @@
+import csv
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from apps.accounts.permissions import require_permission
@@ -26,23 +30,14 @@ STATUS_BUCKETS = {
 }
 
 
-@login_required
-def audit_log_list(request):
-    require_permission(request.user, "audit_log.manage", "view the audit log")
-
+def _filtered_entries(request):
+    """Entries matching the list page's filters (shared with the CSV export)."""
     query = request.GET.get("q", "").strip()
     method = request.GET.get("method", "").strip()
     actor = request.GET.get("actor", "").strip()
     status_bucket = request.GET.get("status", "").strip()
     date_from = parse_date(request.GET.get("from", "").strip())
     date_to = parse_date(request.GET.get("to", "").strip())
-
-    try:
-        page_size = int(request.GET.get("page_size", DEFAULT_PAGE_SIZE))
-    except ValueError:
-        page_size = DEFAULT_PAGE_SIZE
-    if page_size not in PAGE_SIZE_CHOICES:
-        page_size = DEFAULT_PAGE_SIZE
 
     entries = AuditLogEntry.objects.select_related("actor")
     if query:
@@ -66,8 +61,67 @@ def audit_log_list(request):
         entries = entries.filter(created_at__date__gte=date_from)
     if date_to:
         entries = entries.filter(created_at__date__lte=date_to)
+    filters = {"query": query, "method": method, "actor": actor, "status_bucket": status_bucket}
+    return entries.order_by("-created_at"), filters
 
-    page_obj = Paginator(entries.order_by("-created_at"), page_size).get_page(request.GET.get("page"))
+
+CSV_COLUMNS = [
+    ("created_at", "Time (UTC)"), ("actor_username", "User"), ("actor_role", "Role"), ("action", "Action"),
+    ("method", "Method"), ("path", "Path"), ("query_string", "Query"), ("status_code", "Status"),
+    ("engagement_id", "Engagement"), ("object_ref", "Object"), ("ip_address", "IP address"),
+    ("user_agent", "User agent"), ("referer", "Referer"), ("duration_ms", "Duration (ms)"),
+    ("entry_hash", "Entry hash"),
+]
+
+
+def _csv_cell(value):
+    """Spreadsheet-safe text: a leading = + - @ (or tab/CR) would otherwise be
+    run as a formula when someone opens the export in Excel or Sheets."""
+    if value is None:
+        return ""
+    text = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
+class _Echo:
+    def write(self, value):
+        return value
+
+
+@login_required
+def audit_log_export(request):
+    """The filtered log as CSV, streamed so a large log doesn't sit in memory."""
+    require_permission(request.user, "audit_log.manage", "export the audit log")
+    entries, _ = _filtered_entries(request)
+    writer = csv.writer(_Echo())
+
+    def rows():
+        yield writer.writerow([label for _, label in CSV_COLUMNS])
+        for entry in entries.iterator(chunk_size=2000):
+            yield writer.writerow([_csv_cell(getattr(entry, field)) for field, _ in CSV_COLUMNS])
+
+    response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="audit-log-{timezone.now():%Y%m%d-%H%M%S}.csv"'
+    return response
+
+
+@login_required
+def audit_log_list(request):
+    require_permission(request.user, "audit_log.manage", "view the audit log")
+
+    entries, filters = _filtered_entries(request)
+    query, method, actor, status_bucket = (
+        filters["query"], filters["method"], filters["actor"], filters["status_bucket"],
+    )
+
+    try:
+        page_size = int(request.GET.get("page_size", DEFAULT_PAGE_SIZE))
+    except ValueError:
+        page_size = DEFAULT_PAGE_SIZE
+    if page_size not in PAGE_SIZE_CHOICES:
+        page_size = DEFAULT_PAGE_SIZE
+
+    page_obj = Paginator(entries, page_size).get_page(request.GET.get("page"))
     page_range = [
         p if isinstance(p, int) else None
         for p in page_obj.paginator.get_elided_page_range(page_obj.number, on_each_side=2, on_ends=1)

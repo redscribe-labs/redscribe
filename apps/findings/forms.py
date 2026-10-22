@@ -108,6 +108,14 @@ class ScanImportForm(forms.Form):
 MAX_CATALOGUE_IMPORT_SIZE = 10 * 1024 * 1024
 
 
+def selected_import_rows(post):
+    """Indexes ticked on an import preview, or None when the form was sent
+    without a preview (no JS), meaning import everything."""
+    if post.get("selection") != "1":
+        return None
+    return {int(v) for v in post.getlist("include") if v.isdigit()}
+
+
 class CatalogueImportForm(forms.Form):
     file = forms.FileField(help_text="A .json file exported from this (or another) RedScribe instance's catalogue. Max 10MB.")
 

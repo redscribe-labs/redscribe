@@ -660,3 +660,47 @@ class HashChainTests(TestCase):
 
         entry = AuditLogEntry.objects.filter(action="audit:list").latest("created_at")
         self.assertTrue(entry.entry_hash)
+
+
+class AuditLogExportTests(TestCase):
+    def setUp(self):
+        self.url = reverse("audit:export")
+        self.superadmin = make_user(User.Role.SUPERADMIN)
+        AuditLogEntry.objects.create(actor_username="alice", method="POST", path="/findings/", status_code=302, action="finding.create")
+        AuditLogEntry.objects.create(actor_username="bob", method="GET", path="/=HYPERLINK(\"x\")", status_code=200, user_agent="-cmd")
+
+    def rows(self, resp):
+        import csv
+        import io
+
+        return list(csv.reader(io.StringIO(b"".join(resp.streaming_content).decode())))
+
+    def test_superadmin_gets_a_csv_of_the_filtered_log(self):
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.get(self.url, {"actor": "alice"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("attachment", resp["Content-Disposition"])
+        rows = self.rows(resp)
+        self.assertEqual(rows[0][:4], ["Time (UTC)", "User", "Role", "Action"])
+        self.assertEqual([r[1] for r in rows[1:]], ["alice"])
+
+    def test_cells_cannot_run_as_spreadsheet_formulas(self):
+        client = Client()
+        login(client, self.superadmin)
+        rows = self.rows(client.get(self.url, {"actor": "bob"}))
+        header, row = rows[0], rows[1]
+        self.assertEqual(row[header.index("Path")], "/=HYPERLINK(\"x\")")
+        self.assertEqual(row[header.index("User agent")], "'-cmd")
+
+    def test_team_lead_cannot_export(self):
+        client = Client()
+        login(client, make_user(User.Role.TEAM_LEAD))
+        self.assertEqual(client.get(self.url).status_code, 403)
+
+    def test_list_links_to_export_with_current_filters(self):
+        client = Client()
+        login(client, self.superadmin)
+        resp = client.get(reverse("audit:list"), {"method": "POST"})
+        self.assertContains(resp, f'{self.url}?method=POST')

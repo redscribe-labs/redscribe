@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
+from apps.checklist.models import ChecklistTemplate
 from apps.clients.models import Client
 
 from .models import Engagement, EngagementMembership, ScopeChangeRequest
@@ -60,7 +61,7 @@ class EngagementCreateForm(_DateRangeCleanMixin, forms.ModelForm):
     class Meta:
         model = Engagement
         fields = [
-            "client", "reference_number", "scope", "start_date", "end_date",
+            "client", "reference_number", "test_type", "scope", "start_date", "end_date",
             "default_reviewer", "default_qa", "default_approver",
         ]
         widgets = {
@@ -79,6 +80,13 @@ class EngagementCreateForm(_DateRangeCleanMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         _hide_client_field_for_non_client_managers(self, requesting_user)
         _set_default_role_field_querysets(self)
+        # Not saved on the engagement: the view starts a run from it.
+        self.fields["checklist_template"] = forms.ModelChoiceField(
+            queryset=ChecklistTemplate.objects.all(), required=False, label="Testing checklist",
+            empty_label="Don't start a checklist yet",
+            initial=ChecklistTemplate.objects.filter(is_default=True).first(),
+            help_text="Starts a checklist run from this template. You can add more runs later from the Checklist tab.",
+        )
 
 
 class EngagementEditForm(_DateRangeCleanMixin, forms.ModelForm):
@@ -87,7 +95,7 @@ class EngagementEditForm(_DateRangeCleanMixin, forms.ModelForm):
     class Meta:
         model = Engagement
         fields = [
-            "client_name", "client", "reference_number", "start_date", "end_date",
+            "client_name", "client", "reference_number", "test_type", "start_date", "end_date",
             "default_reviewer", "default_qa", "default_approver",
         ]
         widgets = {

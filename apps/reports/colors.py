@@ -30,6 +30,29 @@ def contrasting_text_rgb(background_rgba: str, default: tuple[int, int, int] = (
     return (255, 255, 255) if luminance < 140 else (15, 23, 42)
 
 
+def _relative_luminance(r: int, g: int, b: int) -> float:
+    def channel(c):
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+
+
+def accessible_text_rgb(background_rgba: str, default: tuple[int, int, int] = (15, 23, 42)) -> tuple[int, int, int]:
+    """White or near-black, whichever has the higher WCAG contrast ratio on
+    the background. Used for the app's severity chips; report rendering keeps
+    contrasting_text_rgb() so existing deliverables don't change."""
+    parsed = parse_rgba(background_rgba)
+    if not parsed:
+        return default
+    r, g, b, alpha = parsed
+    bg = _relative_luminance(*composite_on_white(r, g, b, alpha))
+    dark = (15, 23, 42)
+    on_white = 1.05 / (bg + 0.05)
+    on_dark = (bg + 0.05) / (_relative_luminance(*dark) + 0.05)
+    return (255, 255, 255) if on_white >= on_dark else dark
+
+
 def mix_with_white(rgba: str, amount: float, default: str = "rgba(241,245,249,1)") -> str:
     parsed = parse_rgba(rgba)
     if not parsed:
@@ -64,5 +87,5 @@ def severity_rgba(severity: str, variant: str, profile=None) -> str:
 def finding_severity_style(finding, profile=None) -> dict:
     variant = "open" if finding.status == finding.Status.OPEN else "closed"
     background = severity_rgba(finding.severity, variant, profile)
-    r, g, b = contrasting_text_rgb(background)
+    r, g, b = accessible_text_rgb(background)
     return {"background": background, "color": f"rgb({r},{g},{b})"}

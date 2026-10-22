@@ -405,6 +405,7 @@ class Vector {
         }
 
         const expectedMetrics = Object.entries(Vector.ALL_METRICS);
+        const baseMetricsCount = Object.keys(Vector.METRICS.BASE).length;
         let mandatoryMetricIndex = 0;
 
         for (let metric of metrics) {
@@ -419,7 +420,7 @@ class Vector {
             // Find the current expected metric
             while (expectedMetrics[mandatoryMetricIndex] && expectedMetrics[mandatoryMetricIndex][0] !== key) {
                 // Check for missing mandatory metrics
-                if (mandatoryMetricIndex < 11) {
+                if (mandatoryMetricIndex < baseMetricsCount) {
                     console.error("Error: invalid vector, missing mandatory metrics");
                     return false;
                 }
@@ -433,6 +434,13 @@ class Vector {
             }
 
             mandatoryMetricIndex++;
+        }
+
+        // A vector that ends before naming all mandatory metrics never reaches the
+        // missing-metric check inside the loop, so enforce the count once the input is spent.
+        if (mandatoryMetricIndex < baseMetricsCount) {
+            console.error("Error: invalid vector, missing mandatory metrics");
+            return false;
         }
 
         return true;

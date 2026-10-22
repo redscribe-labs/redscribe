@@ -18,8 +18,8 @@
             <p class="text-xs text-slate-500">Uploaded {{ profile.docx_template_uploaded_at|date:"d/m/Y H:i" }}</p>
         </div>
         <div class="flex items-center gap-3 shrink-0">
-            <a href="{% url 'report_profiles:docx_template_download' profile.pk %}" class="text-brand-600 hover:underline text-xs">Download</a>
-            <a href="{% url 'report_profiles:docx_style_map' profile.pk %}" class="text-brand-600 hover:underline text-xs">Map styles ({{ profile.docx_style_map|length }} mapped)</a>
+            <a href="{% url 'report_profiles:docx_template_download' profile.pk %}" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200 text-xs">Download</a>
+            <a href="{% url 'report_profiles:docx_style_map' profile.pk %}" class="text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200 text-xs">Map styles ({{ profile.docx_style_map|length }} mapped)</a>
             <form method="post" action="{% url 'report_profiles:docx_template' profile.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="remove">

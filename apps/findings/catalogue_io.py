@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 
 from django.db import transaction
 
@@ -108,8 +109,9 @@ def _clean_entry(index: int, raw_entry, definitions_by_slug: dict) -> dict:
     return cleaned
 
 
-@transaction.atomic
-def import_templates(raw_text: str, *, created_by) -> list[VulnerabilityTemplate]:
+def parse_templates(raw_text: str) -> list[dict]:
+    """Validates an export file and returns its cleaned entries, in file order.
+    Raises CatalogueImportError on the first problem."""
     try:
         raw_entries = json.loads(raw_text)
     except json.JSONDecodeError as exc:
@@ -122,7 +124,70 @@ def import_templates(raw_text: str, *, created_by) -> list[VulnerabilityTemplate
         raise CatalogueImportError("No entries found in the uploaded file.")
 
     definitions_by_slug = {d.slug: d for d in ContentSectionDefinition.objects.all()}
-    cleaned_entries = [_clean_entry(i + 1, entry, definitions_by_slug) for i, entry in enumerate(raw_entries)]
+    return [_clean_entry(i + 1, entry, definitions_by_slug) for i, entry in enumerate(raw_entries)]
+
+
+def section_notices(raw_text: str) -> list[str]:
+    """Warnings for the confirm step about section content that won't show up
+    after import: sections this instance doesn't have (skipped — matched by
+    slug, not label) and retired ones (stored, but hidden until re-activated).
+    Call only after parse_templates has accepted raw_text."""
+    definitions_by_slug = {d.slug: d for d in ContentSectionDefinition.objects.all()}
+    missing, retired = Counter(), Counter()
+    for entry in json.loads(raw_text):
+        for slug, value in (entry.get("sections") or {}).items():
+            if not value:
+                continue
+            definition = definitions_by_slug.get(slug)
+            if definition is None:
+                missing[slug] += 1
+            elif not definition.is_active:
+                retired[definition.label] += 1
+
+    def listed(counter):
+        return ", ".join(f"'{name}' ({n} entr{'y' if n == 1 else 'ies'})" for name, n in counter.most_common())
+
+    notices = []
+    if missing:
+        notices.append(
+            f"Content for sections this instance doesn't have will be skipped: {listed(missing)}. "
+            "Sections are matched by their internal name, not their label — add matching sections in "
+            "Finding structure before importing to keep it."
+        )
+    if retired:
+        notices.append(
+            f"Content for retired sections will be imported but stay hidden until they're re-activated: {listed(retired)}."
+        )
+    return notices
+
+
+def preview_rows(cleaned_entries) -> list[dict]:
+    """What import_templates would create, for the confirm step. Flags entries
+    whose title matches one already in the catalogue (import never merges)."""
+    existing = {t.lower() for t in VulnerabilityTemplate.objects.values_list("title", flat=True)}
+    rows = []
+    for index, entry in enumerate(cleaned_entries):
+        sections = len(entry["sections"])
+        classifications = ", ".join(f"{r['taxonomy']} {r['value']}" for r in entry["classifications"][:3])
+        rows.append({
+            "index": index,
+            "title": entry["title"],
+            "severity": entry["default_severity"],
+            "severity_label": dict(Finding.Severity.choices).get(entry["default_severity"], entry["default_severity"]),
+            "detail": " · ".join(part for part in [
+                f"{sections} section{'s' if sections != 1 else ''}", classifications,
+            ] if part),
+            "duplicate": entry["title"].lower() in existing,
+        })
+    return rows
+
+
+@transaction.atomic
+def import_templates(raw_text: str, *, created_by, only=None) -> list[VulnerabilityTemplate]:
+    """only: optional set of entry indexes (from preview_rows) to import."""
+    cleaned_entries = parse_templates(raw_text)
+    if only is not None:
+        cleaned_entries = [entry for index, entry in enumerate(cleaned_entries) if index in only]
 
     created = []
     for entry in cleaned_entries:

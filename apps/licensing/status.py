@@ -23,5 +23,7 @@ def license_status(payload: dict | None) -> dict:
         "state": state,
         "org": payload["org"],
         "expires": payload["expires"],
+        "issued": payload.get("issued", ""),
+        "license_type": payload.get("type", "commercial"),
         "days_left": days_left,
     }

@@ -696,6 +696,22 @@ class EncryptedBlobTests(TestCase):
         blob = EncryptedBlob.objects.get()
         self.assertEqual(blob.content_type, "image/jpeg")
 
+    def test_spoofed_tiff_is_rejected_without_running_the_tiff_decoder(self):
+        import io
+        from unittest import mock
+
+        from PIL import Image, TiffImagePlugin
+
+        client = Client()
+        login(client, self.member)
+        buf = io.BytesIO()
+        Image.new("RGB", (1, 1)).save(buf, format="TIFF")
+        with mock.patch.object(TiffImagePlugin.TiffImageFile, "_open", autospec=True) as tiff_open:
+            resp = self._upload(client, filename="pixel.png", content_type="image/png", data=buf.getvalue())
+        self.assertEqual(resp.status_code, 400)
+        tiff_open.assert_not_called()
+        self.assertFalse(EncryptedBlob.objects.exists())
+
     def test_serve_sets_nosniff_header(self):
         client = Client()
         login(client, self.member)

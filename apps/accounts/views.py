@@ -53,7 +53,7 @@ def _lockout_error_code(form) -> str | None:
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("accounts:dashboard")
+        return _home_redirect(request.user)
 
     status_code = 200
     if request.method == "POST":
@@ -137,13 +137,16 @@ def session_ping(request):
 @login_required
 def password_change_view(request):
     user = request.user
+    # Client accounts may only use portal pages (ClientPortalAccessMiddleware),
+    # so they get the portal's chrome here and are sent back to the portal.
+    home = "clients_portal:dashboard" if user.is_client_role else "accounts:dashboard"
     if user.auth_type != User.AuthType.LOCAL:
         messages.info(
             request,
             "Your account signs in through your organization's identity provider — "
             "there's no local password to change.",
         )
-        return redirect("accounts:dashboard")
+        return redirect(home)
 
     if request.method == "POST":
         form = PasswordChangeForm(user, request.POST)
@@ -159,13 +162,16 @@ def password_change_view(request):
                 context={"user": user},
             )
             messages.success(request, "Your password has been changed. Other active sessions were signed out.")
-            return redirect("accounts:dashboard")
+            return redirect(home)
     else:
         form = PasswordChangeForm(user)
 
     return render(
         request, "accounts/password_change.html",
-        {"form": form, "breadcrumbs": [{"label": "Change password"}]},
+        {
+            "form": form, "breadcrumbs": [{"label": "Change password"}],
+            "base_template": "base/portal_base.html" if user.is_client_role else "base/base.html",
+        },
     )
 
 
@@ -293,11 +299,16 @@ def password_reset_confirm_view(request, uidb64, token):
     return render(request, "accounts/password_reset_confirm.html", {"form": form})
 
 
+def _home_redirect(user):
+    """Where a signed-in user starts: client users have only the portal."""
+    return redirect("clients_portal:dashboard" if user.is_client_role else "accounts:dashboard")
+
+
 @login_required
 def mfa_enroll_view(request):
     user = request.user
     if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
-        return redirect("accounts:dashboard")
+        return _home_redirect(user)
 
     device, _ = TOTPDevice.objects.get_or_create(
         user=user, confirmed=False, defaults={"name": "default"}
@@ -330,7 +341,7 @@ def mfa_enroll_view(request):
                         # event, so their other sessions are left alone.
                         security.invalidate_other_sessions(user, keep_session_key=request.session.session_key)
                     messages.success(request, "MFA enabled for your account.")
-                    return redirect("accounts:dashboard")
+                    return _home_redirect(user)
                 form.add_error("token", "That code didn't match. Please try again.")
     else:
         form = TOTPVerifyForm()
@@ -350,7 +361,7 @@ def mfa_verify_view(request):
     if device is None:
         return redirect("accounts:mfa_enroll")
     if request.user.is_verified():
-        return redirect("accounts:dashboard")
+        return _home_redirect(user)
 
     status_code = 200
     if request.method == "POST":
@@ -366,7 +377,7 @@ def mfa_verify_view(request):
                 if verified:
                     otp_login(request, device)
                     security.invalidate_other_sessions(user, keep_session_key=request.session.session_key)
-                    return redirect("accounts:dashboard")
+                    return _home_redirect(user)
                 form.add_error("token", "That code didn't match. Please try again.")
     else:
         form = TOTPVerifyForm()
@@ -375,11 +386,12 @@ def mfa_verify_view(request):
 
 
 WORKFLOW_COLORS = {
+    # Same hues as the workflow badges; bell (red) stays reserved for alerts.
     "DRAFT": "bg-slate-400",
-    "REVIEWED": "bg-bell-500",
+    "REVIEWED": "bg-mist-500",
     "REVIEW_CHANGES_REQUESTED": "bg-amber-500",
-    "QA_APPROVED": "bg-green-600",
-    "QA_CHANGES_REQUESTED": "bg-amber-500",
+    "QA_APPROVED": "bg-brand-600",
+    "QA_CHANGES_REQUESTED": "bg-orange-500",
 }
 
 
@@ -410,25 +422,49 @@ def _chart_data(queryset, field, choices, colors=None, severity_style=False):
 @login_required
 def dashboard_view(request):
     from apps.engagements.access import visible_engagements
+    from apps.engagements.models import Engagement
     from apps.findings.models import Finding
 
     user = request.user
     engagements = visible_engagements(user)
     my_findings = Finding.objects.filter(created_by=user)
 
-    to_review_count = Finding.objects.filter(
-        assigned_reviewer=user,
-        workflow_status__in=[Finding.WorkflowStatus.DRAFT, Finding.WorkflowStatus.REVIEW_CHANGES_REQUESTED],
-    ).count()
-    to_qa_count = Finding.objects.filter(
-        assigned_qa=user,
-        workflow_status__in=[Finding.WorkflowStatus.REVIEWED, Finding.WorkflowStatus.QA_CHANGES_REQUESTED],
-    ).count()
+    from apps.engagements.metrics import checklist_pct, stage_index, with_metrics
+    from apps.findings.review import assignments_for_user
+
+    to_review, to_qa = assignments_for_user(user)
+    changes_on_mine = Finding.objects.filter(
+        created_by=user,
+        workflow_status__in=[Finding.WorkflowStatus.REVIEW_CHANGES_REQUESTED, Finding.WorkflowStatus.QA_CHANGES_REQUESTED],
+    ).select_related("engagement")
+    to_review_count = to_review.count()
+    to_qa_count = to_qa.count()
+
+    # One list of everything waiting on this user, oldest first so nothing sits for long.
+    needs_you = sorted(
+        [{"kind": "Review", "tone": "badge-purple", "finding": f} for f in to_review[:20]]
+        + [{"kind": "QA", "tone": "badge-mist", "finding": f} for f in to_qa[:20]]
+        + [{"kind": "Changes requested", "tone": "badge-amber", "finding": f} for f in changes_on_mine[:20]],
+        key=lambda item: item["finding"].updated_at,
+    )
+    needs_you_total = to_review_count + to_qa_count + changes_on_mine.count()
+
+    active_engagements = list(
+        with_metrics(engagements.filter(archived=False).exclude(status=Engagement.Status.CLOSED))
+        .order_by("end_date", "-created_at")[:6]
+    )
+    stage_count = len(Engagement.Status.choices)
+    for engagement in active_engagements:
+        current = stage_index(engagement)
+        engagement.stages = ["done" if i < current else "current" if i == current else "todo" for i in range(stage_count)]
+        engagement.checklist_pct = checklist_pct(engagement)
 
     context = {
+        "needs_you": needs_you[:8],
+        "needs_you_total": needs_you_total,
+        "active_engagements": active_engagements,
         "engagement_count": engagements.count(),
         "active_engagement_count": engagements.filter(archived=False).count(),
-        "recent_engagements": engagements.order_by("-created_at")[:5],
         "my_finding_count": my_findings.count(),
         "my_severity_chart": _chart_data(my_findings, "severity", Finding.Severity.choices, severity_style=True),
         "my_status_chart": _chart_data(

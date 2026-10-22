@@ -22,20 +22,20 @@
     <div>
         <h2 class="font-semibold text-slate-900 mb-3">
             Engagements
-            <span class="text-sm font-normal text-slate-400">({{ engagement_total }})</span>
+            <span class="text-sm font-normal text-slate-500">({{ engagement_total }})</span>
         </h2>
         <ul class="space-y-2">
             {% for engagement in engagements %}
             <li>
                 <a href="{% url 'engagements:detail' engagement.pk %}"
-                   class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+                   class="group flex items-center gap-4 rounded-lg border border-slate-200 bg-white dark:bg-slate-100
                           px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all">
                     <div class="min-w-0 flex-1">
                         <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ engagement.client_name }}</p>
                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                             <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>
                             {% if engagement.archived %}<span class="badge-red">Archived</span>{% endif %}
-                            {% if engagement.reference_number %}<span class="text-xs text-slate-400 font-mono">{{ engagement.reference_number }}</span>{% endif %}
+                            {% if engagement.reference_number %}<span class="text-xs text-slate-500 font-mono">{{ engagement.reference_number }}</span>{% endif %}
                         </div>
                     </div>
                     <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
@@ -44,7 +44,7 @@
             {% endfor %}
         </ul>
         {% if engagement_total > result_limit %}
-        <p class="text-xs text-slate-400 mt-2">Showing the first {{ result_limit }} of {{ engagement_total }} — narrow your search to see more.</p>
+        <p class="text-xs text-slate-500 mt-2">Showing the first {{ result_limit }} of {{ engagement_total }} — narrow your search to see more.</p>
         {% endif %}
     </div>
     {% endif %}
@@ -53,13 +53,13 @@
     <div>
         <h2 class="font-semibold text-slate-900 mb-3">
             Findings
-            <span class="text-sm font-normal text-slate-400">({{ finding_total }})</span>
+            <span class="text-sm font-normal text-slate-500">({{ finding_total }})</span>
         </h2>
         <ul class="space-y-2">
             {% for finding in findings %}
             <li>
                 <a href="{% url 'findings:detail' finding.engagement_id finding.pk %}"
-                   class="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white dark:bg-slate-100
+                   class="group flex items-center gap-4 rounded-lg border border-slate-200 bg-white dark:bg-slate-100
                           px-4 py-3.5 shadow-sm hover:shadow-md hover:border-brand-300 dark:hover:border-brand-400 transition-all rail-severity"
                    style="{{ finding|severity_rail_style }}">
                     <div class="min-w-0 flex-1">
@@ -68,7 +68,7 @@
                             <span class="badge-severity" style="{{ finding|severity_style }}">{{ finding.get_severity_display }}</span>
                             <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
                             {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
-                            <span class="text-xs text-slate-400">{{ finding.engagement.client_name }}</span>
+                            <span class="text-xs text-slate-500">{{ finding.engagement.client_name }}</span>
                         </div>
                     </div>
                     <svg class="h-4 w-4 shrink-0 text-slate-300 group-hover:text-brand-400 transition-colors" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
@@ -77,7 +77,7 @@
             {% endfor %}
         </ul>
         {% if finding_total > result_limit %}
-        <p class="text-xs text-slate-400 mt-2">Showing the first {{ result_limit }} of {{ finding_total }} — narrow your search to see more.</p>
+        <p class="text-xs text-slate-500 mt-2">Showing the first {{ result_limit }} of {{ finding_total }} — narrow your search to see more.</p>
         {% endif %}
     </div>
     {% endif %}

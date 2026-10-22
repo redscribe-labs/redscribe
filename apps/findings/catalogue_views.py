@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -20,7 +20,7 @@ from .classifications import (
     save_classification_rows,
     validate_classification_rows,
 )
-from .forms import CatalogueImportForm, VulnerabilityTemplateForm
+from .forms import CatalogueImportForm, VulnerabilityTemplateForm, selected_import_rows
 from .models import (
     ClassificationTag,
     ContentSectionDefinition,
@@ -80,7 +80,7 @@ def template_list(request):
         templates = templates.filter(created_at__date__gte=date_from)
     if date_to:
         templates = templates.filter(created_at__date__lte=date_to)
-    templates = templates.distinct().order_by("-created_at")
+    templates = templates.annotate(used_count=Count("findings_created", distinct=True)).distinct().order_by("-created_at")
 
     page_obj = Paginator(templates, page_size).get_page(request.GET.get("page"))
     page_range = [
@@ -115,6 +115,10 @@ def template_list(request):
             "page_size": page_size,
             "page_size_choices": PAGE_SIZE_CHOICES,
             "status_choices": status_choices,
+            "status_counts": dict(
+                VulnerabilityTemplate.objects.order_by().values_list("status").annotate(n=Count("id"))
+            ),
+            "total_count": VulnerabilityTemplate.objects.count(),
             "severity_choices": severity_choices,
             "taxonomy_choices": taxonomy_choices,
             "creator_choices": creator_choices,
@@ -136,6 +140,23 @@ def template_export(request):
     return response
 
 
+def _import_preview(request, form):
+    """The entries an export file would create, as a fragment the import page
+    shows before anything is saved. The file stays in the browser."""
+    context = {"noun": "entry", "noun_plural": "entries"}
+    if form.is_valid():
+        raw_text = form.cleaned_data["file"].read().decode("utf-8", errors="replace")
+        try:
+            context["rows"] = catalogue_io.preview_rows(catalogue_io.parse_templates(raw_text))
+            context["notices"] = catalogue_io.section_notices(raw_text)
+            context["duplicate_label"] = "Title already in the catalogue"
+        except catalogue_io.CatalogueImportError as exc:
+            context["error"] = str(exc)
+    else:
+        context["error"] = " ".join(e for errors in form.errors.values() for e in errors)
+    return render(request, "base/_import_preview.html", context, status=200 if "rows" in context else 400)
+
+
 @login_required
 def template_import(request):
     if not can_bulk_manage_catalogue(request.user):
@@ -143,10 +164,15 @@ def template_import(request):
 
     if request.method == "POST":
         form = CatalogueImportForm(request.POST, request.FILES)
+        if request.POST.get("preview") == "1":
+            return _import_preview(request, form)
+        only = selected_import_rows(request.POST)
+        if only is not None and not only:
+            form.add_error(None, "Tick at least one entry to import.")
         if form.is_valid():
             raw_text = form.cleaned_data["file"].read().decode("utf-8", errors="replace")
             try:
-                created = catalogue_io.import_templates(raw_text, created_by=request.user)
+                created = catalogue_io.import_templates(raw_text, created_by=request.user, only=only)
             except catalogue_io.CatalogueImportError as exc:
                 form.add_error(None, str(exc))
             else:
@@ -174,11 +200,38 @@ def template_detail(request, pk):
     sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     values = {ts.definition.slug: ts.content for ts in template.sections.select_related("definition")}
     approved_version = getattr(template, "approved_version", None)
+
+    # When there are edits waiting for QA, show what changed since the approved
+    # version (which is what gets imported into findings until QA approves).
+    has_pending_changes = template.status != VulnerabilityTemplate.Status.APPROVED and approved_version is not None
+    changed_sections, changed_fields = set(), []
+    show_approved = False
+    if has_pending_changes:
+        approved_values = approved_version.sections or {}
+        changed_sections = {
+            d.slug for d in sections if (values.get(d.slug) or "") != (approved_values.get(d.slug) or "")
+        }
+        for label, current, previous in [
+            ("Title", template.title, approved_version.title),
+            ("Default severity", template.get_default_severity_display(), approved_version.get_default_severity_display()),
+            ("CVSS score", template.default_cvss_score, approved_version.default_cvss_score),
+            ("CVSS vector", template.default_cvss_vector, approved_version.default_cvss_vector),
+        ]:
+            if (current or "") != (previous or ""):
+                changed_fields.append({"label": label, "current": current or "—", "previous": previous or "—"})
+        show_approved = request.GET.get("version") == "approved"
+        if show_approved:
+            values = approved_values
+
     return render(
         request, "catalogue/detail.html",
         {
             "template": template,
             "document_sections": document_sections(sections, values),
+            "has_pending_changes": has_pending_changes,
+            "show_approved": show_approved,
+            "changed_sections": changed_sections,
+            "changed_fields": changed_fields,
             "can_approve": can_approve_catalogue_entry(request.user),
             "can_edit": can_edit_catalogue_entry(request.user, template),
             "can_delete": can_delete_catalogue_entry(request.user, template),

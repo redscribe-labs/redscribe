@@ -1,11 +1,19 @@
 {% extends "base/base.html" %}
 {% load redscribe_extras %}
-{% block title %}Profile — RedScribe{% endblock %}
+{% block title %}Profile and security — RedScribe{% endblock %}
 {% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <h1 class="page-title">Profile and security</h1>
+    <p class="text-sm text-slate-500 mt-1">{{ user }} &middot; {{ user.role.name }}{% if user.email %} &middot; {{ user.email }}{% endif %}</p>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-2xl mx-auto">
-    <div class="card">
-        <h1 class="text-xl font-bold text-slate-900 mb-1">Profile</h1>
+<div class="max-w-3xl space-y-6">
+    <section class="card">
+        <h2 class="font-semibold text-slate-900 mb-1">Profile</h2>
         <p class="text-sm text-slate-500 mb-5">
             Shown in the "Assessment team" section of any report exported for an engagement you have
             access to — keep it up to date and every future export reflects it automatically.
@@ -21,11 +29,90 @@
                 {% include "catalogue/_form_field_rte.html" with field=form.background field_name="background" label=form.background.label %}
                 <p class="field-help">{{ form.background.help_text }}</p>
             </div>
-            <button type="submit" class="btn-primary w-full">Save</button>
+            <div class="flex justify-end">
+                <button type="submit" class="btn-primary">Save profile</button>
+            </div>
         </form>
-    </div>
-    {% url 'accounts:dashboard' as back_url %}
-    {% include "base/_back_link.html" with url=back_url label="Dashboard" %}
+    </section>
+
+    <section class="panel" aria-labelledby="security-heading">
+        <div class="panel-header"><h2 id="security-heading" class="font-semibold text-slate-900 text-sm">Security</h2></div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% if user.auth_type == "LOCAL" %}
+            <div class="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-900">Password</p>
+                    <p class="text-sm text-slate-500">Change the password you sign in with.</p>
+                </div>
+                <a href="{% url 'accounts:password_change' %}" class="btn-secondary">Change password</a>
+            </div>
+            {% endif %}
+            <div class="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        Two-factor authentication
+                        {% if user.mfa_enrolled_at %}<span class="badge-green">On</span>{% else %}<span class="badge-amber">Not enrolled</span>{% endif %}
+                    </p>
+                    <p class="text-sm text-slate-500">
+                        {% if user.mfa_enrolled_at %}Authenticator app enrolled {{ user.mfa_enrolled_at|date:"d/m/Y" }}. To move it to a new device, ask an admin to clear it, then enrol again.
+                        {% elif user.auth_type == "LOCAL" %}You'll be asked to enrol an authenticator app when it's required for your account.
+                        {% else %}Handled by your single sign-on provider.{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel" aria-labelledby="prefs-heading">
+        <div class="panel-header"><h2 id="prefs-heading" class="font-semibold text-slate-900 text-sm">Preferences</h2></div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-200">
+            {% if feature_flags.notifications %}
+            <div class="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-900">Email notifications</p>
+                    <p class="text-sm text-slate-500">{% if user.email_notifications_enabled %}On — you also get an email when you're assigned as reviewer or QA approver.{% else %}Off — in-app notifications only.{% endif %}</p>
+                </div>
+                <a href="{% url 'accounts:notification_preferences' %}" class="btn-secondary">Change</a>
+            </div>
+            {% endif %}
+            <div class="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-900">Appearance</p>
+                    <p class="text-sm text-slate-500">Light or dark theme, remembered in this browser. The moon or sun button in the sidebar does the same.</p>
+                </div>
+                <div role="group" aria-label="Theme" class="inline-flex rounded-md border border-slate-300 overflow-hidden" id="theme-choice">
+                    <button type="button" data-theme-choice="light" class="px-3 py-2 text-sm font-medium bg-white dark:bg-slate-100 text-slate-700 hover:bg-slate-50">Light</button>
+                    <button type="button" data-theme-choice="dark" class="px-3 py-2 text-sm font-medium border-l border-slate-300 bg-white dark:bg-slate-100 text-slate-700 hover:bg-slate-50">Dark</button>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 {% endblock %}
-{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}
+{% block extra_body %}
+{% include "findings/_editor_scripts.html" %}
+<script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var group = document.getElementById("theme-choice");
+        if (!group) return;
+        function mark() {
+            var dark = document.documentElement.classList.contains("dark");
+            group.querySelectorAll("[data-theme-choice]").forEach(function (btn) {
+                var on = (btn.dataset.themeChoice === "dark") === dark;
+                btn.setAttribute("aria-pressed", String(on));
+                btn.classList.toggle("!bg-brand-50", on);
+                btn.classList.toggle("!text-brand-800", on);
+            });
+        }
+        group.addEventListener("click", function (e) {
+            var btn = e.target.closest("[data-theme-choice]");
+            if (!btn) return;
+            var dark = btn.dataset.themeChoice === "dark";
+            document.documentElement.classList.toggle("dark", dark);
+            localStorage.setItem("theme", dark ? "dark" : "light");
+            mark();
+        });
+        mark();
+    })();
+</script>
+{% endblock %}
