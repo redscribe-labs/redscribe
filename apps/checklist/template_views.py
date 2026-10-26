@@ -223,17 +223,16 @@ def template_upload(request):
         form = ChecklistImportForm(request.POST, request.FILES)
         if form.is_valid():
             raw_text = form.cleaned_data["file"].read().decode("utf-8", errors="replace")
-            importer_fn = importer.import_json if form.cleaned_data["format"] == "json" else importer.import_csv
             try:
                 with transaction.atomic():
-                    count = importer_fn(
-                        form.cleaned_data["name"], form.cleaned_data["description"], raw_text,
-                        uploaded_by=request.user,
+                    template, count = importer.import_file(
+                        form.cleaned_data["format"], form.cleaned_data["name"], form.cleaned_data["description"],
+                        raw_text, uploaded_by=request.user,
                     )
                     if form.cleaned_data["set_default"]:
-                        ChecklistTemplate.objects.exclude(name=form.cleaned_data["name"]).update(is_default=False)
-                        ChecklistTemplate.objects.filter(name=form.cleaned_data["name"]).update(is_default=True)
-                messages.success(request, f"Imported {count} items into '{form.cleaned_data['name']}'.")
+                        ChecklistTemplate.objects.update(is_default=False)
+                        ChecklistTemplate.objects.filter(pk=template.pk).update(is_default=True)
+                messages.success(request, f"Imported {count} items into '{template.name}'.")
                 return redirect("checklist_templates:list")
             except ValueError as exc:
                 form.add_error(None, str(exc))

@@ -91,14 +91,17 @@
                 </div>
             </section>
 
-            <details class="panel" {% if form.reference_info.value %}open{% endif %}>
+            <details class="panel" {% if item.reference_info %}open{% endif %}>
                 <summary class="panel-header cursor-pointer select-none !bg-mist-50 dark:!bg-mist-950/40">
                     <span class="font-semibold text-sm text-mist-900 dark:text-mist-100">Reference</span>
-                    <span class="text-xs text-mist-800 dark:text-mist-200">From the template &middot; editable for this run</span>
+                    <span class="text-xs text-mist-800 dark:text-mist-200">From the template</span>
                 </summary>
                 <div class="panel-body">
-                    <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
-                    <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
+                    {% if item.reference_info %}
+                    <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="false" data-rte-initial='{{ item.reference_info }}'></div>
+                    {% else %}
+                    <p class="text-sm text-slate-500">No reference guidance for this check.</p>
+                    {% endif %}
                 </div>
             </details>
 

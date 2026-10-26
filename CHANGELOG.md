@@ -18,6 +18,8 @@ have been renumbered to match: 0.2.0-alpha.1 to .4 are now 0.2.0-alpha to
 
 - Image uploads only accept genuine PNG, JPEG, GIF, or WebP files.
 - Updated Django, Pillow, and other libraries to fix known vulnerabilities.
+- Checklist template imports remove unsafe links, and rich text nested too
+  deeply to check is now rejected instead of passing through.
 
 ### Added
 
@@ -43,6 +45,12 @@ have been renumbered to match: 0.2.0-alpha.1 to .4 are now 0.2.0-alpha to
 - Reports say **Vulnerability ID**, list the assessment team by name only,
   and leave out the CVE row when a finding has none.
 - Only one finding section can receive scanner import details.
+- A checklist item's reference is read-only while testing. Edit it on the
+  checklist template; each engagement keeps the copy it started with.
+- Checklist template export now includes the template's name and
+  description, with each reference easy to read. Import still accepts older
+  files, and uses the name and description in the file when you leave those
+  boxes blank.
 
 ### Fixed
 
@@ -54,6 +62,10 @@ have been renumbered to match: 0.2.0-alpha.1 to .4 are now 0.2.0-alpha to
   no logo.
 - Many accessibility fixes, including contrast, form labels, and names for
   screen readers.
+- A bad row in an imported checklist template now stops the import with a
+  message naming the row, instead of a server error.
+- Importing a checklist template can no longer replace an existing one
+  unless you type its name.
 
 ## [0.5.0-alpha] - 2026-10-06
 

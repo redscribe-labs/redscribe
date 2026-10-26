@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 
@@ -73,6 +75,58 @@ class ImporterTests(TestCase):
         self.assertEqual(template.items.count(), 2)
         item = template.items.get(code="A-01")
         self.assertEqual(json.loads(item.reference_info)["content"][0]["content"][0]["text"], "Some guidance")
+
+    def test_import_strips_unsafe_link_protocols_but_keeps_safe_ones(self):
+        def linked(href):
+            return json.dumps({"type": "doc", "content": [{"type": "paragraph", "content": [
+                {"type": "text", "text": "x", "marks": [{"type": "link", "attrs": {"href": href}}]},
+            ]}]})
+        rows = [
+            {"category": "C", "title": "Bad", "reference_info": linked("javascript:alert(1)")},
+            {"category": "C", "title": "Good", "reference_info": linked("https://owasp.org/")},
+        ]
+        importer.import_json("Links", "", json.dumps(rows), uploaded_by=self.superadmin)
+        bad, good = ChecklistTemplateItem.objects.filter(template__name="Links").order_by("order")
+        self.assertNotIn("javascript", bad.reference_info)
+        self.assertIn("https://owasp.org/", good.reference_info)
+
+    def test_reference_accepts_nested_doc_object(self):
+        doc = {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Nested"}]}]}
+        rows = [{"category": "C", "title": "T", "reference_info": doc}]
+        importer.import_json("Nested", "", json.dumps(rows), uploaded_by=self.superadmin)
+        item = ChecklistTemplateItem.objects.get(template__name="Nested")
+        self.assertEqual(json.loads(item.reference_info), doc)
+
+    def test_bad_rows_report_the_row_instead_of_crashing(self):
+        cases = [
+            ([{"category": "C", "title": "T", "reference_info": {"type": "paragraph"}}], "Row 1"),
+            ([{"category": "C", "title": "T", "reference_info": 5}], "Row 1"),
+            ([{"category": "C", "title": "T"}, "not an object"], "Row 2"),
+        ]
+        for rows, expected in cases:
+            with self.assertRaisesMessage(ValueError, expected):
+                importer.import_json("Bad", "", json.dumps(rows), uploaded_by=self.superadmin)
+        self.assertFalse(ChecklistTemplate.objects.filter(name="Bad").exists())
+
+    def test_overly_nested_reference_is_rejected_with_its_row(self):
+        node = {"type": "paragraph"}
+        for _ in range(200):
+            node = {"type": "blockquote", "content": [node]}
+        rows = [{"category": "C", "title": "T"}, {"category": "C", "title": "T2", "reference_info": {"type": "doc", "content": [node]}}]
+        with self.assertRaisesMessage(ValueError, "Row 2"):
+            importer.import_json("Deep", "", json.dumps(rows), uploaded_by=self.superadmin)
+
+    def test_envelope_validation(self):
+        for payload, expected in [
+            ({"format": "something-else", "items": []}, "Unrecognised"),
+            ({"version": 99, "items": []}, "version 99"),
+            ({"version": 1}, "'items' list"),
+            ({"name": "N"}, "'items' list"),
+        ]:
+            with self.assertRaisesMessage(ValueError, expected):
+                importer.import_json("X", "", json.dumps(payload), uploaded_by=self.superadmin)
+        with self.assertRaisesMessage(ValueError, "name"):
+            importer.import_json("", "", json.dumps({"items": []}), uploaded_by=self.superadmin)
 
     def test_json_import_missing_title_rejected(self):
         rows = [{"category": "Cat A"}]
@@ -198,7 +252,6 @@ class ChecklistItemDetailTests(TestCase):
             {
                 "save_item": "1",
                 "status": ChecklistItem.Status.TESTED_NO_FINDING,
-                "reference_info": self.item.reference_info,
                 "test_results": doc_json("Tested with Burp, no issues found."),
                 "findings": [],
             },
@@ -216,6 +269,35 @@ class ChecklistItemDetailTests(TestCase):
             raw, key, associated_data=record_aad("checklistitem", self.item.pk, "test_results"),
         ).decode()
         self.assertIn("Tested with Burp", plaintext)
+
+    def test_reference_is_read_only_on_the_item_page(self):
+        self.item.reference_info = doc_json("Check the session cookie flags.")
+        self.item.save()
+        client = Client()
+        login(client, self.consultant)
+        resp = client.get(reverse("checklist:item_detail", args=[self.engagement.pk, self.item.pk]))
+        html = resp.content.decode()
+        self.assertIn('data-rte-field="reference_info" data-rte-editable="false"', html)
+        self.assertNotIn('data-rte-hidden="reference_info"', html)
+
+    def test_posted_reference_is_ignored(self):
+        original = doc_json("Original guidance.")
+        self.item.reference_info = original
+        self.item.save()
+        client = Client()
+        login(client, self.consultant)
+        payload = {
+            "status": ChecklistItem.Status.TESTED_NO_FINDING,
+            "reference_info": doc_json("Tampered."),
+            "test_results": "",
+            "findings": [],
+        }
+        url = reverse("checklist:item_detail", args=[self.engagement.pk, self.item.pk])
+        self.assertEqual(client.post(url, {**payload, "save_item": "1"}).status_code, 302)
+        autosave = reverse("checklist:item_autosave", args=[self.engagement.pk, self.item.pk])
+        self.assertEqual(client.post(autosave, payload).status_code, 200)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.reference_info, original)
 
     def test_comment_encrypted_at_rest_and_listed(self):
         client = Client()
@@ -258,7 +340,6 @@ class ChecklistItemDetailTests(TestCase):
             {
                 "save_item": "next",
                 "status": ChecklistItem.Status.TESTED_NO_FINDING,
-                "reference_info": self.item.reference_info,
                 "test_results": "",
                 "findings": [],
             },
@@ -278,7 +359,6 @@ class ChecklistItemDetailTests(TestCase):
             {
                 "save_item": "next",
                 "status": ChecklistItem.Status.NOT_APPLICABLE,
-                "reference_info": second_item.reference_info,
                 "test_results": "",
                 "findings": [],
             },
@@ -294,7 +374,6 @@ class ChecklistItemDetailTests(TestCase):
             {
                 "save_item": "prev",
                 "status": ChecklistItem.Status.NOT_APPLICABLE,
-                "reference_info": second_item.reference_info,
                 "test_results": "",
                 "findings": [],
             },
@@ -444,6 +523,9 @@ class TemplateManagementTests(TestCase):
 
     def test_export_produces_reimportable_json(self):
         template = make_default_template()
+        first = template.items.order_by("order").first()
+        first.reference_info = doc_json("Check the headers.")
+        first.save()
         client = Client()
         login(client, self.superadmin)
 
@@ -452,15 +534,46 @@ class TemplateManagementTests(TestCase):
         self.assertEqual(resp["Content-Type"], "application/json")
         self.assertIn("attachment;", resp["Content-Disposition"])
 
-        rows = json.loads(resp.content)
+        payload = json.loads(resp.content)
+        self.assertEqual(payload["format"], "redscribe-checklist-template")
+        self.assertEqual(payload["version"], 1)
+        self.assertEqual(payload["name"], template.name)
+        rows = payload["items"]
         self.assertEqual(len(rows), template.items.count())
         self.assertEqual(rows[0]["title"], "Test item one")
         self.assertEqual(rows[0]["category"], "Information Gathering")
+        self.assertIsInstance(rows[0]["reference_info"], dict)
 
-        count = importer.import_json(
-            "Reimported", "", json.dumps(rows), uploaded_by=self.superadmin,
-        )
+        count = importer.import_json("Reimported", "", resp.content.decode(), uploaded_by=self.superadmin)
         self.assertEqual(count, template.items.count())
+        original = list(template.items.order_by("order").values_list("category", "code", "title", "reference_info"))
+        again = list(
+            ChecklistTemplate.objects.get(name="Reimported").items.order_by("order")
+            .values_list("category", "code", "title", "reference_info")
+        )
+        self.assertEqual([r[:3] for r in again], [r[:3] for r in original])
+        # Items with no reference come back as an empty document; the rest are identical.
+        self.assertEqual(json.loads(again[0][3]), json.loads(original[0][3]))
+        self.assertTrue(all(not r[3] or "text" not in r[3] for r in original[1:] + again[1:]))
+
+    def test_envelope_import_takes_name_and_description_from_file(self):
+        template = make_default_template()
+        template.description = "Shipped description"
+        template.save()
+        client = Client()
+        login(client, self.superadmin)
+        exported = client.get(reverse("checklist_templates:export", args=[template.pk])).content.decode()
+        template.delete()
+
+        imported, count = importer.import_file("json", "", "", exported, uploaded_by=self.superadmin)
+        self.assertEqual(imported.name, template.name)
+        self.assertEqual(imported.description, "Shipped description")
+        self.assertEqual(count, 2)
+        self.assertFalse(imported.is_default)
+
+        # Form values win over the file's.
+        other, _ = importer.import_file("json", "Renamed", "Mine", exported, uploaded_by=self.superadmin)
+        self.assertEqual((other.name, other.description), ("Renamed", "Mine"))
 
     def test_export_requires_permission(self):
         template = make_default_template()
@@ -768,7 +881,7 @@ class SuggestedNextCheckTests(TestCase):
             reverse("checklist:item_detail", args=[self.engagement.pk, not_suggested.pk]),
             {
                 "save_item": "1", "status": ChecklistItem.Status.NOT_APPLICABLE,
-                "reference_info": not_suggested.reference_info, "test_results": "", "findings": [],
+                "test_results": "", "findings": [],
             },
         )
         self.assertEqual(resp.status_code, 302)
@@ -794,7 +907,7 @@ class _ItemPostMixin:
     def post(self, status, reason=""):
         return self.client.post(self.url, {
             "save_item": "stay", "status": status, "blocked_reason": reason,
-            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+            "test_results": "", "findings": [],
         })
 
 
@@ -883,7 +996,7 @@ class AssigneeTests(_ItemPostMixin, TestCase):
     def post_with(self, **extra):
         data = {
             "save_item": "stay", "status": ChecklistItem.Status.NOT_TESTED, "blocked_reason": "",
-            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+            "test_results": "", "findings": [],
         }
         data.update(extra)
         return self.client.post(self.url, data)
@@ -918,7 +1031,7 @@ class ScopeTestedTests(_ItemPostMixin, TestCase):
     def test_scope_tested_is_encrypted_and_shown_again(self):
         self.client.post(self.url, {
             "save_item": "stay", "status": ChecklistItem.Status.TESTED_NO_FINDING, "blocked_reason": "",
-            "scope_tested": "GET /search?q\nPOST /api/orders", "reference_info": self.item.reference_info,
+            "scope_tested": "GET /search?q\nPOST /api/orders",
             "test_results": "", "findings": [],
         })
         self.item.refresh_from_db()
@@ -958,7 +1071,7 @@ class ActivityTests(_ItemPostMixin, TestCase):
     def save(self, **extra):
         data = {
             "save_item": "stay", "status": ChecklistItem.Status.NOT_TESTED, "blocked_reason": "", "scope_tested": "",
-            "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+            "test_results": "", "findings": [],
         }
         data.update(extra)
         return self.client.post(self.url, data)
@@ -992,7 +1105,7 @@ class AutosaveTests(_ItemPostMixin, TestCase):
     def data(self, version, **extra):
         data = {
             "version": version, "status": ChecklistItem.Status.TESTED_NO_FINDING, "blocked_reason": "",
-            "scope_tested": "", "reference_info": self.item.reference_info, "test_results": "", "findings": [],
+            "scope_tested": "", "test_results": "", "findings": [],
         }
         data.update(extra)
         return data
@@ -1203,3 +1316,214 @@ class ItemPageShortcutTests(_ItemPostMixin, TestCase):
         self.assertContains(resp, '<html lang="en" class="h-full" data-focus-page>')
         resp = self.client.get(reverse("checklist:list", args=[self.engagement.pk]))
         self.assertNotContains(resp, "data-focus-page>")
+
+
+def _nested_doc_text(depth):
+    """A doc nested `depth` levels deep, built as text so building it can't hit the recursion limit."""
+    return ('{"type":"doc","content":[' + '{"type":"blockquote","content":[' * depth + '{"type":"paragraph"}'
+            + ']}' * depth + ']}')
+
+
+class ImportHardeningTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(User.Role.SUPERADMIN)
+
+    def _import(self, rows, name="T", **kwargs):
+        return importer.import_json(name, "", json.dumps(rows), uploaded_by=self.superadmin, **kwargs)
+
+    def test_failed_import_leaves_the_existing_template_untouched(self):
+        self._import([{"category": "C", "title": "Keep me"}], name="Stable")
+        with self.assertRaises(ValueError):
+            self._import([{"category": "C", "title": "New"}, {"category": "C"}], name="Stable")
+        self.assertEqual(
+            list(ChecklistTemplateItem.objects.filter(template__name="Stable").values_list("title", flat=True)),
+            ["Keep me"],
+        )
+
+    def test_nesting_near_the_json_parser_limit_is_a_clean_error(self):
+        for depth in (61, 300, 700, 900, 990):
+            raw = '[{"category":"C","title":"T","reference_info":' + _nested_doc_text(depth) + '}]'
+            try:
+                importer.import_json("Deep", "", raw, uploaded_by=self.superadmin)
+            except ValueError:
+                pass  # rejected cleanly: fine
+
+    def test_nested_doc_given_as_a_string_is_rejected_too(self):
+        rows = [{"category": "C", "title": "T", "reference_info": _nested_doc_text(200)}]
+        with self.assertRaisesMessage(ValueError, "Row 1"):
+            self._import(rows)
+
+    def test_overlong_fields_are_a_row_error_not_a_database_error(self):
+        for field, size in (("code", 33), ("category", 256), ("title", 501)):
+            row = {"category": "C", "title": "T", "code": "", field: "x" * size}
+            with self.assertRaisesMessage(ValueError, "Row 1"):
+                self._import([row])
+        with self.assertRaises(ValueError):
+            self._import([{"category": "C", "title": "T"}], name="n" * 256)
+
+    def test_non_text_values_are_rejected_not_stringified(self):
+        for bad in ({"a": 1}, ["x"], True):
+            with self.assertRaisesMessage(ValueError, "Row 1"):
+                self._import([{"category": bad, "title": "T"}])
+
+    def test_numbers_are_accepted_as_codes(self):
+        self._import([{"category": "C", "title": "T", "code": 42}], name="Numeric")
+        self.assertEqual(ChecklistTemplateItem.objects.get(template__name="Numeric").code, "42")
+
+    def test_version_must_be_a_real_integer(self):
+        for version in (True, "1", 1.5, 0, -1):
+            with self.assertRaisesMessage(ValueError, "version"):
+                importer.import_json("N", "", json.dumps({"version": version, "items": []}), uploaded_by=self.superadmin)
+
+    def test_is_default_in_the_file_is_ignored(self):
+        payload = {"name": "Sneaky", "is_default": True, "items": [{"category": "C", "title": "T"}]}
+        template, _ = importer.import_file("json", "", "", json.dumps(payload), uploaded_by=self.superadmin)
+        self.assertFalse(template.is_default)
+
+    def test_csv_cells_are_cleaned_like_json(self):
+        doc = json.dumps({"type": "doc", "content": [{"type": "paragraph", "content": [
+            {"type": "text", "text": "x", "marks": [{"type": "link", "attrs": {"href": "javascript:alert(1)"}}]},
+        ]}]})
+        buf = io.StringIO()
+        csv.writer(buf).writerows([["category", "title", "reference_info"], ["C", "T", doc], ["C", "T2", "plain"]])
+        importer.import_csv("Csv", "", buf.getvalue(), uploaded_by=self.superadmin)
+        first, second = ChecklistTemplateItem.objects.filter(template__name="Csv").order_by("order")
+        self.assertNotIn("javascript", first.reference_info)
+        self.assertIn("plain", second.reference_info)
+
+    def test_csv_without_a_name_is_an_error(self):
+        with self.assertRaisesMessage(ValueError, "name"):
+            importer.import_file("csv", "", "", "category,title\nC,T\n", uploaded_by=self.superadmin)
+
+    def test_legacy_plain_text_reference_exports_and_reimports(self):
+        template = ChecklistTemplate.objects.create(name="Legacy")
+        ChecklistTemplateItem.objects.create(template=template, category="C", title="T", reference_info="just text")
+        payload = json.loads(importer.export_json(template))
+        self.assertEqual(payload["items"][0]["reference_info"], "just text")
+        importer.import_json("Legacy2", "", json.dumps(payload), uploaded_by=self.superadmin)
+        self.assertIn("just text", ChecklistTemplateItem.objects.get(template__name="Legacy2").reference_info)
+
+    def test_content_that_is_not_a_list_is_not_treated_as_a_document(self):
+        rows = [{"category": "C", "title": "T", "reference_info": '{"type":"doc","content":"oops"}'}]
+        self._import(rows, name="Odd")
+        stored = ChecklistTemplateItem.objects.get(template__name="Odd").reference_info
+        self.assertIsInstance(json.loads(stored)["content"], list)
+
+
+class UploadViewHardeningTests(TestCase):
+    def setUp(self):
+        self.superadmin = make_user(User.Role.SUPERADMIN)
+        self.consultant = make_user(User.Role.CONSULTANT)
+
+    def _post(self, client, payload, name="", **extra):
+        upload = SimpleUploadedFile("t.json", json.dumps(payload).encode(), content_type="application/json")
+        data = {"name": name, "description": "", "format": "json", "file": upload, **extra}
+        return client.post(reverse("checklist_templates:upload"), data)
+
+    def test_blank_name_takes_the_name_from_the_file(self):
+        client = Client(); login(client, self.superadmin)
+        resp = self._post(client, {"name": "From File", "items": [{"category": "C", "title": "T"}]})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(ChecklistTemplate.objects.filter(name="From File").exists())
+
+    def test_file_cannot_silently_replace_an_existing_template(self):
+        existing = make_default_template("Shared Library")
+        client = Client(); login(client, self.superadmin)
+        resp = self._post(client, {"name": "Shared Library", "items": [{"category": "C", "title": "Injected"}]})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "already exists")
+        self.assertEqual(existing.items.count(), 2)
+        self.assertFalse(existing.items.filter(title="Injected").exists())
+
+    def test_typing_the_name_confirms_replacing_an_existing_template(self):
+        existing = make_default_template("Shared Library")
+        client = Client(); login(client, self.superadmin)
+        resp = self._post(
+            client, {"name": "Shared Library", "items": [{"category": "C", "title": "Replacement"}]},
+            name="Shared Library",
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(list(existing.items.values_list("title", flat=True)), ["Replacement"])
+
+    def test_overlong_name_in_file_is_a_form_error(self):
+        client = Client(); login(client, self.superadmin)
+        resp = self._post(client, {"name": "n" * 300, "items": []})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_consultant_cannot_upload_or_export_templates(self):
+        template = make_default_template("Guarded")
+        client = Client(); login(client, self.consultant)
+        self.assertEqual(self._post(client, {"name": "X", "items": []}).status_code, 403)
+        self.assertFalse(ChecklistTemplate.objects.filter(name="X").exists())
+        self.assertEqual(client.get(reverse("checklist_templates:export", args=[template.pk])).status_code, 403)
+
+    def test_anonymous_cannot_upload_or_export(self):
+        template = make_default_template("Guarded")
+        client = Client()
+        self.assertEqual(self._post(client, {"name": "X", "items": []}).status_code, 302)
+        self.assertEqual(client.get(reverse("checklist_templates:export", args=[template.pk])).status_code, 302)
+        self.assertFalse(ChecklistTemplate.objects.filter(name="X").exists())
+
+
+class ReferenceReadOnlyHardeningTests(TestCase):
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.consultant = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=self.consultant, engagement=self.engagement)
+        make_default_template()
+        instantiate_checklist(self.engagement)
+        self.item = ChecklistItem.objects.filter(run__engagement=self.engagement).first()
+        self.client = Client(); login(self.client, self.consultant)
+        self.url = reverse("checklist:item_detail", args=[self.engagement.pk, self.item.pk])
+
+    def test_reference_text_cannot_break_out_of_its_attribute(self):
+        evil = "'><script>alert(1)</script><img src=x onerror=alert(1)>"
+        self.item.reference_info = doc_json(evil)
+        self.item.save()
+        html = self.client.get(self.url).content.decode()
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertNotIn("<img src=x onerror", html)
+        self.assertIn("&lt;script&gt;", html)
+
+    def test_empty_reference_shows_a_placeholder_and_no_editor(self):
+        self.item.reference_info = ""
+        self.item.save()
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("No reference guidance", html)
+        self.assertNotIn('data-rte-field="reference_info"', html)
+
+    def test_other_fields_still_save_and_reference_survives(self):
+        original = doc_json("Keep this guidance.")
+        self.item.reference_info = original
+        self.item.save()
+        resp = self.client.post(self.url, {
+            "save_item": "1", "status": ChecklistItem.Status.NOT_APPLICABLE,
+            "scope_tested": "GET /x", "test_results": doc_json("results"), "findings": [],
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, ChecklistItem.Status.NOT_APPLICABLE)
+        self.assertEqual(self.item.reference_info, original)
+
+    def test_reference_cannot_be_changed_via_the_other_engagements_item(self):
+        other = Engagement.objects.create(client_name="Other")
+        generate_project_key(other)
+        resp = self.client.post(
+            reverse("checklist:item_autosave", args=[other.pk, self.item.pk]),
+            {"status": ChecklistItem.Status.NOT_APPLICABLE, "reference_info": doc_json("x"), "findings": []},
+        )
+        self.assertIn(resp.status_code, (403, 404))
+        self.item.refresh_from_db()
+        self.assertNotIn('"x"', self.item.reference_info)
+
+    def test_new_runs_still_copy_the_template_reference(self):
+        template = ChecklistTemplate.objects.get(name="Default Template")
+        first = template.items.order_by("order").first()
+        first.reference_info = doc_json("Template says hello")
+        first.save()
+        second_engagement = Engagement.objects.create(client_name="Fresh")
+        generate_project_key(second_engagement)
+        instantiate_checklist(second_engagement)
+        copied = ChecklistItem.objects.filter(run__engagement=second_engagement, title=first.title).first()
+        self.assertIn("Template says hello", copied.reference_info)

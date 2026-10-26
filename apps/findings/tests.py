@@ -186,6 +186,38 @@ class TiptapJsonValidatorTests(TestCase):
             validate_tiptap_doc_json(json.dumps(["doc"]))
 
 
+def _deep_doc(depth):
+    node = {"type": "paragraph", "content": [
+        {"type": "text", "text": "x", "marks": [{"type": "link", "attrs": {"href": "javascript:alert(1)"}}]},
+        {"type": "image", "attrs": {"src": "https://evil.example/t.png"}},
+    ]}
+    for _ in range(depth):
+        node = {"type": "blockquote", "content": [node]}
+    return json.dumps({"type": "doc", "content": [node]})
+
+
+class DeepNestingTests(TestCase):
+    def test_validator_rejects_documents_nested_beyond_the_sanitizer_limit(self):
+        validate_tiptap_doc_json(_deep_doc(20))
+        with self.assertRaises(ValidationError):
+            validate_tiptap_doc_json(_deep_doc(200))
+
+    def test_sanitizers_drop_content_too_deep_to_check_instead_of_keeping_it(self):
+        from .validators import sanitize_tiptap_image_srcs, sanitize_tiptap_link_hrefs
+
+        out = sanitize_tiptap_link_hrefs(sanitize_tiptap_image_srcs(_deep_doc(200), allow_own_blobs=False))
+        self.assertNotIn("javascript", out)
+        self.assertNotIn("evil.example", out)
+
+    def test_sanitizers_still_clean_a_normally_nested_document(self):
+        from .validators import sanitize_tiptap_image_srcs, sanitize_tiptap_link_hrefs
+
+        out = sanitize_tiptap_link_hrefs(sanitize_tiptap_image_srcs(_deep_doc(20), allow_own_blobs=False))
+        self.assertNotIn("javascript", out)
+        self.assertNotIn("evil.example", out)
+        self.assertIn('"text": "x"', out)
+
+
 class ImageSrcSanitizerTests(TestCase):
 
     def _doc_with_image(self, src):

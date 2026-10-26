@@ -111,7 +111,6 @@ def _apply_form(item, form, request):
     item.assignee = cleaned["assignee"]
     item.scope_tested_ciphertext = encrypt_item_text(item, "scope_tested", cleaned["scope_tested"].strip(), key)
     item.blocked_reason_ciphertext = encrypt_item_text(item, "blocked_reason", cleaned["blocked_reason"].strip(), key)
-    item.reference_info = cleaned["reference_info"]
     item.findings.set(cleaned["findings"])
     test_results = cleaned["test_results"]
     item.test_results_ciphertext = (
@@ -172,7 +171,6 @@ def item_detail(request, engagement_id, pk):
                 "assignee": item.assignee_id,
                 "scope_tested": decrypt_item_text(item, "scope_tested", request.project_key),
                 "blocked_reason": decrypt_item_text(item, "blocked_reason", request.project_key),
-                "reference_info": item.reference_info,
                 "test_results": decrypt_or_blank(
                     item.test_results_ciphertext, request.project_key,
                     associated_data=record_aad("checklistitem", item.pk, "test_results"),

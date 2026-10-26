@@ -24,11 +24,15 @@ class ChecklistTemplateItemForm(forms.Form):
 class ChecklistImportForm(forms.Form):
     FORMAT_CHOICES = [("json", "JSON"), ("csv", "CSV")]
 
-    name = forms.CharField(max_length=255, help_text="e.g. 'OWASP WSTG' — re-uploading the same name replaces its items")
+    name = forms.CharField(
+        max_length=255, required=False,
+        help_text="e.g. 'OWASP WSTG' — re-uploading the same name replaces its items. "
+        "Leave blank to use the name in a RedScribe JSON export.",
+    )
     description = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     format = forms.ChoiceField(choices=FORMAT_CHOICES)
     file = forms.FileField(
-        help_text="JSON: a list of {category, code, title, reference_info} objects. "
+        help_text="JSON: a RedScribe template export, or a list of {category, code, title, reference_info} objects. "
         "CSV: columns category, code, title, reference_info. Max 25MB.",
     )
     set_default = forms.BooleanField(
@@ -56,7 +60,6 @@ class ChecklistItemForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3, "placeholder": "GET /search?q\nPOST /api/orders (id)"}),
         help_text="One endpoint, URL or parameter per line. Used as Affects when you raise a finding from this check.",
     )
-    reference_info = RichTextField(required=False)
     test_results = RichTextField(required=False)
     findings = forms.ModelMultipleChoiceField(
         queryset=None, required=False, label="Linked findings", widget=forms.CheckboxSelectMultiple,
