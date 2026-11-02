@@ -104,7 +104,7 @@
         <div class="card scroll-mt-36" id="report-document-control">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Document control</h2>
             <p class="field-help mb-3">Optional commentary shown before the document control history table wherever {% templatetag openvariable %} document_control {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
-            <div class="rte-editor" data-rte-field="document_control_notes" data-rte-editable="true"
+            <div class="rte-editor" data-rte-field="document_control_notes" data-rte-label="Document control commentary" data-rte-editable="true"
                  data-rte-initial='{{ content.document_control.notes|default:"" }}'></div>
             <input type="hidden" data-rte-hidden="document_control_notes" id="document_control_notes">
         </div>
@@ -129,13 +129,13 @@
                 </div>
                 <div>
                     <label class="field-label mb-1">Intro <span class="text-slate-500 font-normal">(optional — rendered above the chart)</span></label>
-                    <div class="rte-editor" data-rte-field="breakdown_intro" data-rte-editable="true"
+                    <div class="rte-editor" data-rte-field="breakdown_intro" data-rte-label="Breakdown intro" data-rte-editable="true"
                          data-rte-initial='{{ content.breakdown.intro|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="breakdown_intro" id="breakdown_intro">
                 </div>
                 <div>
                     <label class="field-label mb-1">Commentary <span class="text-slate-500 font-normal">(optional — rendered between the chart and the table)</span></label>
-                    <div class="rte-editor" data-rte-field="breakdown_notes" data-rte-editable="true"
+                    <div class="rte-editor" data-rte-field="breakdown_notes" data-rte-label="Breakdown commentary" data-rte-editable="true"
                          data-rte-initial='{{ content.breakdown.notes|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="breakdown_notes" id="breakdown_notes">
                 </div>
@@ -173,7 +173,7 @@
                 {% for key, label, initial in dynamic_section_fields %}
                 <div class="border border-slate-200 dark:border-slate-200 rounded-lg p-3">
                     <label class="block text-sm font-semibold text-slate-900 mb-2">{{ label }}</label>
-                    <div class="rte-editor" data-rte-field="dyn_{{ key }}" data-rte-editable="true"
+                    <div class="rte-editor" data-rte-field="dyn_{{ key }}" data-rte-label="{{ label }}" data-rte-editable="true"
                          data-rte-initial='{{ initial|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="dyn_{{ key }}" data-dynamic-key="{{ key }}" id="dyn_{{ key }}">
                 </div>
@@ -191,7 +191,7 @@
                         <input type="text" class="field-input" placeholder="Title" value="{{ item.title }}" data-item-title>
                         <button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>
                     </div>
-                    <div class="rte-editor" data-rte-field="obs_{{ forloop.counter0 }}" data-rte-editable="true"
+                    <div class="rte-editor" data-rte-field="obs_{{ forloop.counter0 }}" data-rte-label="Observation details" data-rte-editable="true"
                          data-rte-initial='{{ item.content|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="obs_{{ forloop.counter0 }}" data-item-content id="obs_{{ forloop.counter0 }}">
                 </div>
@@ -210,7 +210,7 @@
                         <input type="text" class="field-input" placeholder="Phase title" value="{{ item.title }}" data-item-title>
                         <button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>
                     </div>
-                    <div class="rte-editor" data-rte-field="phase_{{ forloop.counter0 }}" data-rte-editable="true"
+                    <div class="rte-editor" data-rte-field="phase_{{ forloop.counter0 }}" data-rte-label="Phase details" data-rte-editable="true"
                          data-rte-initial='{{ item.content|default:"" }}'></div>
                     <input type="hidden" data-rte-hidden="phase_{{ forloop.counter0 }}" data-item-content id="phase_{{ forloop.counter0 }}">
                 </div>
@@ -296,7 +296,7 @@
       '<input type="text" class="field-input" placeholder="Title" data-item-title>' +
       '<button type="button" class="btn-danger !px-2 !py-1 text-xs shrink-0" data-item-remove>Remove</button>' +
       "</div>" +
-      '<div class="rte-editor" data-rte-field="' + fieldName + '" data-rte-editable="true"></div>' +
+      '<div class="rte-editor" data-rte-field="' + fieldName + '" data-rte-label="' + (kind === "observations" ? "Observation details" : "Phase details") + '" data-rte-editable="true"></div>' +
       '<input type="hidden" data-rte-hidden="' + fieldName + '" data-item-content id="' + fieldName + '">';
     container.appendChild(item);
     window.RedscribeEditorApp.initRichTextEditor(item.querySelector("[data-rte-field]"));

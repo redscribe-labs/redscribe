@@ -2,6 +2,7 @@
     {% include "base/_field_section_header.html" with field_name=field_name label=label encrypted=encrypted %}
     <div class="rte-editor"
          data-rte-field="{{ field_name }}"
+         data-rte-label="{{ label }}"
          data-rte-editable="true"
          data-rte-initial='{{ field.value|default:"" }}'
          {% if supports_image_upload %}data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"{% endif %}

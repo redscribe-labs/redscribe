@@ -52,6 +52,7 @@ def export_options(request, engagement_id):
             "omitted_count": omitted_count,
             "export_logs": engagement.report_export_logs.select_related("exported_by")[:20],
             "docx_available": bool(profile and profile.docx_template),
+            "no_layout": not (profile and (profile.docx_template or (profile.template or {}).get("content"))),
             "breadcrumbs": engagement_crumbs(engagement) + [{"label": "Export report"}],
         },
     )

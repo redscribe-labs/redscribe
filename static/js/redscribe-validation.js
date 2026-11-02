@@ -147,6 +147,15 @@
       });
     });
 
+    // Pressing the mouse on a submit button blurs the focused field. Validating on that blur adds or
+    // removes an error line, which moves the button before the mouse is released, so the click
+    // misses it and the form silently doesn't submit. Keep focus where it is until the click lands.
+    form.addEventListener("mousedown", function (e) {
+      if (e.button === 0 && e.target.closest && e.target.closest('button[type="submit"], input[type="submit"]')) {
+        e.preventDefault();
+      }
+    });
+
     form.addEventListener("submit", function (e) {
       var firstInvalid = null;
       fields.forEach(function (field) {

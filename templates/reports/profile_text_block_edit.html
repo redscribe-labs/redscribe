@@ -1,11 +1,11 @@
 {% extends "base/base.html" %}
-{% block title %}Edit {{ block.label }} — RedScribe{% endblock %}
+{% block title %}Edit {{ text_block.label }} — RedScribe{% endblock %}
 {% block extra_head %}{% include "findings/_editor_head.html" %}{% endblock %}
 
 {% block page_header %}
 <div class="mb-6">
     <p class="page-eyebrow !mb-0.5">{{ profile.name }}</p>
-    <h1 class="page-title">{{ block.label }}</h1>
+    <h1 class="page-title">{{ text_block.label }}</h1>
 </div>
 {% endblock %}
 
@@ -16,10 +16,10 @@
         {% csrf_token %}
         <p class="field-help mb-4">
             This profile's own starting text for
-            <span class="font-mono">{% templatetag openvariable %} {{ block.slug }} {% templatetag closevariable %}</span>
+            <span class="font-mono">{% templatetag openvariable %} {{ text_block.slug }} {% templatetag closevariable %}</span>
             — a reporter can still edit their own copy per engagement.
         </p>
-        <div class="rte-editor" data-rte-field="content" data-rte-editable="true"
+        <div class="rte-editor" data-rte-field="content" data-rte-label="{{ text_block.label }}" data-rte-editable="true"
              data-rte-initial='{{ form.content.value|default:"" }}'></div>
         <input type="hidden" name="content" id="{{ form.content.id_for_label }}" data-rte-hidden="content">
         {% for error in form.content.errors %}<p class="field-error">{{ error }}</p>{% endfor %}

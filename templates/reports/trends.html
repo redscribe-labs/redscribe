@@ -27,7 +27,7 @@
         </div>
 
         <p id="trend-detail" role="status" aria-live="polite" class="min-h-6 mb-3 text-sm text-slate-500">Hover over or tab to a month for its breakdown.</p>
-        <div class="relative overflow-x-auto -mx-1 px-1 pb-1">
+        <div class="relative overflow-x-auto -mx-1 px-1 pb-1" tabindex="0" role="region" aria-label="Trend table">
             <div class="flex items-end gap-3 min-w-max">
                 {% for col in severity_chart.columns %}
                 <button type="button" class="group flex flex-col items-center gap-2 w-9 shrink-0 rounded-md cursor-default"

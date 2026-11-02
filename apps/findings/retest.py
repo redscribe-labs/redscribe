@@ -1,7 +1,6 @@
 from django.core.exceptions import PermissionDenied
 
 from apps.engagements.models import Engagement
-from apps.feature_flags.models import FeatureFlags
 
 from .models import Finding, RetestRecord
 
@@ -12,8 +11,6 @@ RETEST_ENGAGEMENT_STATUSES = {
 
 
 def can_log_retest_result(user, finding: Finding) -> bool:
-    if not FeatureFlags.get_solo().retest_workflow:
-        return False
     if not user.is_authenticated:
         return False
     if finding.archived:
@@ -22,8 +19,6 @@ def can_log_retest_result(user, finding: Finding) -> bool:
 
 
 def log_retest_result(finding: Finding, *, status: str, notes_ciphertext, tested_by) -> RetestRecord:
-    if not FeatureFlags.get_solo().retest_workflow:
-        raise PermissionDenied("Retest tracking is currently disabled.")
     if finding.engagement.status not in RETEST_ENGAGEMENT_STATUSES:
         raise PermissionDenied(
             "Retest results can only be logged while the engagement is Awaiting Remediation Test "

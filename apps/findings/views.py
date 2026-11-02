@@ -341,7 +341,6 @@ def finding_detail(request, engagement_id, pk):
             "can_delete": can_delete_finding(user, finding),
             "linked_checklist_items": finding.checklist_items.all(),
             "can_log_retest": retest.can_log_retest_result(user, finding),
-            "retest_workflow_enabled": FeatureFlags.get_solo().retest_workflow,
             "retest_form": RetestRecordForm(),
             "retest_records": [
                 {
@@ -389,7 +388,7 @@ def finding_edit(request, engagement_id, pk):
         form = FindingForm(request.POST, sections=sections)
         posted_version = request.POST.get("_version", "")
         classification_rows = parse_classification_rows(request.POST)
-        classification_errors = validate_classification_rows(classification_rows, require_at_least_one=False)
+        classification_errors = validate_classification_rows(classification_rows)
         if form.is_valid() and posted_version and posted_version != edit_version:
             messages.error(
                 request,

@@ -11,7 +11,7 @@
             </span>
             <div>
                 <h1 class="page-title">{{ company.name }}</h1>
-                <p class="text-sm text-slate-500">Added {{ company.created_at|date:"d/m/Y" }}{% if company.created_by %} by {{ company.created_by.username }}{% endif %}</p>
+                <p class="text-sm text-slate-500">Added {{ company.created_at|date:"d/m/Y" }}{% if company.created_by %} by {% if company.created_by.erased_at %}{{ company.created_by|user_label }}{% else %}{{ company.created_by.username }}{% if not company.created_by.is_active %} (deactivated){% endif %}{% endif %}{% endif %}</p>
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-1.5 mt-3">
@@ -57,9 +57,9 @@
             {% for target in portal_users %}
             <li class="flex items-center justify-between py-2 text-sm gap-3">
                 <a href="{% url 'clients:user_detail' target.uuid %}" class="text-slate-700 hover:text-brand-700 dark:hover:text-brand-300 truncate">
-                    {{ target.get_full_name|default:target.username }} <span class="text-slate-500">({{ target.username }})</span>
+                    {% if target.erased_at %}{{ target|user_label }}{% else %}{{ target.get_full_name|default:target.username }} <span class="text-slate-500">({{ target.username }})</span>{% endif %}
                 </a>
-                {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+                {% if target.erased_at %}<span class="badge-slate">Erased</span>{% elif target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
             </li>
             {% endfor %}
         </ul>

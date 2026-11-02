@@ -47,6 +47,25 @@ class AuditLogViewTests(TestCase):
         resp = client.get(self.url)
         self.assertEqual(resp.status_code, 200)
 
+    def test_deactivated_actor_is_tagged_and_active_actor_is_not(self):
+        gone = make_user(User.Role.CONSULTANT)
+        here = make_user(User.Role.CONSULTANT)
+        for u in (gone, here):
+            AuditLogEntry.objects.create(
+                actor=u, actor_username=u.username, method="GET", path="/x/", status_code=200,
+            )
+        gone.deactivate()
+        client = Client()
+        login(client, self.superadmin)
+
+        resp = client.get(self.url)
+        tagged = [e for e in resp.context["page_obj"].object_list if e.actor and not e.actor.is_active]
+        self.assertEqual([e.actor_username for e in tagged], [gone.username])
+        # Once on the row, once in the user filter; never for the active actor.
+        self.assertContains(resp, "(deactivated)", count=2)
+        self.assertContains(resp, f'<option value="{gone.username}">{gone.username} (deactivated)</option>', html=True)
+        self.assertContains(resp, f'<option value="{here.username}">{here.username}</option>', html=True)
+
     def test_team_lead_cannot_view(self):
         client = Client()
         login(client, make_user(User.Role.TEAM_LEAD))
@@ -142,6 +161,19 @@ class AuditLogViewTests(TestCase):
         from .middleware import _EXCLUDED_VIEW_NAMES
 
         self.assertNotIn("reports:preview", _EXCLUDED_VIEW_NAMES)
+
+    def test_session_ping_is_not_logged_but_other_gets_are(self):
+        client = Client()
+        login(client, self.superadmin)
+        client.get(self.url)  # absorb any login-side entries
+        before = AuditLogEntry.objects.count()
+
+        self.assertEqual(client.get(reverse("accounts:session_ping")).status_code, 204)
+        self.assertEqual(AuditLogEntry.objects.count(), before)
+        self.assertFalse(AuditLogEntry.objects.filter(action="accounts:session_ping").exists())
+
+        client.get(self.url)
+        self.assertEqual(AuditLogEntry.objects.count(), before + 1)
 
     def test_health_check_endpoint_is_not_logged(self):
         from .models import AuditLogEntry
@@ -429,64 +461,26 @@ class PurgeAllViewTests(TestCase):
         self.assertRedirects(resp, self.confirm_url)
         self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
 
-    def test_correct_phrase_alone_is_not_enough_without_a_second_approver(self):
-        entry = self._entry()
-        client = Client()
-        login(client, self.superadmin)
-        resp = client.post(self.url, {"confirm_phrase": "DELETE ALL LOGS"})
-        self.assertRedirects(resp, self.confirm_url)
-        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
-
-    def test_second_approver_with_wrong_password_deletes_nothing(self):
-        other_superadmin = make_user(User.Role.SUPERADMIN)
-        entry = self._entry()
-        client = Client()
-        login(client, self.superadmin)
-        resp = client.post(self.url, {
-            "confirm_phrase": "DELETE ALL LOGS",
-            "approver_username": other_superadmin.username, "approver_password": "wrong-password",
-        })
-        self.assertRedirects(resp, self.confirm_url)
-        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
-
-    def test_approving_your_own_purge_is_rejected(self):
-        entry = self._entry()
-        client = Client()
-        login(client, self.superadmin)
-        resp = client.post(self.url, {
-            "confirm_phrase": "DELETE ALL LOGS",
-            "approver_username": self.superadmin.username, "approver_password": TEST_PASSWORD,
-        })
-        self.assertRedirects(resp, self.confirm_url)
-        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
-
-    def test_non_superadmin_approver_deletes_nothing(self):
-        team_lead = make_user(User.Role.TEAM_LEAD)
-        entry = self._entry()
-        client = Client()
-        login(client, self.superadmin)
-        resp = client.post(self.url, {
-            "confirm_phrase": "DELETE ALL LOGS",
-            "approver_username": team_lead.username, "approver_password": TEST_PASSWORD,
-        })
-        self.assertRedirects(resp, self.confirm_url)
-        self.assertTrue(AuditLogEntry.objects.filter(pk=entry.pk).exists())
-
-    def test_correct_phrase_and_a_different_superadmin_approver_deletes_everything_regardless_of_age(self):
-        other_superadmin = make_user(User.Role.SUPERADMIN)
+    def test_correct_phrase_deletes_everything_regardless_of_age(self):
         recent = self._entry(days_old=0)
         old = self._entry(days_old=3000)
         client = Client()
         login(client, self.superadmin)
 
-        resp = client.post(self.url, {
-            "confirm_phrase": "DELETE ALL LOGS",
-            "approver_username": other_superadmin.username, "approver_password": TEST_PASSWORD,
-        })
+        resp = client.post(self.url, {"confirm_phrase": "DELETE ALL LOGS"})
 
         self.assertRedirects(resp, reverse("audit:list"))
         self.assertFalse(AuditLogEntry.objects.filter(pk=recent.pk).exists())
         self.assertFalse(AuditLogEntry.objects.filter(pk=old.pk).exists())
+
+    def test_cleared_log_records_who_cleared_it(self):
+        self._entry()
+        client = Client()
+        login(client, self.superadmin)
+        client.post(self.url, {"confirm_phrase": "DELETE ALL LOGS"})
+        entry = AuditLogEntry.objects.get()
+        self.assertEqual(entry.action, "audit:purge_all")
+        self.assertEqual(entry.actor_id, self.superadmin.pk)
 
     def test_get_on_purge_all_does_not_delete_anything(self):
         entry = self._entry()

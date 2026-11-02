@@ -85,6 +85,10 @@ class User(AbstractUser):
 
     deactivated_at = models.DateTimeField(null=True, blank=True)
 
+    # Set once, irreversibly, by apps.accounts.erasure.erase_user: the row stays (audit
+    # chain, authorship and comments point at it) but its personal data is gone.
+    erased_at = models.DateTimeField(null=True, blank=True)
+
     email_notifications_enabled = models.BooleanField(default=True)
 
     client = models.ForeignKey(
@@ -101,7 +105,23 @@ class User(AbstractUser):
         ordering = ["username"]
 
     def __str__(self):
+        # An erased account has no name left, only a placeholder username, so reports,
+        # emails and exports get the same readable label as the app does.
+        if self.erased_at:
+            return self.erased_label
         return self.get_full_name() or self.username
+
+    @property
+    def erased_label(self):
+        return f"Erased user {self.uuid.hex[:8]}"
+
+    @property
+    def display_label(self):
+        # In-app label only. __str__ stays free of "(deactivated)": it feeds reports,
+        # emails and exports.
+        if self.erased_at:
+            return self.erased_label
+        return f"{self} (deactivated)" if not self.is_active else str(self)
 
     @property
     def is_superadmin_role(self):

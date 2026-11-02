@@ -491,3 +491,44 @@ class NotificationViewTests(TestCase):
         login(client, self.senior)
         resp = client.get(reverse("accounts:dashboard"))
         self.assertEqual(resp.context["unread_notification_count"], 1)
+
+
+class OutcomeActorLabelTests(TestCase):
+    def setUp(self):
+        self.engagement = Engagement.objects.create(client_name="Acme")
+        generate_project_key(self.engagement)
+        self.author = make_user(User.Role.CONSULTANT)
+        self.reviewer = make_user(User.Role.SENIOR, first_name="Jane", last_name="Smith")
+        self.finding = make_finding(self.engagement, self.author)
+        services.notify_review_outcome(
+            self.finding, Notification.Verb.REVIEWED, actor=self.reviewer, send_email=False,
+        )
+        self.notification = Notification.objects.get(recipient=self.author)
+
+    def test_active_actor_is_shown_as_sent(self):
+        self.assertTrue(self.notification.display_message.endswith(" by Jane Smith."))
+        self.assertEqual(self.notification.display_message, self.notification.message)
+
+    def test_deactivated_actor_is_labelled_but_stored_text_is_unchanged(self):
+        self.reviewer.deactivate()
+        self.notification.refresh_from_db()
+        self.assertTrue(self.notification.display_message.endswith(" by Jane Smith (deactivated)."))
+        self.assertTrue(self.notification.message.endswith(" by Jane Smith."))
+
+        client = Client()
+        login(client, self.author)
+        self.assertContains(client.get(reverse("notifications:list")), "Jane Smith (deactivated)")
+
+    def test_erased_actor_name_is_replaced_and_notification_kept(self):
+        from apps.accounts.erasure import erase_user
+
+        superadmin = make_user(User.Role.SUPERADMIN)
+        self.reviewer.deactivate()
+        erase_user(self.reviewer, actor=superadmin)
+
+        self.notification.refresh_from_db()
+        self.reviewer.refresh_from_db()
+        self.assertNotIn("Jane", self.notification.message)
+        self.assertTrue(self.notification.message.endswith(f" by {self.reviewer.erased_label}."))
+        self.assertEqual(self.notification.display_message, self.notification.message)
+

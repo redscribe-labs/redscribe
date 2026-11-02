@@ -25,7 +25,7 @@
                    class="flex items-start gap-3 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-50 transition-colors {% if notification.read %}bg-slate-50/60 dark:bg-slate-50/60{% endif %}">
                     <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {% if not notification.read %}bg-bell-500{% else %}bg-transparent{% endif %}" aria-hidden="true"></span>
                     <span class="min-w-0 flex-1">
-                        <span class="block text-sm {% if not notification.read %}font-semibold text-slate-900{% else %}text-slate-600{% endif %}">{{ notification.message }}</span>
+                        <span class="block text-sm {% if not notification.read %}font-semibold text-slate-900{% else %}text-slate-600{% endif %}">{{ notification.display_message }}</span>
                         <span class="block text-xs text-slate-500 mt-1">{{ notification.created_at|date:"d/m/Y H:i" }}{% if not notification.read %} &middot; <span class="text-brand-700 dark:text-brand-300">unread</span>{% endif %}</span>
                     </span>
                 </a>

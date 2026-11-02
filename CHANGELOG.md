@@ -5,6 +5,39 @@ All notable changes to RedScribe. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0, each
 release carries an `-alpha` suffix and may include breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- User Management has separate **Active** and **Deactivated** tabs.
+- Deactivated people are labelled "(deactivated)" throughout the app.
+  Reports, emails, and exports are unchanged.
+- **Erase account** permanently removes a deactivated person's personal
+  details while keeping their work attributed to "Erased user".
+
+### Changed
+
+- Deactivating a client also deactivates its portal users. They have to be
+  reactivated one by one.
+- The **Retest workflow** setting is gone. An engagement's status now
+  decides whether it is retested.
+- Clearing the audit log no longer needs a second Superadmin.
+- Classifications are optional when creating a finding or template.
+- The audit log no longer records background session checks.
+- Signing out now only works from the sign-out button.
+
+### Fixed
+
+- Buttons that sometimes missed a click, and a server error when deleting
+  a report text block.
+- Classifications typed but not added were lost on save.
+- Portal users of an inactive client couldn't be edited.
+- Saving some forms could clear a deactivated person or inactive client
+  from them.
+- Deactivated people could still be assigned findings to review.
+- The export page now warns when a report has no layout.
+- Several fixes for phones, keyboard use, and screen readers.
+
 ## [0.6.0-alpha] - 2026-10-22
 
 A redesign of the whole app, with a new checklist workflow. The database

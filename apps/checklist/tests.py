@@ -1026,6 +1026,37 @@ class AssigneeTests(_ItemPostMixin, TestCase):
         self.assertNotContains(self.client.get(self.url + "?mine=1"), marker)
         self.assertContains(self.client.get(self.url), marker)
 
+    def _assign_deactivated_member(self):
+        gone = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=gone, engagement=self.engagement)
+        self.item.assignee = gone
+        self.item.save(update_fields=["assignee"])
+        gone.deactivate()
+        return gone
+
+    def test_deactivated_assignee_is_shown_selected_and_labelled(self):
+        gone = self._assign_deactivated_member()
+        resp = self.client.get(self.url)
+        self.assertContains(resp, f'<option value="{gone.pk}" selected>{gone} (deactivated)</option>', html=True)
+
+    def test_saving_keeps_a_deactivated_assignee(self):
+        gone = self._assign_deactivated_member()
+        resp = self.post_with(assignee=gone.pk, status=ChecklistItem.Status.TESTED_NO_FINDING)
+        self.assertEqual(resp.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.assignee, gone)
+        self.assertEqual(self.item.status, ChecklistItem.Status.TESTED_NO_FINDING)
+
+    def test_deactivated_user_cannot_be_newly_assigned(self):
+        self._assign_deactivated_member()
+        other_gone = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=other_gone, engagement=self.engagement)
+        other_gone.deactivate()
+        resp = self.post_with(assignee=other_gone.pk)
+        self.assertEqual(resp.status_code, 200)
+        self.item.refresh_from_db()
+        self.assertNotEqual(self.item.assignee, other_gone)
+
 
 class ScopeTestedTests(_ItemPostMixin, TestCase):
     def test_scope_tested_is_encrypted_and_shown_again(self):
@@ -1086,6 +1117,15 @@ class ActivityTests(_ItemPostMixin, TestCase):
         self.assertCountEqual(self.kinds(), ["STATUS", "ASSIGNEE"])
         resp = self.client.get(self.url)
         self.assertContains(resp, "changed the outcome")
+
+    def test_assignee_change_links_the_users(self):
+        from .models import ChecklistItemEvent
+
+        self.save(status=ChecklistItem.Status.TESTED_NO_FINDING, assignee=self.consultant.pk)
+        event = ChecklistItemEvent.objects.get(item=self.item, kind="ASSIGNEE")
+        self.assertIsNone(event.from_user)
+        self.assertEqual(event.to_user, self.consultant)
+        self.assertEqual(event.to_value, str(self.consultant))
 
     def test_resaving_without_changes_records_nothing(self):
         self.save(status=ChecklistItem.Status.TESTED_NO_FINDING)

@@ -3,7 +3,14 @@ import flatpickr from "flatpickr";
 // flatpickr shows a second, visible input and hides the original, so a
 // <label for> pointing at the original no longer names anything visible.
 // Point the label at the visible input instead (or copy its text across).
-function labelAltInput(original, alt) {
+function labelAltInput(original, alt, mobile) {
+    // On touch devices flatpickr swaps in a native date input instead, which needs naming too.
+    if (mobile && !mobile.getAttribute("aria-label")) {
+        var own = original.id ? document.querySelector('label[for="' + original.id + '"]') : null;
+        var near = original.parentElement ? original.parentElement.querySelector("label") : null;
+        var name = original.getAttribute("aria-label") || ((own || near) && (own || near).textContent.trim());
+        if (name) mobile.setAttribute("aria-label", name);
+    }
     if (!alt) return;
     var label = original.id ? document.querySelector('label[for="' + original.id + '"]') : null;
     if (label) {
@@ -26,7 +33,7 @@ function initAll(root) {
             altFormat: "d/m/Y",
             altInputClass: el.className || "field-input",
             allowInput: true,
-            onReady: function (_dates, _str, instance) { labelAltInput(el, instance.altInput); },
+            onReady: function (_dates, _str, instance) { labelAltInput(el, instance.altInput, instance.mobileInput); },
         });
     });
 }

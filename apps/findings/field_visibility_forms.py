@@ -49,5 +49,6 @@ ContentSectionDefinitionFormSet = modelformset_factory(
     ContentSectionDefinition,
     formset=BaseContentSectionFormSet,
     fields=["label"] + _BOOLEAN_FIELDS,
+    widgets={"label": forms.TextInput(attrs={"aria-label": "Section name"})},
     extra=0,
 )

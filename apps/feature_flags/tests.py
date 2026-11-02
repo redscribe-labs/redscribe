@@ -38,7 +38,6 @@ def login(client: Client, user) -> None:
 class FeatureFlagsModelTests(TestCase):
     def test_all_flags_default_enabled(self):
         flags = FeatureFlags.get_solo()
-        self.assertTrue(flags.retest_workflow)
         self.assertTrue(flags.notifications)
         self.assertTrue(flags.recurrence_and_trends)
         self.assertTrue(flags.cvss_calculator)
@@ -69,7 +68,6 @@ class FeatureFlagsViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
         resp = client.post(self.url, {
-            "retest_workflow": "on",
             "notifications": "on",
             "recurrence_and_trends": "on",
             "cvss_calculator": "on",
@@ -79,14 +77,14 @@ class FeatureFlagsViewTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         flags = FeatureFlags.get_solo()
         self.assertFalse(flags.scan_import)
-        self.assertTrue(flags.retest_workflow)
+        self.assertTrue(flags.notifications)
         self.assertTrue(flags.mfa_required)
 
     def test_superadmin_can_disable_mfa(self):
         client = Client()
         login(client, make_user(User.Role.SUPERADMIN))
         resp = client.post(self.url, {
-            "retest_workflow": "on", "notifications": "on", "recurrence_and_trends": "on",
+            "notifications": "on", "recurrence_and_trends": "on",
             "cvss_calculator": "on", "global_search": "on", "scan_import": "on",
         })
         self.assertEqual(resp.status_code, 302)

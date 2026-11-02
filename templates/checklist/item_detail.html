@@ -42,7 +42,7 @@
             <input type="hidden" name="version" value="{{ version }}" data-autosave-version>
             {% if conflict %}
             <div role="alert" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-                <p class="font-semibold">{{ last_event.actor|default:"Someone else" }} saved this check after you opened it{% if last_event %} ({{ last_event.created_at|date:"H:i" }}){% endif %}.</p>
+                <p class="font-semibold">{{ last_event.actor|user_label|default:"Someone else" }} saved this check after you opened it{% if last_event %} ({{ last_event.created_at|date:"H:i" }}){% endif %}.</p>
                 <p class="mt-1">Your changes are below and haven't been saved. Keep them to replace the other version, or discard them and load what's saved now.</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button type="submit" name="save_item" value="overwrite" class="btn-primary">Keep my changes</button>
@@ -52,7 +52,7 @@
             {% endif %}
             <section class="card space-y-5">
                 <div>
-                    <p class="text-xs text-slate-500">{{ item.category }} &middot; {{ item.run.label }}{% if item.tested_at %} &middot; Marked {{ item.get_status_display }} by {{ item.tested_by|default:"a former user" }} on {{ item.tested_at|date:"d/m/Y H:i" }}{% endif %}</p>
+                    <p class="text-xs text-slate-500">{{ item.category }} &middot; {{ item.run.label }}{% if item.tested_at %} &middot; Marked {{ item.get_status_display }} by {{ item.tested_by|user_label|default:"a former user" }} on {{ item.tested_at|date:"d/m/Y H:i" }}{% endif %}</p>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight mt-1 break-words">
                         {% if item.code %}<span class="font-mono text-base font-medium text-slate-500 mr-1.5">{{ item.code }}</span>{% endif %}{{ item.title }}
                     </h1>
@@ -98,7 +98,7 @@
                 </summary>
                 <div class="panel-body">
                     {% if item.reference_info %}
-                    <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="false" data-rte-initial='{{ item.reference_info }}'></div>
+                    <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="false" data-rte-label="Reference" data-rte-initial='{{ item.reference_info }}'></div>
                     {% else %}
                     <p class="text-sm text-slate-500">No reference guidance for this check.</p>
                     {% endif %}
@@ -123,7 +123,7 @@
                     <span class="text-xs text-slate-500">Encrypted</span>
                 </div>
                 <div class="panel-body">
-                    <div class="rte-editor" data-rte-field="test_results" data-rte-editable="true" data-rte-initial='{{ form.test_results.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
+                    <div class="rte-editor" data-rte-field="test_results" data-rte-label="Test results and evidence" data-rte-editable="true" data-rte-initial='{{ form.test_results.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
                     <input type="hidden" name="test_results" id="{{ form.test_results.id_for_label }}" data-rte-hidden="test_results">
                 </div>
             </section>
@@ -161,10 +161,10 @@
         {% for c in comments %}
         <li class="py-3">
             <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                <span class="font-medium text-slate-600">{{ c.author|default:"Unknown" }}</span>
+                <span class="font-medium text-slate-600">{{ c.author|user_label|default:"Unknown" }}</span>
                 <span>{{ c.created_at|date:"d/m/Y H:i" }}</span>
             </div>
-            <div class="rte-editor" data-rte-field="comment-{{ forloop.counter }}" data-rte-editable="false" data-rte-initial='{{ c.body }}'></div>
+            <div class="rte-editor" data-rte-field="comment-{{ forloop.counter }}" data-rte-label="Comment by {{ c.author|user_label|default:'Unknown' }}" data-rte-editable="false" data-rte-initial='{{ c.body }}'></div>
         </li>
         {% endfor %}
     </ul>
@@ -188,7 +188,7 @@
                 <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true"></span>
                 <div class="min-w-0">
                     <p class="text-slate-800">
-                        <span class="font-medium">{{ event.actor|default:"Someone" }}</span>
+                        <span class="font-medium">{{ event.actor|user_label|default:"Someone" }}</span>
                         {% if event.kind == "STATUS" %}changed the outcome {% if event.from_value %}from {{ event.from_value }} {% endif %}to <span class="font-medium">{{ event.to_value }}</span>
                         {% elif event.kind == "ASSIGNEE" %}assigned it to <span class="font-medium">{{ event.to_value }}</span>
                         {% elif event.kind == "FINDINGS" %}changed linked findings ({{ event.from_value }} &rarr; {{ event.to_value }})

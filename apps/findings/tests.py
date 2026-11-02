@@ -492,15 +492,16 @@ class FindingViewTests(TestCase):
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(Finding.objects.filter(title="Reflected XSS in search").exists())
 
-    def test_classification_required(self):
+    def test_classification_is_optional(self):
         client = Client()
         login(client, self.consultant)
         resp = client.post(
             reverse("findings:create", args=[self.engagement.pk]),
             self._form_data(classification_taxonomy=[], classification_value=[]),
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertFalse(Finding.objects.filter(title="Reflected XSS in search").exists())
+        self.assertEqual(resp.status_code, 302)
+        finding = Finding.objects.get(title="Reflected XSS in search")
+        self.assertFalse(finding.classifications.exists())
 
     def test_classification_row_needs_both_taxonomy_and_value(self):
         client = Client()
@@ -541,6 +542,19 @@ class FindingViewTests(TestCase):
         self.assertIn("<script>alert(1)</script>", by_slug["technical-details"])
         self.assertIn("Retested 2026-08-01", by_slug["remediation-testing"])
         self.assertIn("Confirmed with two payloads.", by_slug["note"])
+
+    def test_detail_marks_deactivated_people_but_not_active_ones(self):
+        viewer = make_user(User.Role.CONSULTANT)
+        EngagementMembership.objects.create(user=viewer, engagement=self.engagement)
+        finding = make_finding(self.engagement, self.consultant)
+        url = reverse("findings:detail", args=[self.engagement.pk, finding.pk])
+        client = Client()
+        login(client, viewer)
+
+        self.assertNotContains(client.get(url), "(deactivated)")
+
+        self.consultant.deactivate()
+        self.assertContains(client.get(url), f"{self.consultant} (deactivated)")
 
     def test_non_member_cannot_view_finding(self):
         client = Client()
@@ -936,6 +950,17 @@ class CatalogueTests(TestCase):
         self.assertEqual(template.created_by, self.team_lead)
         self.assertEqual(list(template.classifications.all()), [self.tag])
         self.assertIn("<script>alert(1)</script>", section_content(template, "technical-details"))
+
+    def test_template_can_be_created_without_classifications(self):
+        client = Client()
+        login(client, self.team_lead)
+        resp = client.post(
+            reverse("catalogue:create"),
+            self._template_form_data(classification_taxonomy=[], classification_value=[]),
+        )
+        self.assertEqual(resp.status_code, 302)
+        template = VulnerabilityTemplate.objects.get(title="Reflected XSS")
+        self.assertFalse(template.classifications.exists())
 
     def test_catalogue_form_strips_any_image_node(self):
         doc_with_image = json.dumps({
@@ -2245,9 +2270,14 @@ class RetestViewTests(TestCase):
         resp = client.post(self._url(), {"status": Finding.RetestStatus.FIXED, "notes": ""})
         self.assertEqual(resp.status_code, 403)
 
-    def test_disabled_feature_flag_blocks_logging_but_preserves_existing_history(self):
-        from apps.feature_flags.models import FeatureFlags
+    def test_retest_card_hidden_when_nothing_to_show_and_logging_unavailable(self):
+        client = Client()
+        login(client, self.consultant)
+        resp = client.get(reverse("findings:detail", args=[self.engagement.pk, self.finding.pk]))
+        self.assertFalse(resp.context["can_log_retest"])
+        self.assertNotContains(resp, "Retest history")
 
+    def test_logging_blocked_outside_retest_statuses_but_history_stays_visible(self):
         self.engagement.status = Engagement.Status.REMEDIATION_TEST
         self.engagement.save(update_fields=["status"])
 
@@ -2256,9 +2286,8 @@ class RetestViewTests(TestCase):
         client.post(self._url(), {"status": Finding.RetestStatus.NOT_FIXED, "notes": ""})
         self.assertEqual(self.finding.retest_records.count(), 1)
 
-        flags = FeatureFlags.get_solo()
-        flags.retest_workflow = False
-        flags.save()
+        self.engagement.status = Engagement.Status.CLOSED
+        self.engagement.save(update_fields=["status"])
 
         resp = client.post(self._url(), {"status": Finding.RetestStatus.FIXED, "notes": ""})
         self.assertEqual(resp.status_code, 403)
@@ -2267,14 +2296,7 @@ class RetestViewTests(TestCase):
         detail_resp = client.get(reverse("findings:detail", args=[self.engagement.pk, self.finding.pk]))
         self.assertEqual(len(detail_resp.context["retest_records"]), 1)
         self.assertFalse(detail_resp.context["can_log_retest"])
-
-    def test_detail_page_explains_why_retest_is_unavailable_due_to_engagement_status(self):
-        client = Client()
-        login(client, self.consultant)
-        resp = client.get(reverse("findings:detail", args=[self.engagement.pk, self.finding.pk]))
-        self.assertTrue(resp.context["retest_workflow_enabled"])
-        self.assertFalse(resp.context["can_log_retest"])
-        self.assertContains(resp, "Retest results can only be logged while the engagement is")
+        self.assertContains(detail_resp, "Retest history")
 
     def test_no_explanation_shown_once_engagement_is_in_a_retest_status(self):
         self.engagement.status = Engagement.Status.REMEDIATION_TEST

@@ -16,7 +16,7 @@ from .permissions import can_delete_comment_thread
 def _entry_json(entry, project_key):
     return {
         "id": entry.pk,
-        "author": str(entry.author) if entry.author else None,
+        "author": entry.author.display_label if entry.author else None,
         "created_at": timezone.localtime(entry.created_at).isoformat(),
         "body": decrypt_bytes(
             bytes(entry.body_ciphertext), project_key,

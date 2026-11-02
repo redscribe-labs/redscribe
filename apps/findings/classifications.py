@@ -14,10 +14,9 @@ def parse_classification_rows(post_data):
     return rows
 
 
-def validate_classification_rows(rows, require_at_least_one=True):
+def validate_classification_rows(rows):
+    # Classifications are optional; a row only has to be complete.
     errors = []
-    if require_at_least_one and not rows:
-        errors.append("Add at least one classification.")
     for row in rows:
         if not row["taxonomy"]:
             errors.append(f"Choose or type a taxonomy for classification '{row['value']}'.")

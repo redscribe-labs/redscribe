@@ -1,5 +1,6 @@
 from django import forms
 
+from apps.accounts.fields import keep_current_user_selectable
 from apps.engagements.access import users_with_access
 from apps.findings.forms import MAX_IMPORT_FILE_SIZE, RichTextField
 
@@ -66,11 +67,13 @@ class ChecklistItemForm(forms.Form):
     )
     assignee = forms.ModelChoiceField(queryset=None, required=False, label="Assigned to", empty_label="Unassigned")
 
-    def __init__(self, *args, engagement=None, **kwargs):
+    def __init__(self, *args, engagement=None, current_assignee=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["findings"].queryset = engagement.findings.all() if engagement else None
-        # Only people who can open the engagement can own one of its checks.
+        # Only people who can open the engagement can own one of its checks. The current
+        # assignee stays listed even after losing access, so saving doesn't unassign them.
         self.fields["assignee"].queryset = users_with_access(engagement) if engagement else None
+        keep_current_user_selectable(self.fields["assignee"], current_assignee)
 
     def clean(self):
         cleaned = super().clean()

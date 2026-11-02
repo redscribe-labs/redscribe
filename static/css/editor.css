@@ -144,7 +144,7 @@
 }
 
 .rte-comments-panel { margin-top: 0.5rem; font-size: 0.85rem; }
-.rte-comments-empty { color: var(--color-slate-400, #94a3b8); font-size: 0.8rem; }
+.rte-comments-empty { color: var(--color-slate-500, #64748b); font-size: 0.8rem; }
 .rte-thread-card {
     border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.5rem;
 }
@@ -157,7 +157,7 @@
 .rte-thread-entry { margin-bottom: 0.35rem; }
 .rte-thread-entry p { margin: 0.1rem 0 0; }
 .rte-thread-author { font-weight: 600; font-size: 0.8rem; }
-.rte-thread-time { color: var(--color-slate-400, #94a3b8); font-size: 0.75rem; }
+.rte-thread-time { color: var(--color-slate-500, #64748b); font-size: 0.75rem; }
 .rte-reply-form { display: flex; gap: 0.35rem; align-items: flex-start; margin-top: 0.35rem; }
 .rte-reply-form textarea { flex: 1; }
 

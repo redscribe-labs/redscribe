@@ -83,7 +83,7 @@
                     <a href="{% url 'checklist:item_detail' engagement.pk cell.item.pk %}"
                        class="posture-cell posture-cell-{{ cell.key }} h-5 w-5"
                        data-detail-for="posture-detail"
-                       data-detail="{% if cell.item.code %}{{ cell.item.code }} · {% endif %}{{ cell.item.title }} — {{ cell.item.get_status_display }}{% if cell.item.tested_at %} by {{ cell.item.tested_by|default:"a former user" }}, {{ cell.item.tested_at|date:"d/m/Y" }}{% endif %}{% if cell.finding_titles %} — {{ cell.finding_titles|join:', ' }}{% endif %}"
+                       data-detail="{% if cell.item.code %}{{ cell.item.code }} · {% endif %}{{ cell.item.title }} — {{ cell.item.get_status_display }}{% if cell.item.tested_at %} by {{ cell.item.tested_by|user_label|default:"a former user" }}, {{ cell.item.tested_at|date:"d/m/Y" }}{% endif %}{% if cell.finding_titles %} — {{ cell.finding_titles|join:', ' }}{% endif %}"
                        title="{% if cell.item.code %}{{ cell.item.code }} {% endif %}{{ cell.item.title }}: {{ cell.item.get_status_display }}"
                        aria-label="{% if cell.item.code %}{{ cell.item.code }} {% endif %}{{ cell.item.title }}: {{ cell.item.get_status_display }}">
                         {% include "checklist/_posture_cell_glyph.html" with key=cell.key inner=True %}
@@ -104,7 +104,7 @@
 
         <details class="border-t border-slate-100 dark:border-slate-200">
             <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-brand-700 dark:text-brand-300 hover:underline">Show as a table</summary>
-            <div class="relative overflow-x-auto pb-3">
+            <div class="relative overflow-x-auto pb-3" tabindex="0" role="region" aria-label="Checklist items">
                 <table class="w-full min-w-[36rem] text-sm">
                     <caption class="sr-only">Checklist outcomes by category for {{ posture.run.label }}</caption>
                     <thead><tr class="text-right text-xs text-slate-500 border-b border-slate-200">
@@ -186,7 +186,7 @@
                                     {% if item.code %}<span class="text-slate-500 font-mono text-xs mr-2">{{ item.code }}</span>{% endif %}{{ item.title }}
                                 </span>
                                 <span class="flex flex-wrap items-center gap-1.5 sm:shrink-0">
-                                    {% if item.assignee %}<span class="text-xs text-slate-500">{{ item.assignee }}</span>{% endif %}
+                                    {% if item.assignee %}<span class="text-xs text-slate-500">{{ item.assignee|user_label }}</span>{% endif %}
                                     {% if item.pk in selected_context.suggested_ids %}<span class="badge-amber">Suggested</span>{% endif %}
                                     {% if item.findings.all %}<span class="badge-red">{{ item.findings.all|length }} finding{{ item.findings.all|length|pluralize }}</span>{% endif %}
                                     <span class="{{ item.status|badge_class }}">{{ item.get_status_display }}</span>

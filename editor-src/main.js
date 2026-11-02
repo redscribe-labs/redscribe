@@ -116,6 +116,16 @@ const PageBreak = Node.create({
   },
 });
 
+// The editable area is a bare contenteditable, so mark it as a text box. Only an explicit
+// name is set here; the app names the rest from the field's <label> (see nameEditor).
+function editorAttributes(element, editable) {
+  const attributes = { role: "textbox", "aria-multiline": "true" };
+  if (!editable) attributes["aria-readonly"] = "true";
+  const name = element.getAttribute("aria-label") || element.dataset.label;
+  if (name) attributes["aria-label"] = name;
+  return attributes;
+}
+
 function mount(element, opts) {
   const { content, editable = true, onImageUpload, onUpdate, commentThreads } = opts;
 
@@ -124,6 +134,7 @@ function mount(element, opts) {
     editable,
     content: content ? stripDisallowedImages(content) : "",
     editorProps: {
+      attributes: editorAttributes(element, editable),
       transformPastedHTML: (html) => html.replace(/<img\b[^>]*>/gi, ""),
     },
     extensions: [

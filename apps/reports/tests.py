@@ -2208,6 +2208,22 @@ class ReportProfileViewTests(TestCase):
         self.assertEqual({b.profile_id for b in blocks}, {profile_a.pk, profile_b.pk})
         self.assertEqual({b.slug for b in blocks}, {"shared_sounding_name"})
 
+    def test_text_block_delete_confirm_page_renders(self):
+        # `block` is a reserved name inside {% block %} tags, so the context key can't be called that.
+        profile = ReportProfile.objects.get(is_default=True)
+        block = ReportTextBlockDefinition.objects.create(profile=profile, label="SMOKE TEST confirm me")
+        resp = self.client.get(reverse("report_profiles:text_block_delete", args=[block.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "SMOKE TEST confirm me")
+        self.assertContains(resp, reverse("report_profiles:edit", args=[profile.pk]))
+
+    def test_text_block_edit_page_shows_its_label_and_placeholder(self):
+        profile = ReportProfile.objects.get(is_default=True)
+        block = ReportTextBlockDefinition.objects.create(profile=profile, label="SMOKE TEST named block")
+        resp = self.client.get(reverse("report_profiles:profile_text_block_edit", args=[profile.pk, block.pk]))
+        self.assertContains(resp, '<h1 class="page-title">SMOKE TEST named block</h1>', html=True)
+        self.assertContains(resp, f"{{{{ {block.slug} }}}}")
+
     def test_text_block_delete_next_is_validated_against_open_redirect(self):
         profile = ReportProfile.objects.get(is_default=True)
         block = ReportTextBlockDefinition.objects.create(profile=profile, label="SMOKE TEST delete me")
@@ -3109,6 +3125,20 @@ class DocxExportViewTests(TestCase):
         resp = client.get(reverse("reports:options", args=[self.engagement.pk]))
         self.assertNotContains(resp, 'download docx')  # sanity: no leftover copy-paste string
         self.assertFalse(resp.context["docx_available"])
+
+    def test_export_options_warns_when_report_has_no_layout(self):
+        client = Client()
+        login(client, self.author)
+        resp = client.get(reverse("reports:options", args=[self.engagement.pk]))
+        self.assertFalse(resp.context["no_layout"])
+        self.assertNotContains(resp, "would be empty")
+
+        self.profile.docx_template = None
+        self.profile.template = {"type": "doc", "content": []}
+        self.profile.save(update_fields=["docx_template", "template"])
+        resp = client.get(reverse("reports:options", args=[self.engagement.pk]))
+        self.assertTrue(resp.context["no_layout"])
+        self.assertContains(resp, "would be empty")
 
     def test_download_rejected_when_no_template_configured(self):
         self.profile.docx_template = None

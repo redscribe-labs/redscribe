@@ -1014,6 +1014,85 @@ class EngagementDefaultRolesTests(TestCase):
             EngagementMembership.objects.filter(user=self.approver, engagement=self.engagement).exists()
         )
 
+    def _deactivated_defaults(self):
+        self.engagement.default_reviewer = self.reviewer
+        self.engagement.default_qa = self.qa_person
+        self.engagement.default_approver = self.approver
+        self.engagement.save(update_fields=["default_reviewer", "default_qa", "default_approver"])
+        for user in (self.reviewer, self.qa_person, self.approver):
+            user.deactivate()
+
+    def test_edit_form_shows_deactivated_defaults_labelled(self):
+        self._deactivated_defaults()
+        client = Client()
+        login(client, self.team_lead)
+        resp = client.get(reverse("engagements:edit", args=[self.engagement.pk]))
+        self.assertContains(
+            resp, f'<option value="{self.reviewer.pk}" selected>{self.reviewer} (deactivated)</option>', html=True,
+        )
+
+    def test_saving_edit_form_keeps_deactivated_defaults(self):
+        self._deactivated_defaults()
+        client = Client()
+        login(client, self.team_lead)
+        resp = client.post(
+            reverse("engagements:edit", args=[self.engagement.pk]),
+            {
+                "client_name": "Acme renamed", "reference_number": "", "start_date": "", "end_date": "",
+                "default_reviewer": self.reviewer.pk, "default_qa": self.qa_person.pk,
+                "default_approver": self.approver.pk,
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.engagement.refresh_from_db()
+        self.assertEqual(self.engagement.client_name, "Acme renamed")
+        self.assertEqual(
+            (self.engagement.default_reviewer, self.engagement.default_qa, self.engagement.default_approver),
+            (self.reviewer, self.qa_person, self.approver),
+        )
+
+    def test_deactivated_person_cannot_be_newly_made_a_default(self):
+        self.reviewer.deactivate()
+        client = Client()
+        login(client, self.team_lead)
+        resp = client.post(
+            reverse("engagements:edit", args=[self.engagement.pk]),
+            {"client_name": "Acme", "reference_number": "", "start_date": "", "end_date": "",
+             "default_reviewer": self.reviewer.pk},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.engagement.refresh_from_db()
+        self.assertIsNone(self.engagement.default_reviewer)
+
+    def test_deactivated_default_reviewer_is_not_auto_assigned(self):
+        self.engagement.default_reviewer = self.reviewer
+        self.engagement.save(update_fields=["default_reviewer"])
+        self.reviewer.deactivate()
+
+        lifecycle.transition_engagement(self.engagement, Engagement.Status.IN_REVIEW, actor=self.team_lead)
+
+        self.finding.refresh_from_db()
+        self.assertIsNone(self.finding.assigned_reviewer)
+
+    def test_saving_edit_form_keeps_an_inactive_client_link(self):
+        company = ClientCompany.objects.create(name="Acme Ltd")
+        self.engagement.client = company
+        self.engagement.save(update_fields=["client"])
+        company.is_active = False
+        company.save(update_fields=["is_active"])
+        superadmin = make_user(User.Role.SUPERADMIN)
+        client = Client()
+        login(client, superadmin)
+        resp = client.get(reverse("engagements:edit", args=[self.engagement.pk]))
+        self.assertContains(resp, f'<option value="{company.pk}" selected>Acme Ltd (inactive)</option>', html=True)
+        resp = client.post(
+            reverse("engagements:edit", args=[self.engagement.pk]),
+            {"client_name": "Acme", "client": company.pk, "reference_number": "", "start_date": "", "end_date": ""},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.engagement.refresh_from_db()
+        self.assertEqual(self.engagement.client, company)
+
     def test_default_approver_can_approve(self):
         self.engagement.default_approver = self.approver
         self.engagement.status = Engagement.Status.QA

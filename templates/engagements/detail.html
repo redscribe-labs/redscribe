@@ -66,9 +66,9 @@
         </div>
         <p class="text-xs text-slate-500 mb-3">Auto-assigned to findings, or notified, as the engagement reaches each stage.</p>
         <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800 truncate">{{ engagement.default_reviewer|default:"—" }}</dd>
-            <dt class="text-slate-500">QA</dt><dd class="text-slate-800 truncate">{{ engagement.default_qa|default:"—" }}</dd>
-            <dt class="text-slate-500">Approver</dt><dd class="text-slate-800 truncate">{{ engagement.default_approver|default:"—" }}</dd>
+            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800 truncate">{{ engagement.default_reviewer|user_label|default:"—" }}</dd>
+            <dt class="text-slate-500">QA</dt><dd class="text-slate-800 truncate">{{ engagement.default_qa|user_label|default:"—" }}</dd>
+            <dt class="text-slate-500">Approver</dt><dd class="text-slate-800 truncate">{{ engagement.default_approver|user_label|default:"—" }}</dd>
         </dl>
     </section>
 
@@ -84,7 +84,7 @@
                 <div class="flex items-center gap-2 min-w-0">
                     <span class="avatar !bg-navy-50 !text-navy-700 dark:!bg-navy-950 dark:!text-navy-300">{{ m.user|initials }}</span>
                     <div class="min-w-0">
-                        <p class="font-medium text-slate-800 truncate">{{ m.user }}</p>
+                        <p class="font-medium text-slate-800 truncate">{{ m.user|user_label }}</p>
                         <p class="text-xs text-slate-500">{{ m.user.role.name }}</p>
                     </div>
                 </div>
@@ -118,7 +118,7 @@
         </div>
         {% if engagement.client_release_approved %}
         <p class="text-xs text-navy-800 dark:text-navy-200">
-            Released by {{ engagement.client_release_approved_by|default:"—" }} on {{ engagement.client_release_approved_at|date:"d/m/Y" }}.
+            Released by {{ engagement.client_release_approved_by|user_label|default:"—" }} on {{ engagement.client_release_approved_at|date:"d/m/Y" }}.
             QA Approved findings are visible to {{ engagement.client.name }}'s portal users.
         </p>
         {% else %}
@@ -239,14 +239,14 @@
             <div class="py-3">
                 <div class="flex items-center justify-between">
                     <div class="text-xs text-slate-500">
-                        {{ sr.requested_by|default:"—" }} &middot; {{ sr.created_at|date:"d/m/Y H:i" }}
+                        {{ sr.requested_by|user_label|default:"—" }} &middot; {{ sr.created_at|date:"d/m/Y H:i" }}
                     </div>
                     <span class="{{ sr.status|badge_class }}">{{ sr.get_status_display }}</span>
                 </div>
                 <p class="text-sm text-slate-700 whitespace-pre-wrap mt-1">{{ sr.proposed_scope }}</p>
                 {% if sr.status != "PENDING" and sr.reviewed_by %}
                 <div class="text-xs text-slate-500 mt-1">
-                    {{ sr.get_status_display }} by {{ sr.reviewed_by }} &middot; {{ sr.reviewed_at|date:"d/m/Y H:i" }}
+                    {{ sr.get_status_display }} by {{ sr.reviewed_by|user_label }} &middot; {{ sr.reviewed_at|date:"d/m/Y H:i" }}
                 </div>
                 {% endif %}
                 {% if is_manager and sr.status == "PENDING" %}

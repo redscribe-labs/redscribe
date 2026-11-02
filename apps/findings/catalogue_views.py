@@ -91,10 +91,12 @@ def template_list(request):
     taxonomy_choices = sorted(
         ClassificationTag.objects.order_by().values_list("taxonomy", flat=True).distinct()
     )
-    creator_choices = list(
-        get_user_model().objects.filter(vulnerability_templates_created__isnull=False)
-        .distinct().order_by("username").values_list("id", "username")
-    )
+    creator_choices = [
+        (creator.pk, creator.username if creator.is_active else creator.display_label)
+        for creator in get_user_model().objects
+        .filter(vulnerability_templates_created__isnull=False)
+        .distinct().order_by("username")
+    ]
 
     carry_params = request.GET.copy()
     carry_params.pop("page", None)
@@ -300,7 +302,7 @@ def template_edit(request, pk):
     if request.method == "POST":
         form = VulnerabilityTemplateForm(request.POST, sections=sections)
         classification_rows = parse_classification_rows(request.POST)
-        classification_errors = validate_classification_rows(classification_rows, require_at_least_one=False)
+        classification_errors = validate_classification_rows(classification_rows)
         if form.is_valid() and not classification_errors:
             needs_reset = template.status != VulnerabilityTemplate.Status.DRAFT
             was_approved = template.status == VulnerabilityTemplate.Status.APPROVED

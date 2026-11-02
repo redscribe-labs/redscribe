@@ -463,6 +463,24 @@ class PwnedPasswordValidatorTests(TestCase):
         mock_urlopen.assert_not_called()
 
 
+class LogoutMethodTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client = Client()
+        login(self.client, self.user)
+
+    def test_get_does_not_sign_the_user_out(self):
+        # A GET logout can be triggered from any other site (an <img> tag is enough).
+        resp = self.client.get(reverse("accounts:logout"))
+        self.assertEqual(resp.status_code, 405)
+        self.assertEqual(self.client.get(reverse("accounts:session_ping")).status_code, 204)
+
+    def test_post_signs_the_user_out(self):
+        resp = self.client.post(reverse("accounts:logout"))
+        self.assertRedirects(resp, reverse("accounts:login"))
+        self.assertEqual(self.client.get(reverse("accounts:session_ping")).status_code, 302)
+
+
 class LoginFormWhitespaceTests(TestCase):
     def test_password_with_trailing_whitespace_is_not_stripped(self):
         password_with_space = TEST_PASSWORD + " "
@@ -641,6 +659,64 @@ class UserManagementListSearchPaginationTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("user_management:detail", args=[client_user.uuid])).status_code, 404,
         )
+
+    def _usernames(self, **params):
+        resp = self.client.get(reverse("user_management:list"), params)
+        return resp, {u.username for u in resp.context["page_obj"].object_list}
+
+    def test_tabs_split_active_and_deactivated(self):
+        make_user(role=User.Role.CONSULTANT, username="tab-active")
+        gone = make_user(role=User.Role.CONSULTANT, username="tab-gone")
+        gone.deactivate()
+
+        resp, usernames = self._usernames()
+        self.assertEqual(resp.context["status"], "active")
+        self.assertIn("tab-active", usernames)
+        self.assertNotIn("tab-gone", usernames)
+
+        resp, usernames = self._usernames(status="deactivated")
+        self.assertEqual(usernames, {"tab-gone"})
+        self.assertEqual(resp.context["active_count"], 2)  # the searcher + tab-active
+        self.assertEqual(resp.context["deactivated_count"], 1)
+
+    def test_unknown_status_falls_back_to_active(self):
+        make_user(role=User.Role.CONSULTANT, username="tab-gone").deactivate()
+        resp, usernames = self._usernames(status="bogus")
+        self.assertEqual(resp.context["status"], "active")
+        self.assertNotIn("tab-gone", usernames)
+
+    def test_search_and_pagination_stay_on_the_selected_tab(self):
+        for i in range(12):
+            make_user(role=User.Role.CONSULTANT, username=f"old-{i}").deactivate()
+        make_user(role=User.Role.CONSULTANT, username="old-active")
+
+        _, usernames = self._usernames(status="deactivated", q="old-")
+        self.assertEqual(len(usernames), 10)
+        self.assertNotIn("old-active", usernames)
+
+        resp = self.client.get(reverse("user_management:list"), {"status": "deactivated", "q": "old-"})
+        self.assertContains(resp, "status=deactivated&page=2")
+        self.assertContains(resp, '<input type="hidden" name="status" value="deactivated">', html=True)
+
+    def test_client_portal_users_never_counted_in_tabs(self):
+        from apps.clients.models import Client as ClientCompany
+
+        company = ClientCompany.objects.create(name="Acme Corp")
+        make_user(role="client", username="portal-gone", client=company).deactivate()
+        resp, usernames = self._usernames(status="deactivated")
+        self.assertNotIn("portal-gone", usernames)
+        self.assertEqual(resp.context["deactivated_count"], 0)
+
+    def test_display_label_and_filter_mark_deactivated_only(self):
+        from apps.accounts.templatetags.redscribe_extras import user_label
+
+        user = make_user(role=User.Role.CONSULTANT, username="label-me")
+        self.assertEqual(user.display_label, "label-me")
+        user.deactivate()
+        self.assertEqual(user.display_label, "label-me (deactivated)")
+        self.assertEqual(str(user), "label-me")  # reports/emails keep the plain name
+        self.assertEqual(user_label(user), "label-me (deactivated)")
+        self.assertIsNone(user_label(None))
 
     def test_manage_clients_pointer_shown_only_with_clients_manage(self):
         resp = self.client.get(reverse("user_management:list"))
@@ -2194,3 +2270,234 @@ class ClientLandingTests(TestCase):
         device = TOTPDevice.objects.get(user=self.user, confirmed=False)
         resp = client.post(reverse("accounts:mfa_enroll"), {"token": self._totp(device)})
         self.assertRedirects(resp, reverse("clients_portal:dashboard"), fetch_redirect_response=False)
+
+
+class UserErasureTests(TestCase):
+    def setUp(self):
+        self.actor = make_user(role=User.Role.SUPERADMIN, username="erase-actor")
+        self.target = make_user(
+            role=User.Role.CONSULTANT, username="leaver", email="leaver@example.com",
+            first_name="Lea", last_name="Ver", background="bio", qualifications="quals",
+        )
+        self.target.deactivate()
+        self.client = Client()
+        login(self.client, self.actor)
+        self.url = reverse("user_management:erase", args=[self.target.uuid])
+
+    def _post(self, **overrides):
+        data = {"confirm_username": "leaver"}
+        data.update(overrides)
+        return self.client.post(self.url, data)
+
+    def _assert_untouched(self):
+        self.target.refresh_from_db()
+        self.assertIsNone(self.target.erased_at)
+        self.assertEqual(self.target.username, "leaver")
+
+    def test_requires_users_manage(self):
+        other = Client()
+        login(other, make_user(role=User.Role.CONSULTANT))
+        self.assertEqual(other.get(self.url).status_code, 403)
+        self.assertEqual(other.post(self.url, {}).status_code, 403)
+
+    def test_confirm_page_renders_for_deactivated_account(self):
+        self.assertContains(self.client.get(self.url), "Erase leaver?")
+
+    def test_active_account_cannot_be_erased(self):
+        self.target.reactivate()
+        resp = self._post()
+        self.assertRedirects(resp, reverse("user_management:detail", args=[self.target.uuid]))
+        self._assert_untouched()
+
+    def test_cannot_erase_self(self):
+        self.actor.deactivate()  # simulate; blocker checks self before active
+        self.client.post(
+            reverse("user_management:erase", args=[self.actor.uuid]),
+            {"confirm_username": "erase-actor"},
+        )
+        self.actor.refresh_from_db()
+        self.assertIsNone(self.actor.erased_at)
+
+    def test_client_portal_user_is_not_reachable(self):
+        from apps.clients.models import Client as ClientCompany
+
+        portal = make_user(role="client", client=ClientCompany.objects.create(name="Acme"))
+        portal.deactivate()
+        self.assertEqual(
+            self.client.get(reverse("user_management:erase", args=[portal.uuid])).status_code, 404,
+        )
+
+    def test_wrong_username_confirmation_erases_nothing(self):
+        self._post(confirm_username="nope")
+        self._assert_untouched()
+
+    def test_username_must_match_exactly(self):
+        for typed in ("", "Leaver", " leaver"):
+            self._post(confirm_username=typed)
+            self._assert_untouched()
+
+    def test_typed_username_alone_is_enough(self):
+        resp = self._post()
+        self.assertRedirects(resp, reverse("user_management:detail", args=[self.target.uuid]))
+        self.target.refresh_from_db()
+        self.assertIsNotNone(self.target.erased_at)
+
+    def test_successful_erase_scrubs_personal_data_and_keeps_row(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from apps.audit.models import AuditLogEntry
+        from apps.engagements.models import Engagement, EngagementMembership
+        from apps.notifications.models import Notification
+
+        TOTPDevice.objects.create(user=self.target, name="d", confirmed=True)
+        engagement = Engagement.objects.create(client_name="Acme")
+        EngagementMembership.objects.create(user=self.target, engagement=engagement)
+        LoginAttempt.objects.create(
+            username_attempted="leaver", user=self.target, successful=True, ip_address="10.0.0.9",
+        )
+        pk, uuid = self.target.pk, self.target.uuid
+
+        resp = self._post()
+        self.assertRedirects(resp, reverse("user_management:detail", args=[uuid]))
+
+        gone = User.objects.get(pk=pk)
+        self.assertIsNotNone(gone.erased_at)
+        self.assertEqual(gone.username, f"erased-{uuid.hex}")
+        self.assertTrue(gone.email.endswith("@erased.invalid"))
+        self.assertEqual((gone.first_name, gone.last_name, gone.background, gone.qualifications), ("", "", "", ""))
+        self.assertFalse(gone.has_usable_password())
+        self.assertFalse(gone.is_active)
+        self.assertEqual(gone.uuid, uuid)
+        self.assertFalse(TOTPDevice.objects.filter(user=gone).exists())
+        self.assertFalse(EngagementMembership.objects.filter(user=gone).exists())
+        self.assertFalse(Notification.objects.filter(recipient=gone).exists())
+        self.assertFalse(LoginAttempt.objects.filter(username_attempted="leaver").exists())
+        self.assertEqual(gone.display_label, f"Erased user {uuid.hex[:8]}")
+
+        entry = AuditLogEntry.objects.get(action="user_management:erase_user")
+        self.assertEqual(entry.actor_id, self.actor.pk)
+        self.assertIn(f"user_uuid={uuid}", entry.object_ref)
+
+    def test_already_erased_account_cannot_be_erased_again(self):
+        from apps.audit.models import AuditLogEntry
+
+        self._post()
+        resp = self.client.post(self.url, {"confirm_username": "leaver"}, follow=True)
+        self.assertContains(resp, "already been erased")
+        self.assertEqual(AuditLogEntry.objects.filter(action="user_management:erase_user").count(), 1)
+
+    def test_state_change_during_erase_is_caught_inside_the_transaction(self):
+        # The pre-check passes, but the account was reactivated before the locked re-check.
+        self.target.reactivate()
+        with patch("apps.accounts.erase_views.erasure_blocker", return_value=None):
+            resp = self._post()
+        self.assertRedirects(resp, self.url, fetch_redirect_response=False)
+        self.target.refresh_from_db()
+        self.assertIsNone(self.target.erased_at)
+        self.assertEqual(self.target.username, "leaver")
+
+    def test_erase_redacts_name_in_checklist_assignee_events(self):
+        from apps.checklist.models import ChecklistItem, ChecklistItemEvent
+        from apps.checklist.services import instantiate_checklist
+        from apps.checklist.tests import make_default_template
+        from apps.crypto.services import generate_project_key
+        from apps.engagements.models import Engagement, EngagementMembership
+
+        make_default_template()
+
+        def first_item(name):
+            engagement = Engagement.objects.create(client_name=name)
+            generate_project_key(engagement)
+            instantiate_checklist(engagement)
+            return engagement, ChecklistItem.objects.filter(run__engagement=engagement).first()
+
+        mine, item = first_item("Acme")
+        EngagementMembership.objects.create(user=self.target, engagement=mine)
+        _elsewhere, other_item = first_item("Globex")
+        namesake = make_user(role=User.Role.CONSULTANT, first_name="Lea", last_name="Ver")
+        self.assertEqual(str(self.target), "Lea Ver")
+
+        Event = ChecklistItemEvent
+        legacy_to = Event.objects.create(item=item, kind="ASSIGNEE", from_value="Unassigned", to_value="Lea Ver")
+        legacy_from = Event.objects.create(item=item, kind="ASSIGNEE", from_value="leaver", to_value="Unassigned")
+        unrelated = Event.objects.create(item=item, kind="ASSIGNEE", from_value="Someone Else", to_value="Unassigned")
+        linked = Event.objects.create(
+            item=other_item, kind="ASSIGNEE", from_value="Unassigned", to_value="Lea Ver", to_user=self.target,
+        )
+        namesake_linked = Event.objects.create(
+            item=other_item, kind="ASSIGNEE", from_value="Lea Ver", to_value="Unassigned", from_user=namesake,
+        )
+        namesake_legacy = Event.objects.create(
+            item=other_item, kind="ASSIGNEE", from_value="Unassigned", to_value="Lea Ver",
+        )
+
+        self._post()
+
+        label = User.objects.get(pk=self.target.pk).erased_label
+        for event in (legacy_to, legacy_from, unrelated, linked, namesake_linked, namesake_legacy):
+            event.refresh_from_db()
+        self.assertEqual((legacy_to.from_value, legacy_to.to_value), ("Unassigned", label))
+        self.assertEqual(legacy_to.to_user_id, self.target.pk)
+        self.assertEqual((legacy_from.from_value, legacy_from.to_value), (label, "Unassigned"))
+        self.assertEqual(unrelated.from_value, "Someone Else")
+        self.assertEqual(linked.to_value, label)
+        # A colleague with the same name keeps their history, linked or not.
+        self.assertEqual(namesake_linked.from_value, "Lea Ver")
+        self.assertEqual(namesake_legacy.to_value, "Lea Ver")
+
+    def test_erase_clears_ip_addresses_and_last_login(self):
+        LoginAttempt.objects.create(username_attempted="leaver", user=self.target, successful=False, ip_address="10.0.0.9")
+        LoginAttempt.objects.create(username_attempted="leaver", user=None, successful=False, ip_address="10.0.0.10")
+        User.objects.filter(pk=self.target.pk).update(last_login=timezone.now())
+
+        self._post()
+
+        gone = User.objects.get(pk=self.target.pk)
+        self.assertIsNone(gone.last_login)
+        self.assertFalse(LoginAttempt.objects.filter(username_attempted=gone.username).exclude(ip_address=None).exists())
+        self.assertEqual(LoginAttempt.objects.filter(username_attempted=gone.username).count(), 2)
+
+    def test_erased_user_has_a_readable_name_everywhere(self):
+        from apps.accounts.templatetags.redscribe_extras import initials
+
+        self._post()
+        gone = User.objects.get(pk=self.target.pk)
+        self.assertEqual(str(gone), gone.erased_label)
+        self.assertEqual(gone.display_label, gone.erased_label)
+        self.assertEqual(initials(gone), "EU")
+
+    def test_erased_detail_page_shows_no_sign_in_history(self):
+        LoginAttempt.objects.create(username_attempted="leaver", user=self.target, successful=True, ip_address="10.0.0.9")
+        self._post()
+        resp = self.client.get(reverse("user_management:detail", args=[self.target.uuid]))
+        self.assertNotContains(resp, "10.0.0.9")
+        self.assertContains(resp, "Sign-in history was removed")
+
+    def test_username_and_email_are_reusable_after_erase(self):
+        self._post()
+        make_user(role=User.Role.CONSULTANT, username="leaver", email="leaver@example.com")
+
+    def test_erased_account_is_read_only(self):
+        self._post()
+        uuid = self.target.uuid
+        self.assertEqual(self.client.get(reverse("user_management:detail", args=[uuid])).status_code, 200)
+        for name in ("edit", "reactivate", "send_password_reset", "clear_mfa"):
+            resp = self.client.post(reverse(f"user_management:{name}", args=[uuid]))
+            self.assertEqual(resp.status_code, 404, name)
+        self.assertRedirects(
+            self.client.get(self.url), reverse("user_management:detail", args=[uuid]),
+        )
+
+    def test_erased_account_keeps_audit_chain_valid(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from apps.audit.integrity import append_with_chain
+
+        append_with_chain(
+            actor=self.target, actor_username="leaver", action="x", method="POST", path="/x/", status_code=200,
+        )
+        self._post()
+        out = StringIO()
+        call_command("verify_audit_log", stdout=out)  # raises CommandError on a broken chain

@@ -97,7 +97,7 @@ _PREVIEW_CSS_BASE = """
 }}
 .report-cover-meta-row {{ display: flex; gap: 2.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
 .report-cover-meta-item {{ display: flex; flex-direction: column; gap: .2rem; }}
-.report-cover-meta-label {{ font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }}
+.report-cover-meta-label {{ font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }}
 .report-cover-meta-value {{ font-size: .85rem; color: #1e293b; font-weight: 600; }}
 /* Horizontal row separators only — no vertical cell borders and no
    border-collapse at all. A full grid (border on all four sides of every

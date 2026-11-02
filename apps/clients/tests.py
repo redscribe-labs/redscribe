@@ -371,7 +371,7 @@ class ClientPortalAccessMiddlewareTests(TestCase):
         flags.save()
         login(self.http, self.client_user)
 
-        resp = self.http.get(reverse("accounts:logout"))
+        resp = self.http.post(reverse("accounts:logout"))
         self.assertNotEqual(resp.status_code, 403)
 
     def test_password_change_uses_portal_chrome_and_returns_to_portal(self):
@@ -478,6 +478,52 @@ class ClientCompanyCrudTests(TestCase):
         self.assertEqual(company.name, "New Name")
         self.assertFalse(company.is_active)
 
+    def test_deactivating_client_deactivates_portal_users(self):
+        company = Client.objects.create(name="Acme Corp")
+        active = make_client_user(company)
+        already_off = make_client_user(company)
+        already_off.deactivate()
+        other_user = make_client_user(Client.objects.create(name="Other Corp"))
+
+        self.http.post(reverse("clients:edit", args=[company.pk]), {"name": "Acme Corp"})
+
+        active.refresh_from_db()
+        other_user.refresh_from_db()
+        self.assertFalse(active.is_active)
+        self.assertIsNotNone(active.deactivated_at)
+        self.assertTrue(other_user.is_active)
+
+    def test_rename_keeps_portal_users_active(self):
+        company = Client.objects.create(name="Acme Corp")
+        user = make_client_user(company)
+        self.http.post(
+            reverse("clients:edit", args=[company.pk]), {"name": "Acme Ltd", "is_active": "on"},
+        )
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+
+    def test_reactivating_client_does_not_reactivate_users(self):
+        company = Client.objects.create(name="Acme Corp", is_active=False)
+        user = make_client_user(company)
+        user.deactivate()
+
+        self.http.post(
+            reverse("clients:edit", args=[company.pk]), {"name": "Acme Corp", "is_active": "on"},
+        )
+
+        company.refresh_from_db()
+        user.refresh_from_db()
+        self.assertTrue(company.is_active)
+        self.assertFalse(user.is_active)
+
+    def test_cannot_reactivate_user_of_inactive_client(self):
+        company = Client.objects.create(name="Acme Corp", is_active=False)
+        user = make_client_user(company)
+        user.deactivate()
+        self.http.post(reverse("clients:user_reactivate", args=[user.uuid]))
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
     def test_detail_shows_engagements_and_portal_users(self):
         company = Client.objects.create(name="Acme Corp")
         engagement = Engagement.objects.create(client_name="Acme", client=company)
@@ -492,7 +538,7 @@ class ClientCompanyCrudTests(TestCase):
 class ClientUserCrudTests(TestCase):
     def setUp(self):
         self.http = HttpClient()
-        login(self.http, make_user("superadmin"))
+        self.superadmin = login(self.http, make_user("superadmin"))
         self.acme = Client.objects.create(name="Acme Corp")
 
     def test_create_client_user_gets_client_role_and_company(self):
@@ -530,6 +576,30 @@ class ClientUserCrudTests(TestCase):
         target.refresh_from_db()
         self.assertEqual(target.client, other)
 
+    def test_user_of_inactive_client_can_be_edited_without_moving(self):
+        target = make_client_user(self.acme)
+        self.acme.is_active = False
+        self.acme.save()
+        target.deactivate()
+        resp = self.http.post(
+            reverse("clients:user_edit", args=[target.uuid]),
+            {"email": "fixed@acme.example", "first_name": "A", "last_name": "B", "client": self.acme.pk},
+        )
+        self.assertRedirects(resp, reverse("clients:user_detail", args=[target.uuid]))
+        target.refresh_from_db()
+        self.assertEqual((target.email, target.client), ("fixed@acme.example", self.acme))
+
+    def test_cannot_move_user_to_an_unrelated_inactive_client(self):
+        dormant = Client.objects.create(name="Dormant Corp", is_active=False)
+        target = make_client_user(self.acme)
+        resp = self.http.post(
+            reverse("clients:user_edit", args=[target.uuid]),
+            {"email": target.email, "first_name": "A", "last_name": "B", "client": dormant.pk},
+        )
+        self.assertEqual(resp.status_code, 200)
+        target.refresh_from_db()
+        self.assertEqual(target.client, self.acme)
+
     def test_deactivate_and_reactivate(self):
         target = make_client_user(self.acme)
         self.http.post(reverse("clients:user_deactivate", args=[target.uuid]))
@@ -539,6 +609,125 @@ class ClientUserCrudTests(TestCase):
         self.http.post(reverse("clients:user_reactivate", args=[target.uuid]))
         target.refresh_from_db()
         self.assertTrue(target.is_active)
+
+    def _erase(self, target, **overrides):
+        data = {"confirm_username": target.username}
+        data.update(overrides)
+        return self.http.post(reverse("clients:user_erase", args=[target.uuid]), data)
+
+    def _deactivated_portal_user(self):
+        target = make_client_user(self.acme, first_name="Pat", last_name="Portal")
+        target.deactivate()
+        return target
+
+    def test_erase_scrubs_client_user_and_keeps_company_link(self):
+        target = self._deactivated_portal_user()
+        resp = self._erase(target)
+        self.assertRedirects(resp, reverse("clients:user_detail", args=[target.uuid]))
+        target.refresh_from_db()
+        self.assertIsNotNone(target.erased_at)
+        self.assertEqual(target.first_name, "")
+        self.assertTrue(target.email.endswith("@erased.invalid"))
+        self.assertFalse(target.has_usable_password())
+        self.assertFalse(TOTPDevice.objects.filter(user=target).exists())
+        self.assertEqual(target.client, self.acme)
+
+    def test_erase_audit_entry_names_the_clients_route(self):
+        from apps.audit.models import AuditLogEntry
+
+        target = self._deactivated_portal_user()
+        self._erase(target)
+        entry = AuditLogEntry.objects.get(action="clients:erase_user")
+        self.assertEqual(entry.path, f"/clients/users/{target.uuid}/erase/")
+
+    def test_reactivate_user_without_a_client_explains_why(self):
+        target = make_client_user(self.acme)
+        target.deactivate()
+        User.objects.filter(pk=target.pk).update(client=None)
+        resp = self.http.post(reverse("clients:user_reactivate", args=[target.uuid]), follow=True)
+        self.assertContains(resp, "linked to a client company")
+        target.refresh_from_db()
+        self.assertFalse(target.is_active)
+
+    def test_migration_deactivates_users_of_already_inactive_clients(self):
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        migration = importlib.import_module("apps.clients.migrations.0002_deactivate_users_of_inactive_clients")
+        dormant = Client.objects.create(name="Dormant Co", is_active=False)
+        live = Client.objects.create(name="Live Co")
+        stranded = make_client_user(dormant)
+        kept = make_client_user(live)
+        staff = make_user("consultant")
+
+        migration.deactivate_users_of_inactive_clients(django_apps, None)
+
+        for user in (stranded, kept, staff):
+            user.refresh_from_db()
+        self.assertFalse(stranded.is_active)
+        self.assertIsNotNone(stranded.deactivated_at)
+        self.assertTrue(kept.is_active)
+        self.assertTrue(staff.is_active)
+
+    def test_erase_keeps_finding_view_history(self):
+        target = self._deactivated_portal_user()
+        engagement = Engagement.objects.create(client_name="Acme", client=self.acme)
+        finding = make_finding(engagement)
+        record_client_finding_view(finding, target)
+        self._erase(target)
+        self.assertTrue(FindingClientView.objects.filter(client_user=target).exists())
+
+    def test_erase_requires_deactivated_account(self):
+        target = make_client_user(self.acme)
+        self._erase(target)
+        target.refresh_from_db()
+        self.assertIsNone(target.erased_at)
+
+    def test_erase_needs_the_typed_username(self):
+        target = self._deactivated_portal_user()
+        for typed in ("", "nope", target.username.upper()):
+            self._erase(target, confirm_username=typed)
+            target.refresh_from_db()
+            self.assertIsNone(target.erased_at, typed)
+
+    def test_erased_client_user_is_read_only(self):
+        target = self._deactivated_portal_user()
+        self._erase(target)
+        self.assertEqual(self.http.get(reverse("clients:user_detail", args=[target.uuid])).status_code, 200)
+        for name in ("user_edit", "user_reactivate", "user_deactivate", "user_erase"):
+            resp = self.http.post(reverse(f"clients:{name}", args=[target.uuid]))
+            self.assertIn(resp.status_code, (302, 404), name)
+        target.refresh_from_db()
+        self.assertFalse(target.is_active)
+        self.assertEqual(
+            self.http.get(reverse("clients:user_edit", args=[target.uuid])).status_code, 404,
+        )
+
+    def test_erase_needs_clients_manage(self):
+        target = self._deactivated_portal_user()
+        http = HttpClient()
+        login(http, make_user("consultant"))
+        resp = http.get(reverse("clients:user_erase", args=[target.uuid]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_erase_needs_superadmin_even_with_clients_manage(self):
+        target = self._deactivated_portal_user()
+        http = HttpClient()
+        login(http, make_user("team_lead"))
+        detail = http.get(reverse("clients:user_detail", args=[target.uuid]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertNotContains(detail, reverse("clients:user_erase", args=[target.uuid]))
+        self.assertEqual(http.get(reverse("clients:user_erase", args=[target.uuid])).status_code, 403)
+        resp = http.post(reverse("clients:user_erase", args=[target.uuid]), {"confirm_username": target.username})
+        self.assertEqual(resp.status_code, 403)
+        target.refresh_from_db()
+        self.assertIsNone(target.erased_at)
+
+    def test_superadmin_sees_erase_button_for_deactivated_portal_user(self):
+        target = self._deactivated_portal_user()
+        resp = self.http.get(reverse("clients:user_detail", args=[target.uuid]))
+        self.assertContains(resp, reverse("clients:user_erase", args=[target.uuid]))
 
     def test_deactivate_404s_for_non_client_user(self):
         consultant = make_user("consultant")

@@ -13,7 +13,7 @@
             <span class="badge-severity" style="{{ template.default_severity|severity_chip_style }}">{{ template.get_default_severity_display }}</span>
             {% if template.default_cvss_score %}<span class="text-sm text-slate-500">CVSS <span class="font-mono font-semibold text-slate-800">{{ template.default_cvss_score }}</span></span>{% endif %}
         </div>
-        {% if template.created_by %}<p class="text-xs text-slate-500 mt-1.5">Created by {{ template.created_by }}</p>{% endif %}
+        {% if template.created_by %}<p class="text-xs text-slate-500 mt-1.5">Created by {{ template.created_by|user_label }}</p>{% endif %}
     </div>
     <div class="flex flex-wrap gap-2 min-w-0">
         {% if can_submit_qa %}
@@ -107,7 +107,7 @@
         <h2 class="font-semibold text-slate-900 text-sm mb-3">About this entry</h2>
         <dl class="space-y-2 text-sm">
             {% if template.created_by %}
-            <div class="flex justify-between gap-3"><dt class="text-slate-500">Created by</dt><dd class="text-slate-700 text-right">{{ template.created_by }}</dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-slate-500">Created by</dt><dd class="text-slate-700 text-right">{{ template.created_by|user_label }}</dd></div>
             {% endif %}
             <div class="flex justify-between gap-3"><dt class="text-slate-500">Created</dt><dd class="text-slate-700">{{ template.created_at|date:"d/m/Y" }}</dd></div>
             {% if template.updated_at != template.created_at %}

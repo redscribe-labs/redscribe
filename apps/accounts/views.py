@@ -19,6 +19,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+from django.views.decorators.http import require_POST
 from django_otp import login as otp_login
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -120,6 +121,7 @@ def setup_view(request):
 
 
 @login_required
+@require_POST
 def logout_view(request):
     from .models import UserSession
 

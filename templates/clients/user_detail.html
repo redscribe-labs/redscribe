@@ -8,8 +8,8 @@
         <div class="flex items-center gap-3">
             <span class="avatar !h-10 !w-10 !bg-orange-50 !text-orange-700 dark:!bg-orange-950/50 dark:!text-orange-300">{{ target|initials }}</span>
             <div>
-                <h1 class="page-title">{{ target.get_full_name|default:target.username }}</h1>
-                <p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>
+                <h1 class="page-title">{% if target.erased_at %}{{ target|user_label }}{% else %}{{ target.get_full_name|default:target.username }}{% endif %}</h1>
+                {% if not target.erased_at %}<p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>{% endif %}
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-1.5 mt-3">
@@ -17,16 +17,20 @@
             {% if target.client %}
             <a href="{% url 'clients:detail' target.client.pk %}" class="badge-slate hover:ring-brand-400">{{ target.client.name }}</a>
             {% endif %}
-            {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
-            {% if has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
+            {% if target.erased_at %}<span class="badge-slate">Erased</span>{% elif target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+            {% if target.erased_at %}{% elif has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
         </div>
     </div>
-    <a href="{% url 'clients:user_edit' target.uuid %}" class="btn-secondary">Edit</a>
+    {% if not target.erased_at %}<a href="{% url 'clients:user_edit' target.uuid %}" class="btn-secondary">Edit</a>{% endif %}
 </div>
 {% endblock %}
 
 {% block side_panel %}
 <div class="rail-panel space-y-3">
+    {% if target.erased_at %}
+    <h2 class="font-semibold text-slate-900 mb-1">Account erased</h2>
+    <p class="text-sm text-slate-600">Personal data was removed on {{ target.erased_at|date:"d/m/Y H:i" }}. Their activity and audit history stay attributed to this record. This can't be undone.</p>
+    {% else %}
     <h2 class="font-semibold text-slate-900 mb-1">Actions</h2>
 
     <form method="post" action="{% url 'clients:user_send_password_reset' target.uuid %}">
@@ -52,6 +56,15 @@
         </form>
         {% endif %}
     </div>
+
+    {% if not target.is_active and target.pk != user.pk and user.is_superadmin_role %}
+    <div class="pt-2 border-t border-slate-100 dark:border-slate-200">
+        <h3 class="font-semibold text-red-800 dark:text-red-300">Erase account</h3>
+        <p class="field-help mt-1 mb-2">Permanently removes their name, email, and sign-in details. Their activity and the audit trail stay.</p>
+        <a href="{% url 'clients:user_erase' target.uuid %}" class="btn-danger w-full text-center">Erase account…</a>
+    </div>
+    {% endif %}
+    {% endif %}
 </div>
 {% endblock %}
 

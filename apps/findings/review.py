@@ -19,6 +19,9 @@ from .models import Finding
 
 
 def _is_eligible(candidate, finding: Finding, permission: str, own_permission: str) -> bool:
+    # A deactivated engagement default must not be auto-assigned work they can't sign in to do.
+    if not candidate.is_active:
+        return False
     if not candidate.has_permission(permission):
         return False
     author = finding.created_by

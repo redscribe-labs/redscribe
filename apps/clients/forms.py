@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 from apps.accounts.models import Role
 
@@ -51,3 +52,12 @@ class ClientUserEditForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ["email", "first_name", "last_name", "client"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Keep the user's current company selectable even once it's inactive, so their
+        # details can be corrected without moving them to another company.
+        if self.instance.client_id:
+            self.fields["client"].queryset = Client.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.client_id)
+            )

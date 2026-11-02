@@ -50,3 +50,16 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_verb_display()} -> {self.recipient} [{'read' if self.read else 'unread'}]"
+
+    @property
+    def display_message(self):
+        # Outcome messages end "… by <actor>." with the name as it was when sent. Show the
+        # actor's current in-app label there instead, so a deactivated reviewer reads
+        # "Jane Smith (deactivated)" and an erased one stays "Erased user …".
+        actor = self.actor
+        if actor is None:
+            return self.message
+        suffix = f" by {actor}."
+        if not self.message.endswith(suffix):
+            return self.message
+        return f"{self.message[:-len(suffix)]} by {actor.display_label}."

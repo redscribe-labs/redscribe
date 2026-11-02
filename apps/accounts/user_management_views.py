@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -13,6 +13,7 @@ PAGE_SIZE = 10
 from apps.findings.review import assignments_for_user
 
 from . import security
+from .erase_views import run_erase_flow
 from .forms import LocalUserCreateForm, LocalUserEditForm, oauth_domain_mismatch
 from .models import LoginAttempt
 from .permissions import require_permission
@@ -31,15 +32,28 @@ def _staff_users():
     return User.objects.exclude(role__slug="client")
 
 
-def _get_staff_target(user_uuid, **extra):
-    return get_object_or_404(_staff_users(), uuid=user_uuid, **extra)
+def _get_staff_target(user_uuid, *, allow_erased=False, **extra):
+    # Erased accounts are read-only tombstones: only the detail page may open one,
+    # every action view 404s so nothing can revive or edit it.
+    users = _staff_users()
+    if not allow_erased:
+        users = users.filter(erased_at__isnull=True)
+    return get_object_or_404(users, uuid=user_uuid, **extra)
 
 
 @login_required
 def user_list(request):
     _require_users_manage(request.user)
     query = request.GET.get("q", "").strip()
-    users = _staff_users()
+    status = request.GET.get("status", "active")
+    if status not in ("active", "deactivated"):
+        status = "active"
+    staff = _staff_users()
+    counts = staff.aggregate(
+        active=Count("pk", filter=Q(is_active=True)), deactivated=Count("pk", filter=Q(is_active=False)),
+    )
+    active_count, deactivated_count = counts["active"], counts["deactivated"]
+    users = staff.filter(is_active=(status == "active"))
     if query:
         users = users.filter(
             Q(username__icontains=query)
@@ -55,6 +69,9 @@ def user_list(request):
         {
             "page_obj": page_obj,
             "query": query,
+            "status": status,
+            "active_count": active_count,
+            "deactivated_count": deactivated_count,
             "breadcrumbs": [{"label": "User Management"}],
         },
     )
@@ -97,8 +114,8 @@ def user_create(request):
 @login_required
 def user_detail(request, user_uuid):
     _require_users_manage(request.user)
-    target = _get_staff_target(user_uuid)
-    recent_attempts = LoginAttempt.objects.filter(user=target)[:10]
+    target = _get_staff_target(user_uuid, allow_erased=True)
+    recent_attempts = [] if target.erased_at else LoginAttempt.objects.filter(user=target)[:10]
     has_confirmed_mfa = TOTPDevice.objects.filter(user=target, confirmed=True).exists()
 
     return render(
@@ -190,6 +207,26 @@ def user_deactivate(request, user_uuid):
                 )
 
     return redirect("user_management:detail", user_uuid=target.uuid)
+
+
+@login_required
+def user_erase(request, user_uuid):
+    _require_users_manage(request.user)
+    target = _get_staff_target(user_uuid, allow_erased=True)
+    detail_url = reverse("user_management:detail", args=[target.uuid])
+
+    return run_erase_flow(
+        request, target,
+        detail_url=detail_url,
+        erase_url=reverse("user_management:erase", args=[target.uuid]),
+        breadcrumbs=[
+            {"label": "User Management", "url": reverse("user_management:list")},
+            {"label": target.username, "url": detail_url},
+            {"label": "Erase"},
+        ],
+        action="user_management:erase_user",
+        route="user-management",
+    )
 
 
 @login_required

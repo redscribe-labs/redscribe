@@ -149,6 +149,14 @@ class ChecklistItemEvent(models.Model):
     kind = models.CharField(max_length=16, choices=Kind.choices)
     from_value = models.CharField(max_length=255, blank=True, default="")
     to_value = models.CharField(max_length=255, blank=True, default="")
+    # For assignee changes: who the names above refer to, so erasing an account can redact
+    # exactly that person's entries. Empty on entries written before these were added.
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

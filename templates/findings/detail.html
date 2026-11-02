@@ -24,7 +24,7 @@
                 </div>
                 <div class="pb-4 pt-0.5">
                     <p class="text-sm font-medium text-slate-800">Draft</p>
-                    <p class="text-xs text-slate-500">Authored by {{ finding.created_by|default:"—" }}</p>
+                    <p class="text-xs text-slate-500">Authored by {{ finding.created_by|user_label|default:"—" }}</p>
                 </div>
             </div>
             <div class="flex items-start gap-3">
@@ -42,7 +42,7 @@
                 <div class="pb-4 pt-0.5">
                     <p class="text-sm font-medium text-slate-800">Review</p>
                     {% if finding.assigned_reviewer %}
-                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>{{ finding.assigned_reviewer }}</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_reviewer|initials }}</span>{{ finding.assigned_reviewer|user_label }}</p>
                     {% else %}<p class="text-xs text-slate-500">Unassigned</p>{% endif %}
                 </div>
             </div>
@@ -61,7 +61,7 @@
                 <div class="pt-0.5">
                     <p class="text-sm font-medium text-slate-800">QA approval</p>
                     {% if finding.assigned_qa %}
-                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>{{ finding.assigned_qa }}</p>
+                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><span class="avatar !h-4 !w-4 !text-white !bg-brand-600 !text-[0.55rem]">{{ finding.assigned_qa|initials }}</span>{{ finding.assigned_qa|user_label }}</p>
                     {% else %}<p class="text-xs text-slate-500">Unassigned</p>{% endif %}
                 </div>
             </div>
@@ -285,18 +285,9 @@
 </div>
 {% endif %}
 
-{% if retest_records or can_log_retest or retest_workflow_enabled %}
+{% if retest_records or can_log_retest %}
 <div class="card mt-6">
     <h2 class="font-semibold text-slate-900 mb-3">Retest history</h2>
-
-    {% if retest_workflow_enabled and not can_log_retest and not finding.archived %}
-    <p class="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 rounded-md px-3 py-2 mb-4">
-        Retest results can only be logged while the engagement is Awaiting Remediation Test or in
-        Remediation Test — this one is currently
-        <span class="{{ engagement.status|badge_class }}">{{ engagement.get_status_display }}</span>.
-        {% if is_manager %}<a href="{% url 'engagements:detail' engagement.pk %}" class="underline">Change the engagement's status</a> to unlock this.{% endif %}
-    </p>
-    {% endif %}
 
     {% if retest_records %}
     <div class="space-y-4 divide-y divide-slate-100 dark:divide-slate-200 [&>*:not(:first-child)]:pt-4">
@@ -304,11 +295,11 @@
         <div>
             <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
                 <span class="{{ record.status|badge_class }}">{{ record.status_display }}</span>
-                <span>{{ record.tested_by|default:"Unknown" }}</span>
+                <span>{{ record.tested_by|user_label|default:"Unknown" }}</span>
                 <span>&middot; {{ record.created_at|date:"d/m/Y H:i" }}</span>
             </div>
             {% if record.notes %}
-            <div class="rte-editor" data-rte-field="retest-record-{{ forloop.counter }}" data-rte-editable="false" data-rte-initial='{{ record.notes }}'></div>
+            <div class="rte-editor" data-rte-field="retest-record-{{ forloop.counter }}" data-rte-label="Retest notes, {{ record.created_at|date:'d/m/Y H:i' }}" data-rte-editable="false" data-rte-initial='{{ record.notes }}'></div>
             {% endif %}
         </div>
         {% endfor %}
@@ -327,7 +318,7 @@
         </div>
         <div class="mb-3">
             <label class="field-label">{{ retest_form.notes.label }}</label>
-            <div class="rte-editor" data-rte-field="retest_notes" data-rte-editable="true" data-rte-initial='{{ retest_form.notes.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
+            <div class="rte-editor" data-rte-field="retest_notes" data-rte-label="{{ retest_form.notes.label }}" data-rte-editable="true" data-rte-initial='{{ retest_form.notes.value|default:"" }}' data-upload-url="{% url 'crypto:blob_upload' engagement.pk %}"></div>
             <input type="hidden" name="notes" id="{{ retest_form.notes.id_for_label }}" data-rte-hidden="retest_notes">
             {% for error in retest_form.notes.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
         </div>

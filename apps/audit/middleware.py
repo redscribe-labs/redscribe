@@ -8,6 +8,8 @@ _SAFE_METHODS = {"HEAD", "OPTIONS"}
 _EXCLUDED_VIEW_NAMES = {
     "health",
     "csp_report",
+    # Polled every 60s by each open tab to notice a dead session; no action to record.
+    "accounts:session_ping",
 }
 
 _REDACTED_PATH_VIEW_NAMES = {

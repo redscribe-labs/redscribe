@@ -38,7 +38,7 @@
 
         <div class="mb-4">
             <label class="field-label">Reference info</label>
-            <div class="rte-editor" data-rte-field="reference_info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
+            <div class="rte-editor" data-rte-field="reference_info" data-rte-label="Reference info" data-rte-editable="true" data-rte-initial='{{ form.reference_info.value|default:"" }}'></div>
             <input type="hidden" name="reference_info" id="{{ form.reference_info.id_for_label }}" data-rte-hidden="reference_info">
             {% for error in form.reference_info.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
         </div>

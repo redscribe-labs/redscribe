@@ -21,7 +21,7 @@
                     <span class="sr-only">{{ it.get_status_display }}:</span>
                     {% if it.code %}<span class="font-mono text-[0.6875rem] font-normal {% if it.pk == item.pk %}text-slate-600{% else %}text-slate-500{% endif %} shrink-0">{{ it.code }}</span>{% endif %}
                     <span class="min-w-0 flex-1 truncate">{{ it.title }}</span>
-                    {% if it.assignee %}<span class="shrink-0 rounded-full bg-navy-50 px-1.5 font-mono text-[0.625rem] text-navy-700 dark:bg-navy-950 dark:text-navy-300" title="Assigned to {{ it.assignee }}">{{ it.assignee|initials }}</span>{% endif %}
+                    {% if it.assignee %}<span class="shrink-0 rounded-full bg-navy-50 px-1.5 font-mono text-[0.625rem] text-navy-700 dark:bg-navy-950 dark:text-navy-300" title="Assigned to {{ it.assignee|user_label }}">{{ it.assignee|initials }}</span>{% endif %}
                 </a>
             </li>
             {% endfor %}

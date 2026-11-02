@@ -3,13 +3,10 @@ from django.db import models
 
 
 class FeatureFlags(models.Model):
-    retest_workflow = models.BooleanField(
-        default=True, help_text="Retest/remediation tracking on findings (Fixed/Not Fixed/etc. + history).",
-    )
     notifications = models.BooleanField(
         default=True,
         help_text="Reviewer/QA assignment notifications, both in-app and email. Per-user email opt-out "
-        "(see accounts:notification_preferences) still applies on top of this.",
+        "(set under Notification preferences) still applies on top of this.",
     )
     recurrence_and_trends = models.BooleanField(
         default=True,

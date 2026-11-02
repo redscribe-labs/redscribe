@@ -39,7 +39,7 @@
                 </p>
                 <div class="grid grid-cols-1 xl:grid-cols-[1fr_16rem] gap-6">
                     <div>
-                        <div class="rte-editor" data-rte-field="template" data-rte-editable="true" data-rte-page-breaks="true"
+                        <div class="rte-editor" data-rte-field="template" data-rte-label="Report document" data-rte-editable="true" data-rte-page-breaks="true"
                              data-rte-initial='{{ form.template.value|default:"" }}'></div>
                         <input type="hidden" name="template" id="{{ form.template.id_for_label }}" data-rte-hidden="template">
                         {% for error in form.template.errors %}<p class="field-error">{{ error }}</p>{% endfor %}

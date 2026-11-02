@@ -88,6 +88,8 @@ def can_manage_engagement(user, engagement):
 
 @register.filter(name="initials")
 def initials(user):
+    if getattr(user, "erased_at", None):
+        return "EU"
     first = getattr(user, "first_name", "") or ""
     last = getattr(user, "last_name", "") or ""
     if first or last:
@@ -96,6 +98,14 @@ def initials(user):
     if len(username) < 2:
         return username.upper()
     return f"{username[0]}{username[-1]}".upper()
+
+
+@register.filter(name="user_label")
+def user_label(user):
+    # Falsy values pass through so `|user_label|default:"—"` keeps working.
+    if not user:
+        return user
+    return getattr(user, "display_label", user)
 
 
 @register.filter(name="add_class")

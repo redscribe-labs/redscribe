@@ -1,5 +1,8 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
+
+from apps.accounts.fields import keep_current_user_selectable
 
 from apps.checklist.models import ChecklistTemplate
 from apps.clients.models import Client
@@ -48,6 +51,11 @@ def _set_default_role_field_querysets(form) -> None:
     form.fields["default_approver"].help_text = (
         "The only person (besides a Superadmin/Team Lead) who can approve this engagement once QA is done."
     )
+    # On edit, keep whoever is set now even if they've since been deactivated, so saving the
+    # form for another change doesn't clear them. They aren't auto-assigned while inactive.
+    instance = form.instance if form.instance.pk else None
+    for name in ("default_reviewer", "default_qa", "default_approver"):
+        keep_current_user_selectable(form.fields[name], getattr(instance, name) if instance else None)
 
 
 class EngagementCreateForm(_DateRangeCleanMixin, forms.ModelForm):
@@ -113,6 +121,11 @@ class EngagementEditForm(_DateRangeCleanMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         _hide_client_field_for_non_client_managers(self, requesting_user)
         _set_default_role_field_querysets(self)
+        # Keep the linked company choosable after it's deactivated, so saving doesn't unlink it.
+        if "client" in self.fields and self.instance.client_id:
+            field = self.fields["client"]
+            field.queryset = Client.objects.filter(Q(is_active=True) | Q(pk=self.instance.client_id))
+            field.label_from_instance = lambda c: str(c) if c.is_active else f"{c} (inactive)"
 
 
 class ScopeChangeRequestForm(forms.ModelForm):

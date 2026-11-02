@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load redscribe_extras %}
 {% block title %}Export report — {{ engagement.client_name }}{% endblock %}
 
 {% block engagement_subnav %}
@@ -22,6 +23,15 @@
             <span class="font-medium">{{ included_count }}</span> finding{{ included_count|pluralize }}
             {% if included_count %}(QA Approved){% endif %} will be included in the report.
         </p>
+        {% if no_layout %}
+        <p class="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-md px-3 py-2 mt-3">
+            <strong>This report has no layout, so the export would be empty.</strong>
+            No report profile is selected and none is set as the default. Pick or create a profile with a
+            Document layout in
+            <a href="{% url 'reports:configure' engagement.pk %}" class="underline font-medium">Configure &amp; preview</a>
+            before exporting.
+        </p>
+        {% endif %}
         {% if omitted_count %}
         <p class="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-md px-3 py-2 mt-3">
             <strong>{{ omitted_count }} QA-approved finding{{ omitted_count|pluralize }}
@@ -101,7 +111,7 @@
     {% if export_logs %}
     <div class="card mt-6">
         <h2 class="font-semibold text-slate-900 text-sm mb-3">Export history</h2>
-        <div class="relative overflow-x-auto">
+        <div class="relative overflow-x-auto" tabindex="0" role="region" aria-label="Recent exports">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-xs text-slate-500 uppercase tracking-wide">
@@ -116,7 +126,7 @@
                     <tr>
                         <td class="py-2 pr-4 text-slate-600 whitespace-nowrap">{{ log.exported_at|date:"d/m/Y H:i" }}</td>
                         <td class="py-2 pr-4"><span class="badge-slate">{{ log.fmt|upper }}</span></td>
-                        <td class="py-2 pr-4 text-slate-600">{{ log.exported_by|default:"—" }}</td>
+                        <td class="py-2 pr-4 text-slate-600">{{ log.exported_by|user_label|default:"—" }}</td>
                         <td class="py-2 text-slate-600">{{ log.comment|default:"—" }}</td>
                     </tr>
                     {% endfor %}

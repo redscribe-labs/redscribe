@@ -125,8 +125,8 @@
                         {% if finding.status == "CLOSED" %}<span class="badge-slate">Closed</span>{% endif %}
                         {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
                         {% if finding.cvss_score %}<span class="font-mono">CVSS {{ finding.cvss_score }}</span>{% endif %}
-                        {% if finding.assigned_reviewer %}<span>Reviewer: {{ finding.assigned_reviewer }}</span>{% endif %}
-                        {% if finding.assigned_qa %}<span>QA: {{ finding.assigned_qa }}</span>{% endif %}
+                        {% if finding.assigned_reviewer %}<span>Reviewer: {{ finding.assigned_reviewer|user_label }}</span>{% endif %}
+                        {% if finding.assigned_qa %}<span>QA: {{ finding.assigned_qa|user_label }}</span>{% endif %}
                     </div>
                 </div>
                 <a href="?{% if page_querystring %}{{ page_querystring }}&{% endif %}selected={{ finding.pk }}" class="btn-ghost !px-2 hidden lg:inline-flex shrink-0"{% if selected and finding.pk == selected.pk %} aria-current="true"{% endif %}>Preview<span class="sr-only"> {{ finding.title }}</span></a>
@@ -160,11 +160,11 @@
         </div>
         <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt class="text-slate-500">Status</dt><dd class="text-slate-800">{{ selected.get_status_display }}</dd>
-            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800">{{ selected.assigned_reviewer|default:"—" }}</dd>
-            <dt class="text-slate-500">QA</dt><dd class="text-slate-800">{{ selected.assigned_qa|default:"—" }}</dd>
-            {% if feature_flags.retest_workflow %}<dt class="text-slate-500">Retest</dt><dd class="text-slate-800">{{ selected.get_retest_status_display }}</dd>{% endif %}
+            <dt class="text-slate-500">Reviewer</dt><dd class="text-slate-800">{{ selected.assigned_reviewer|user_label|default:"—" }}</dd>
+            <dt class="text-slate-500">QA</dt><dd class="text-slate-800">{{ selected.assigned_qa|user_label|default:"—" }}</dd>
+            <dt class="text-slate-500">Retest</dt><dd class="text-slate-800">{{ selected.get_retest_status_display }}</dd>
             {% if selected.cve_id %}<dt class="text-slate-500">CVE</dt><dd class="font-mono text-xs text-slate-800">{{ selected.cve_id }}</dd>{% endif %}
-            <dt class="text-slate-500">Written by</dt><dd class="text-slate-800">{{ selected.created_by|default:"—" }}</dd>
+            <dt class="text-slate-500">Written by</dt><dd class="text-slate-800">{{ selected.created_by|user_label|default:"—" }}</dd>
             <dt class="text-slate-500">Updated</dt><dd class="text-slate-800">{{ selected.updated_at|date:"d/m/Y H:i" }}</dd>
         </dl>
         {% if selected.classifications.all %}

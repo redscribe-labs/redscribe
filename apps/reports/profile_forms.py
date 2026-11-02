@@ -161,6 +161,7 @@ class ReportTextBlockCreateForm(forms.ModelForm):
 
 ReportTextBlockFormSet = forms.modelformset_factory(
     ReportTextBlockDefinition, fields=["label", "is_active", "include_in_remediation_report_only"], extra=0,
+    widgets={"label": forms.TextInput(attrs={"aria-label": "Text block name"})},
 )
 
 

@@ -68,6 +68,32 @@
     }
 
     addBtn.addEventListener("click", addChip);
+
+    // A pair typed but never added would otherwise be dropped on submit. Add a complete pair;
+    // stop on a half-typed one so it isn't silently lost.
+    function addPendingOnSubmit(e) {
+      const taxonomy = taxonomyInput.value.trim();
+      const value = valueInput.value.trim();
+      if (taxonomy && value) {
+        addChip();
+      } else if (taxonomy || value) {
+        const missing = taxonomy ? valueInput : taxonomyInput;
+        missing.setCustomValidity(taxonomy
+          ? "Add a value for this classification, or clear the taxonomy."
+          : "Add a taxonomy for this classification, or clear the value.");
+        missing.reportValidity();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }
+    [taxonomyInput, valueInput].forEach((input) => {
+      input.addEventListener("input", () => {
+        taxonomyInput.setCustomValidity("");
+        valueInput.setCustomValidity("");
+      });
+    });
+    const form = field.closest("form");
+    if (form) form.addEventListener("submit", addPendingOnSubmit, true);
     [taxonomyInput, valueInput].forEach((input) => {
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {

@@ -13,6 +13,7 @@ urlpatterns = [
     path("users/<uuid:user_uuid>/", views.client_user_detail, name="user_detail"),
     path("users/<uuid:user_uuid>/edit/", views.client_user_edit, name="user_edit"),
     path("users/<uuid:user_uuid>/deactivate/", views.client_user_deactivate, name="user_deactivate"),
+    path("users/<uuid:user_uuid>/erase/", views.client_user_erase, name="user_erase"),
     path("users/<uuid:user_uuid>/reactivate/", views.client_user_reactivate, name="user_reactivate"),
     path(
         "users/<uuid:user_uuid>/send-password-reset/",

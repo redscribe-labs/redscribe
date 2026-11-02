@@ -1,0 +1,44 @@
+{% extends "base/settings_base.html" %}
+{% block title %}Erase account — RedScribe{% endblock %}
+{% block settings_content %}
+<div class="max-w-2xl">
+    <div class="card">
+        <h1 class="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Erase {{ target.username }}?</h1>
+        <p class="text-sm text-slate-600 mb-3">
+            This <strong>permanently and irreversibly</strong> removes this account's name, email address,
+            password, two-factor devices, notifications, engagement memberships, and linked sign-in
+            accounts. The account can never be reactivated, and its username and email become free to reuse.
+        </p>
+        <div class="rounded-lg border border-slate-300 bg-slate-50 dark:bg-slate-50 px-4 py-3 mb-5">
+            <p class="text-sm font-semibold text-slate-800 mb-1">What stays</p>
+            <p class="text-xs text-slate-700">
+                Findings, comments, checklist history, and audit log entries remain attributed to an
+                anonymous "Erased user" record. Audit entries already written keep the username as it was
+                then; they are tamper-evident and age out under your normal retention period.
+            </p>
+        </div>
+        <form method="post" data-permanent-delete-form>
+            {% csrf_token %}
+            <label for="confirm-username" class="field-label">
+                Type <span class="font-mono">{{ target.username }}</span> to confirm
+            </label>
+            <input type="text" id="confirm-username" name="confirm_username" class="field-input mb-4" autocomplete="off" data-confirm-input data-expected="{{ target.username }}">
+            <div class="flex gap-2">
+                <button type="submit" class="btn-danger" data-confirm-submit disabled>Erase account</button>
+                <a href="{{ cancel_url }}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+(function () {
+    var input = document.querySelector("[data-confirm-input]");
+    var submit = document.querySelector("[data-confirm-submit]");
+    var expected = input.getAttribute("data-expected");
+    function refresh() {
+        submit.disabled = input.value !== expected;
+    }
+    input.addEventListener("input", refresh);
+})();
+</script>
+{% endblock %}

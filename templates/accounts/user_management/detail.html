@@ -8,21 +8,21 @@
         <div class="flex items-center gap-3">
             <span class="avatar !h-10 !w-10 !bg-brand-50 !text-brand-700 dark:!bg-brand-950 dark:!text-brand-300">{{ target|initials }}</span>
             <div>
-                <h1 class="page-title">{{ target.get_full_name|default:target.username }}</h1>
-                <p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>
+                <h1 class="page-title">{% if target.erased_at %}{{ target|user_label }}{% else %}{{ target.get_full_name|default:target.username }}{% endif %}</h1>
+                {% if not target.erased_at %}<p class="text-sm text-slate-500">{{ target.username }} &middot; {{ target.email }}</p>{% endif %}
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-1.5 mt-3">
             <span class="{{ target.role.slug|badge_class }}">{{ target.role.name }}</span>
             <span class="badge-slate">{{ target.get_auth_type_display }}</span>
             {% if target.oauth_invite_pending %}<span class="badge-amber">Invited — awaiting first login</span>{% endif %}
-            {% if target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
-            {% if target.auth_type == "LOCAL" %}
+            {% if target.erased_at %}<span class="badge-slate">Erased</span>{% elif target.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Deactivated</span>{% endif %}
+            {% if target.auth_type == "LOCAL" and not target.erased_at %}
                 {% if has_confirmed_mfa %}<span class="badge-green">MFA enrolled</span>{% else %}<span class="badge-amber">MFA not enrolled</span>{% endif %}
             {% endif %}
         </div>
     </div>
-    <a href="{% url 'user_management:edit' target.uuid %}" class="btn-secondary">Edit</a>
+    {% if not target.erased_at %}<a href="{% url 'user_management:edit' target.uuid %}" class="btn-secondary">Edit</a>{% endif %}
 </div>
 {% endblock %}
 
@@ -42,7 +42,7 @@
         <section class="panel">
             <div class="panel-header"><h2 class="font-semibold text-slate-900">Recent sign-in attempts</h2></div>
             {% if recent_attempts %}
-            <div class="relative overflow-x-auto">
+            <div class="relative overflow-x-auto" tabindex="0" role="region" aria-label="Sign-in history">
                 <table class="w-full text-sm">
                     <thead><tr class="text-left text-xs text-slate-500 border-b border-slate-200">
                         <th scope="col" class="px-5 py-2.5 font-semibold">When</th>
@@ -61,12 +61,18 @@
                 </table>
             </div>
             {% else %}
-            <p class="px-5 py-4 text-sm text-slate-500">No sign-in attempts recorded yet.</p>
+            <p class="px-5 py-4 text-sm text-slate-500">{% if target.erased_at %}Sign-in history was removed with the account.{% else %}No sign-in attempts recorded yet.{% endif %}</p>
             {% endif %}
         </section>
     </div>
 
     <aside aria-label="Account actions" class="space-y-4">
+        {% if target.erased_at %}
+        <section class="card !p-5 space-y-2">
+            <h2 class="font-semibold text-slate-900">Account erased</h2>
+            <p class="text-sm text-slate-600">Personal data was removed on {{ target.erased_at|date:"d/m/Y H:i" }}. Their work and audit history stay attributed to this record. This can't be undone.</p>
+        </section>
+        {% else %}
         <section class="card !p-5 space-y-2.5">
             <h2 class="font-semibold text-slate-900">Actions</h2>
             {% if target.auth_type == "LOCAL" %}
@@ -133,6 +139,14 @@
             </form>
             {% endif %}
         </section>
+        {% if not target.is_active and not is_self %}
+        <section class="rounded-lg border border-red-200 dark:border-red-900 bg-white dark:bg-slate-100 p-5 space-y-2">
+            <h2 class="font-semibold text-red-800 dark:text-red-300">Erase account</h2>
+            <p class="text-sm text-slate-600">Permanently removes their name, email, and sign-in details. Their work and the audit trail stay.</p>
+            <a href="{% url 'user_management:erase' target.uuid %}" class="btn-danger w-full text-center">Erase account…</a>
+        </section>
+        {% endif %}
+        {% endif %}
     </aside>
 </div>
 {% endblock %}

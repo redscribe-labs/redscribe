@@ -1,14 +1,27 @@
 {% extends "base/base.html" %}
+{% load redscribe_extras %}
 {% comment %}
 Shell for the admin pages that live under Settings in the sidebar. Pages
 put their heading in settings_header and their body in settings_content;
-the settings menu sits to the left on large screens and above on small ones.
+the settings menu sits to the left on large screens and folds into a disclosure above on small ones.
 {% endcomment %}
 
 {% block content %}
 <div class="flex flex-col lg:flex-row lg:items-start gap-8">
+    {% settings_pages user request.path as nav_pages %}
     <aside aria-label="Settings sections" class="lg:w-56 lg:shrink-0 lg:sticky lg:top-24">
-        {% include "base/_settings_nav.html" %}
+        <details class="lg:hidden rounded-lg border border-slate-200 bg-white dark:bg-slate-100">
+            <summary class="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-slate-900">
+                <span>Settings menu<span class="text-slate-500 font-normal">{% for p in nav_pages %}{% if p.active %} · {{ p.label }}{% endif %}{% endfor %}</span></span>
+                <svg class="h-4 w-4 shrink-0 text-slate-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>
+            </summary>
+            <div class="border-t border-slate-200 px-4 py-3">
+                {% include "base/_settings_nav.html" %}
+            </div>
+        </details>
+        <div class="hidden lg:block">
+            {% include "base/_settings_nav.html" %}
+        </div>
     </aside>
     <div class="min-w-0 flex-1">
         {% block settings_header %}{% endblock %}

@@ -28,7 +28,7 @@
             </span>
             <div class="min-w-0 flex-1">
                 <p class="font-medium text-slate-800 truncate group-hover:text-brand-700 dark:group-hover:text-brand-300">{{ company.name }}</p>
-                <p class="text-xs text-slate-500 truncate">Added {{ company.created_at|date:"d/m/Y" }}{% if company.created_by %} by {{ company.created_by.username }}{% endif %}</p>
+                <p class="text-xs text-slate-500 truncate">Added {{ company.created_at|date:"d/m/Y" }}{% if company.created_by %} by {% if company.created_by.erased_at %}{{ company.created_by|user_label }}{% else %}{{ company.created_by.username }}{% if not company.created_by.is_active %} (deactivated){% endif %}{% endif %}{% endif %}</p>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                     {% if company.is_active %}<span class="badge-green">Active</span>{% else %}<span class="badge-red">Inactive</span>{% endif %}
                 </div>

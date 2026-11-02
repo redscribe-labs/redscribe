@@ -321,7 +321,7 @@ def report_profile_text_block_edit(request, pk, block_pk):
     return render(
         request, "reports/profile_text_block_edit.html",
         {
-            "profile": profile, "block": block, "form": form,
+            "profile": profile, "text_block": block, "form": form,
             "breadcrumbs": [
                 {"label": "Report Profiles", "url": reverse("report_profiles:list")},
                 {"label": profile.name, "url": reverse("report_profiles:edit", args=[profile.pk])},
@@ -354,7 +354,7 @@ def report_text_block_delete(request, pk):
     ]
     return render(
         request, "reports/text_block_delete_confirm.html",
-        {"block": block, "next": next_url, "breadcrumbs": breadcrumbs},
+        {"text_block": block, "next": next_url, "breadcrumbs": breadcrumbs},
     )
 
 

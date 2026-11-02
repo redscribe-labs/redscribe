@@ -66,6 +66,7 @@ def _record_events(item, actor, before, cleaned):
         events.append(ChecklistItemEvent(
             item=item, actor=actor, kind=Kind.ASSIGNEE,
             from_value=str(before["assignee"] or "Unassigned")[:255], to_value=str(cleaned["assignee"] or "Unassigned")[:255],
+            from_user=before["assignee"], to_user=cleaned["assignee"],
         ))
     if before["test_results"] != (cleaned["test_results"] or "") and not _recently_logged(item, actor, Kind.EVIDENCE):
         events.append(ChecklistItemEvent(item=item, actor=actor, kind=Kind.EVIDENCE))
@@ -131,9 +132,9 @@ def item_autosave(request, engagement_id, pk):
         last = item.events.select_related("actor").first()
         return JsonResponse({
             "saved": False, "conflict": True,
-            "message": f"{last.actor if last and last.actor else 'Someone else'} saved this check after you opened it.",
+            "message": f"{last.actor.display_label if last and last.actor else 'Someone else'} saved this check after you opened it.",
         }, status=409)
-    form = ChecklistItemForm(request.POST, engagement=request.engagement)
+    form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee)
     if not form.is_valid():
         return JsonResponse({"saved": False, "errors": form.errors.get_json_data()}, status=400)
     _apply_form(item, form, request)
@@ -147,7 +148,7 @@ def item_detail(request, engagement_id, pk):
 
     conflict = False
     if request.method == "POST" and "save_item" in request.POST:
-        form = ChecklistItemForm(request.POST, engagement=request.engagement)
+        form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee)
         # Someone else saved after this page loaded: show their change instead of
         # overwriting it, unless the user has chosen "Keep my changes" (save_item=overwrite).
         conflict = _is_stale(item, request.POST.get("version")) and request.POST.get("save_item") != "overwrite"
@@ -166,6 +167,7 @@ def item_detail(request, engagement_id, pk):
     else:
         form = ChecklistItemForm(
             engagement=request.engagement,
+            current_assignee=item.assignee,
             initial={
                 "status": item.status,
                 "assignee": item.assignee_id,

@@ -54,7 +54,7 @@
         {{ form.key_text|add_class:"field-input font-mono text-xs" }}
         {% for error in form.key_text.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
         <div class="flex flex-wrap items-center justify-end gap-3">
-            {% if license_key.key_text %}<p class="mr-auto text-xs text-slate-500">Last changed {{ license_key.updated_at|date:"d/m/Y H:i" }}{% if license_key.updated_by %} by {{ license_key.updated_by }}{% endif %}</p>{% endif %}
+            {% if license_key.key_text %}<p class="mr-auto text-xs text-slate-500">Last changed {{ license_key.updated_at|date:"d/m/Y H:i" }}{% if license_key.updated_by %} by {{ license_key.updated_by|user_label }}{% endif %}</p>{% endif %}
             <button type="submit" class="btn-primary">Save key</button>
         </div>
     </form>
