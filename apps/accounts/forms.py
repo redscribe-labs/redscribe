@@ -22,6 +22,8 @@ class LocalLoginForm(forms.Form):
         "attempts. Please try again in a few minutes.",
         "rate_limited": "Too many attempts in a short period. Please wait a moment "
         "and try again.",
+        "ip_rate_limited": "Too many failed sign-in attempts from your network. Please "
+        "wait a while before trying again.",
     }
 
     def __init__(self, request=None, *args, **kwargs):
@@ -40,7 +42,10 @@ class LocalLoginForm(forms.Form):
             except User.DoesNotExist:
                 is_superadmin = False
 
-            status = security.check_lockout(username=username, is_superadmin=is_superadmin)
+            ip_address = security.client_ip(self.request) if self.request is not None else None
+            status = security.check_lockout(
+                username=username, is_superadmin=is_superadmin, ip_address=ip_address
+            )
             if status.blocked:
                 raise forms.ValidationError(
                     self.error_messages[status.reason], code=status.reason
@@ -107,6 +112,25 @@ class LocalUserCreateForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
+        # Case-folded uniqueness (M-5e): the model's unique constraints are case-sensitive,
+        # so "Alice" and "alice" would both be accepted. Reject a case-insensitive collision
+        # on create to avoid confusable duplicate accounts.
+        username = cleaned_data.get("username")
+        if username and User.objects.filter(username__iexact=username).exists():
+            self.add_error(
+                "username",
+                "A user with that username already exists (names are matched "
+                "case-insensitively).",
+            )
+        email = cleaned_data.get("email")
+        if email and User.objects.filter(email__iexact=email).exists():
+            self.add_error(
+                "email",
+                "A user with that email already exists (emails are matched "
+                "case-insensitively).",
+            )
+
         if not self.creates_oauth_invite:
             return cleaned_data
 

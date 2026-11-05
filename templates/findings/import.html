@@ -7,16 +7,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl">
     <div class="card">
         <h1 class="text-xl font-bold text-slate-900 mb-1">Import scan results</h1>
         <p class="text-sm text-slate-500 mb-5">
-            Creates one Draft finding per result — nothing is published automatically, everything
-            goes through the normal review/QA flow from there.
+            Creates one Draft finding per result — each goes through the normal review/QA flow.
         </p>
-        {% if import_target %}
+        {% if import_targets %}
         <p class="text-sm text-slate-600 mb-5">
-            Each result's details go into the <strong>{{ import_target.label }}</strong> section.
+            Each result's details go into the {% for target in import_targets %}<strong>{{ target.label }}</strong>{% if not forloop.last %}{% if forloop.revcounter0 == 1 %} and {% else %}, {% endif %}{% endif %}{% endfor %} section{{ import_targets|length|pluralize }}.
         </p>
         {% else %}
         <div class="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 px-3 py-3 mb-5" role="note">

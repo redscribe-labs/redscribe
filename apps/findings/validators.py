@@ -92,6 +92,85 @@ def validate_cvss_vector(value: str) -> None:
         )
 
 
+def validate_cvss_score(value: str) -> None:
+    """Blank (unscored) is fine; otherwise a plain number from 0.0 to 10.0."""
+    value = (value or "").strip()
+    if not value:
+        return
+    if not re.fullmatch(r"\d{1,2}(\.\d)?", value) or float(value) > 10.0:
+        raise ValidationError("CVSS score must be a number from 0.0 to 10.0 (one decimal place), e.g. 8.6.")
+
+
+def cvss_severity_for_score(score: float) -> str:
+    """Qualitative severity band (CVSS v3.1/v4.0 rating scale) for a score."""
+    if score >= 9.0:
+        return "CRITICAL"
+    if score >= 7.0:
+        return "HIGH"
+    if score >= 4.0:
+        return "MEDIUM"
+    if score > 0.0:
+        return "LOW"
+    return "INFORMATIONAL"
+
+
+_V31_W = {
+    "AV": {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2},
+    "AC": {"L": 0.77, "H": 0.44},
+    "UI": {"N": 0.85, "R": 0.62},
+    "CIA": {"H": 0.56, "L": 0.22, "N": 0.0},
+}
+
+
+def _roundup(x: float) -> float:
+    n = round(x * 100000)
+    return n / 100000.0 if n % 10000 == 0 else (n // 10000 + 1) / 10.0
+
+
+def cvss_v31_base_score(vector: str):
+    """Base score of a CVSS:3.1 vector, or None if it carries any
+    temporal/environmental metric (the entered score may then differ)."""
+    parts = vector.strip().split("/")
+    if parts[0] != "CVSS:3.1" or len(parts) != 9:
+        return None
+    try:
+        m = dict(t.split(":", 1) for t in parts[1:])
+        changed = m["S"] == "C"
+        pr = {"N": 0.85, "L": 0.68 if changed else 0.62, "H": 0.5 if changed else 0.27}[m["PR"]]
+        iss = 1 - (1 - _V31_W["CIA"][m["C"]]) * (1 - _V31_W["CIA"][m["I"]]) * (1 - _V31_W["CIA"][m["A"]])
+        expl = 8.22 * _V31_W["AV"][m["AV"]] * _V31_W["AC"][m["AC"]] * pr * _V31_W["UI"][m["UI"]]
+    except (KeyError, ValueError):
+        return None
+    impact = 7.52 * (iss - 0.029) - 3.25 * (iss - 0.02) ** 15 if changed else 6.42 * iss
+    if impact <= 0:
+        return 0.0
+    return _roundup(min((1.08 if changed else 1.0) * (impact + expl), 10.0))
+
+
+def validate_cvss_consistency(score: str, vector: str, severity: str) -> None:
+    """Cross-field check: the severity must fall in the score's band, and a
+    base-only CVSS:3.1 vector must produce the entered score. Raises
+    ValidationError (callers attach it to the right field)."""
+    score = (score or "").strip()
+    if not score:
+        return
+    try:
+        value = float(score)
+    except ValueError:
+        # Non-numeric score (e.g. a legacy free-text value): its format is
+        # reported separately by validate_cvss_score, so there's nothing to
+        # cross-check here. Returning avoids a ValueError bubbling up as a 500.
+        return
+    expected = cvss_severity_for_score(value)
+    if severity and severity != expected:
+        raise ValidationError(
+            f"Severity {severity.title()} doesn't match a CVSS score of {score} ({expected.title()})."
+        )
+    computed = cvss_v31_base_score((vector or "").strip())
+    if computed is not None and abs(computed - value) > 0.05:
+        raise ValidationError(f"CVSS score {score} doesn't match the vector, which scores {computed:.1f}.")
+
+
 # The sanitizers below walk the document down to this depth. Anything deeper
 # can't be checked, so the validator rejects it and the sanitizers drop it.
 _MAX_SANITIZE_DEPTH = 60

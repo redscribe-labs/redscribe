@@ -32,10 +32,20 @@ function buildDecorations(doc, threads) {
   const decorations = [];
   for (const t of threads || []) {
     if (t.start_pos < t.end_pos && t.end_pos <= doc.content.size) {
+      const count = Array.isArray(t.entries) ? t.entries.length : 0;
+      const label =
+        "Comment" +
+        (count ? `, ${count} message${count === 1 ? "" : "s"}` : "") +
+        (t.resolved ? ", resolved" : "");
       decorations.push(
         Decoration.inline(t.start_pos, t.end_pos, {
           class: t.resolved ? "rte-comment-highlight rte-comment-resolved" : "rte-comment-highlight",
           "data-thread-id": String(t.id),
+          // Focusable + labelled so comments are reachable and announced
+          // without a mouse (there is no separate button or side panel).
+          tabindex: "0",
+          role: "button",
+          "aria-label": label,
         })
       );
     }

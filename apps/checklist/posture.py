@@ -39,7 +39,7 @@ def run_posture(run, project_key=None):
     categories = {}
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
-        linked = list(item.findings.all())
+        linked = [f for f in item.findings.all() if not f.archived]
         cat = categories.setdefault(item.category, {"name": item.category, "cells": [], "findings": {}})
         for finding in linked:
             cat["findings"][finding.pk] = finding

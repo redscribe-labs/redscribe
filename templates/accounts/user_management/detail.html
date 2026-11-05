@@ -156,7 +156,13 @@
     // Inline onsubmit handlers are blocked by the CSP, so confirmations are wired up here.
     document.querySelectorAll("form[data-confirm]").forEach(function (form) {
         form.addEventListener("submit", function (event) {
-            if (!window.confirm(form.getAttribute("data-confirm"))) event.preventDefault();
+            if (form.dataset.confirmed) return;
+            event.preventDefault();
+            window.RedscribeConfirm(form.getAttribute("data-confirm"), { title: "Please confirm", confirmLabel: "Continue" }).then(function (ok) {
+                if (!ok) return;
+                form.dataset.confirmed = "1";
+                form.requestSubmit(event.submitter || undefined);
+            });
         });
     });
 </script>

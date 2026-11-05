@@ -1607,7 +1607,7 @@ class CatalogueExportImportTests(TestCase):
         login(client, self.superadmin)
         resp = client.post(reverse("catalogue:import"), {"file": upload})
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Invalid JSON")
+        self.assertContains(resp, "isn&#x27;t valid JSON")
         self.assertEqual(VulnerabilityTemplate.objects.count(), 1)
 
 
@@ -1775,7 +1775,9 @@ class FindingArchiveViewTests(TestCase):
         others_finding.refresh_from_db()
         self.assertTrue(others_finding.archived)
 
-    def test_archived_finding_hidden_from_default_list_but_shown_when_toggled(self):
+    def test_active_and_archived_tabs_partition_findings(self):
+        # Active and Archived are partitioned tabs (not a show/hide toggle): the
+        # Active tab shows only non-archived findings, the Archived tab only archived.
         self.finding.archived = True
         self.finding.save(update_fields=["archived"])
         active = make_finding(self.engagement, self.consultant, title="Active finding")
@@ -1786,10 +1788,11 @@ class FindingArchiveViewTests(TestCase):
         resp = client.get(reverse("findings:list", args=[self.engagement.pk]))
         self.assertEqual([f.title for f in resp.context["findings"]], [active.title])
         self.assertEqual(resp.context["archived_count"], 1)
+        self.assertEqual(resp.context["active_count"], 1)
 
         resp = client.get(reverse("findings:list", args=[self.engagement.pk]), {"archived": "1"})
         titles = {f.title for f in resp.context["findings"]}
-        self.assertEqual(titles, {active.title, self.finding.title})
+        self.assertEqual(titles, {self.finding.title})
 
     def test_archived_finding_cannot_be_edited(self):
         self.finding.archived = True
@@ -1839,6 +1842,9 @@ class ReviewEligibilityTests(TestCase):
         self.assertNotIn(self.senior_author, review.eligible_qa_candidates(finding))
 
     def test_team_lead_can_review_and_qa_own_finding(self):
+        # A Team Lead holds findings.review_own / findings.qa_own, so (unlike a
+        # Senior or Consultant) they may review and QA a finding they authored —
+        # this is what lets a small team self-serve.
         finding = make_finding(self.engagement, self.team_lead_author)
         self.assertTrue(review.is_eligible_reviewer(self.team_lead_author, finding))
         self.assertTrue(review.is_eligible_qa_reviewer(self.team_lead_author, finding))
@@ -2128,6 +2134,10 @@ class BulkReviewQATests(TestCase):
         review.assign_reviewer(self.findings[0], self.senior, assigned_by=self.team_lead)
         other_senior = make_user(User.Role.SENIOR)
         review.assign_reviewer(self.findings[1], other_senior, assigned_by=self.team_lead)
+        # A reviewer must be assigned before a finding can be reviewed (M-1), even for
+        # a Superadmin acting in bulk. The point of this test is that the Superadmin's
+        # bulk action covers findings assigned to *anyone*, not only to themselves.
+        review.assign_reviewer(self.findings[2], self.senior, assigned_by=self.team_lead)
 
         updated, skipped = review.bulk_submit_review(self.engagement, superadmin, Finding.WorkflowStatus.REVIEWED)
         self.assertEqual(len(updated), 3)
@@ -3186,13 +3196,17 @@ class SectionGapWarningTests(TestCase):
         self.assertNotContains(resp, "Scan details won't be kept")
         self.assertContains(resp, "go into the <strong>Description</strong> section", html=False)
 
-    def test_structure_refuses_two_import_targets(self):
+    def test_structure_accepts_two_import_targets(self):
+        # §4: multiple scan-import target sections are now allowed; scan import
+        # writes each result's details into every ticked section.
         self.section("Description")
         self.section("Impact")
         resp = self.structure_post(ticked={"Description", "Impact"})
-        self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Only one section can be the scan import target", count=2)
-        self.assertFalse(ContentSectionDefinition.objects.filter(is_import_target=True).exists())
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            set(ContentSectionDefinition.objects.filter(is_import_target=True).values_list("label", flat=True)),
+            {"Description", "Impact"},
+        )
 
     def test_structure_accepts_one_import_target(self):
         self.section("Description")
@@ -3211,15 +3225,18 @@ class SectionGapWarningTests(TestCase):
         affects.refresh_from_db()
         self.assertFalse(affects.is_import_target)
 
-    def test_new_section_cannot_become_a_second_import_target(self):
+    def test_new_section_can_become_a_second_import_target(self):
+        # §4: multiple scan-import target sections are now allowed (the single-target
+        # limit blocked a legitimate config); scan import writes to every ticked section.
         self.section("Description", is_import_target=True)
         login(self.client, self.superadmin)
         resp = self.client.post(reverse("field_visibility:edit"), {
             "action": "create", "create-label": "Impact", "create-is_active": "on", "create-is_import_target": "on",
         })
-        self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "&#x27;Description&#x27; is already the scan import target")
-        self.assertFalse(ContentSectionDefinition.objects.filter(label="Impact").exists())
+        self.assertIn(resp.status_code, (200, 302))
+        impact = ContentSectionDefinition.objects.get(label="Impact")
+        self.assertTrue(impact.is_import_target)
+        self.assertTrue(ContentSectionDefinition.objects.get(label="Description").is_import_target)
 
     def test_catalogue_preview_names_missing_and_retired_sections(self):
         self.section("Description")

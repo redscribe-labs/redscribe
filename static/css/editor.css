@@ -166,6 +166,32 @@
 }
 .rte-new-comment-box textarea { width: 100%; margin-bottom: 0.35rem; }
 
+/* In-place comments: a floating popover (desktop) / bottom sheet (mobile) that
+   hosts the new-comment composer or an existing thread. Opened from the
+   selection bubble (create) or by hover / focus / tap on a highlight (read). */
+.rte-comment-highlight:focus-visible {
+    outline: 2px solid var(--color-brand-600, #4d7a4d); outline-offset: 1px; border-radius: 1px;
+}
+.rte-comment-backdrop { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.4); z-index: 59; }
+.rte-comment-surface {
+    position: fixed; z-index: 60; width: 20rem; max-width: calc(100vw - 1rem);
+    max-height: 60vh; overflow-y: auto;
+    background: var(--color-slate-50, #fff); border: 1px solid var(--color-slate-300, #cbd5e1);
+    border-radius: 0.5rem; box-shadow: 0 12px 28px rgba(12, 10, 9, 0.22); padding: 0.75rem;
+}
+.rte-comment-surface.rte-comment-sheet {
+    left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: 100%;
+    max-height: 75vh; border-radius: 0.9rem 0.9rem 0 0; border-bottom: 0;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+.rte-comment-surface .rte-thread-card { border: 0; padding: 0; margin: 0; }
+.rte-comment-surface .rte-reply-form { flex-direction: column; align-items: stretch; }
+.rte-comment-compose textarea { width: 100%; margin: 0.4rem 0; }
+.rte-thread-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+
+.dark .rte-comment-highlight:focus-visible { outline-color: #fbbf24; }
+.dark .rte-comment-surface { background: #181a1b; border-color: #494d50; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5); }
+
 .dark .rte-toolbar-sticky { background: #181a1b; }
 .dark .rte-toolbar-btn {
     background: #181a1b; color: #cacdce; border-color: #494d50;

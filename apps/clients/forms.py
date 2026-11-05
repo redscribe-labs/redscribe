@@ -14,6 +14,15 @@ class ClientCreateForm(forms.ModelForm):
         model = Client
         fields = ["name"]
 
+    def clean_name(self):
+        name = self.cleaned_data.get("name")
+        # Case-folded uniqueness (M-5e): avoid "Acme" and "acme" becoming two clients.
+        if name and Client.objects.filter(name__iexact=name).exists():
+            raise forms.ValidationError(
+                "A client with that name already exists (names are matched case-insensitively)."
+            )
+        return name
+
 
 class ClientEditForm(forms.ModelForm):
     class Meta:
@@ -22,21 +31,22 @@ class ClientEditForm(forms.ModelForm):
 
 
 class ClientUserCreateForm(forms.ModelForm):
-    client = forms.ModelChoiceField(
-        queryset=Client.objects.filter(is_active=True),
-        label="Client company",
-        help_text="Which company this account can see engagements/findings for.",
-    )
-
     class Meta:
         model = User
-        fields = ["username", "email", "first_name", "last_name", "client"]
+        fields = ["username", "email", "first_name", "last_name"]
+
+    def __init__(self, *args, client=None, **kwargs):
+        # M-5c: the company is fixed by the URL the view was reached through, never chosen
+        # in the form. Dropping the `client` field means a forged/changed POST value can no
+        # longer attach the new account to a different company.
+        super().__init__(*args, **kwargs)
+        self.client = client
 
     def save(self, commit=True):
         user = super().save(commit=False)
         user.auth_type = User.AuthType.LOCAL
         user.role = Role.objects.get(slug="client")
-        user.client = self.cleaned_data["client"]
+        user.client = self.client
         user.set_unusable_password()
         if commit:
             user.save()

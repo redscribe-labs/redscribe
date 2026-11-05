@@ -100,7 +100,7 @@
                         <p class="text-xs text-slate-500 truncate" title="{{ row.tag.taxonomy }}">{{ row.tag.value }}</p>
                     </div>
                     <div class="text-right shrink-0">
-                        <p class="text-sm text-slate-700 tabular-nums">{{ row.engagement_count }} engagements</p>
+                        <p class="text-sm text-slate-700 tabular-nums">{{ row.engagement_count }} engagement{{ row.engagement_count|pluralize }}</p>
                         <p class="text-xs text-slate-500 tabular-nums">{{ row.finding_count }} finding{{ row.finding_count|pluralize }}</p>
                     </div>
                 </li>

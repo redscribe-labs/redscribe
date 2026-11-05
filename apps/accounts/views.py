@@ -47,7 +47,7 @@ def _no_superadmin_yet() -> bool:
 
 def _lockout_error_code(form) -> str | None:
     for error in form.errors.as_data().get("__all__", []):
-        if error.code in ("locked_out", "rate_limited"):
+        if error.code in ("locked_out", "rate_limited", "ip_rate_limited"):
             return error.code
     return None
 
@@ -75,7 +75,8 @@ def login_view(request):
                 if user.is_client_role:
                     return redirect("clients_portal:dashboard")
                 return redirect("accounts:dashboard")
-        if _lockout_error_code(form):
+        lockout_code = _lockout_error_code(form)
+        if lockout_code:
             status_code = 429
     else:
         form = LocalLoginForm(request)
@@ -90,12 +91,21 @@ def login_view(request):
         status=status_code,
     )
     if status_code == 429:
-        username = request.POST.get("username", "")
-        is_superadmin = User.objects.filter(username=username, role__is_superadmin=True).exists()
-        window = (
-            settings.SUPERADMIN_RATE_LIMIT_WINDOW_SECONDS if is_superadmin
-            else settings.LOCKOUT_DURATION_SECONDS
-        )
+        if lockout_code == "ip_rate_limited":
+            # Progressive window — read the actual escalated duration back from the service.
+            # It can report not-blocked (retry_after_seconds=None) if failures aged out of
+            # the window between form validation and here, so fall back to the base window
+            # rather than emit "Retry-After: None".
+            window = security.check_ip_lockout(
+                ip_address=security.client_ip(request)
+            ).retry_after_seconds or settings.IP_LOCKOUT_DURATION_SECONDS
+        else:
+            username = request.POST.get("username", "")
+            is_superadmin = User.objects.filter(username=username, role__is_superadmin=True).exists()
+            window = (
+                settings.SUPERADMIN_RATE_LIMIT_WINDOW_SECONDS if is_superadmin
+                else settings.LOCKOUT_DURATION_SECONDS
+            )
         response["Retry-After"] = str(window)
     return response
 

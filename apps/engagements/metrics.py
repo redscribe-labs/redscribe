@@ -18,9 +18,10 @@ SEVERITY_FIELDS = [
 
 
 def with_metrics(engagements):
-    open_finding = Q(findings__status=Finding.Status.OPEN)
+    active_finding = Q(findings__archived=False)
+    open_finding = active_finding & Q(findings__status=Finding.Status.OPEN)
     annotations = {
-        "findings_total": Count("findings", distinct=True),
+        "findings_total": Count("findings", filter=active_finding, distinct=True),
         "checklist_total": Count("checklist_runs__items", distinct=True),
         "checklist_tested": Count(
             "checklist_runs__items",

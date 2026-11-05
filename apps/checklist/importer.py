@@ -80,7 +80,9 @@ def _parse_json_payload(raw_text):
     try:
         data = json.loads(raw_text)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON: {exc}") from exc
+        raise ValueError(
+            f"The file isn't valid JSON — problem near line {exc.lineno}, column {exc.colno}."
+        ) from exc
     except RecursionError as exc:
         raise ValueError("Invalid JSON: too deeply nested.") from exc
     if isinstance(data, list):

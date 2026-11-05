@@ -5,6 +5,8 @@ from .validators import (
     sanitize_tiptap_image_srcs,
     sanitize_tiptap_link_hrefs,
     validate_cve_id,
+    validate_cvss_consistency,
+    validate_cvss_score,
     validate_cvss_vector,
     validate_tiptap_doc_json,
 )
@@ -29,12 +31,21 @@ def _section_field_name(slug: str) -> str:
 
 class FindingForm(forms.Form):
     title = forms.CharField(max_length=255)
-    cvss_score = forms.CharField(max_length=32, required=False, help_text="Free text, e.g. '8.6' or 'High'")
+    # validate_cvss_score / validate_cvss_consistency aren't attached as field
+    # validators: they only apply to values the user actually edits (see clean()),
+    # so a pre-existing finding with a legacy free-text score stays editable.
+    cvss_score = forms.CharField(
+        max_length=32, required=False,
+        help_text="Number from 0.0 to 10.0, e.g. 8.6 — leave blank if not scored",
+    )
     cvss_vector = forms.CharField(
         max_length=255, required=False, validators=[validate_cvss_vector],
-        help_text="CVSS:3.1/... or CVSS:4.0/... — leave blank if not scored",
+        help_text="CVSS:4.0/... (default) or CVSS:3.1/... — leave blank if not scored",
     )
-    severity = forms.ChoiceField(choices=Finding.Severity.choices)
+    severity = forms.ChoiceField(
+        choices=[("", "— Select severity —"), *Finding.Severity.choices],
+        error_messages={"required": "Choose a severity."},
+    )
     cve_id = forms.CharField(
         max_length=32, required=False, validators=[validate_cve_id], label="CVE ID",
         widget=forms.TextInput(attrs={
@@ -65,6 +76,31 @@ class FindingForm(forms.Form):
             self.fields[_section_field_name(section.slug)] = RichTextField(
                 required=False, label=section.label,
             )
+
+    _CVSS_FIELDS = ("cvss_score", "cvss_vector", "severity")
+
+    def clean(self):
+        cleaned = super().clean()
+        # Only enforce the stricter CVSS rules on values the user actually
+        # changed, so editing (and re-saving) a finding created before these
+        # rules existed isn't blocked by its legacy score/severity. On create
+        # there's no initial, so every entered value counts as changed.
+        changed = set(self.changed_data) & set(self._CVSS_FIELDS)
+        if not changed:
+            return cleaned
+        if "cvss_score" in changed and "cvss_score" not in self.errors:
+            try:
+                validate_cvss_score(cleaned.get("cvss_score"))
+            except forms.ValidationError as exc:
+                self.add_error("cvss_score", exc)
+        if not any(f in self.errors for f in self._CVSS_FIELDS):
+            try:
+                validate_cvss_consistency(
+                    cleaned.get("cvss_score"), cleaned.get("cvss_vector"), cleaned.get("severity"),
+                )
+            except forms.ValidationError as exc:
+                self.add_error("cvss_score", exc)
+        return cleaned
 
     def content_bound_fields(self):
         return [
@@ -132,11 +168,11 @@ class VulnerabilityTemplateForm(forms.Form):
     title = forms.CharField(max_length=255)
     default_cvss_score = forms.CharField(
         max_length=32, required=False, label="Default CVSS score",
-        help_text="Free text, e.g. '8.6' or 'High'",
+        help_text="Number from 0.0 to 10.0, e.g. 8.6 — leave blank if not scored",
     )
     default_cvss_vector = forms.CharField(
         max_length=255, required=False, validators=[validate_cvss_vector], label="Default CVSS vector",
-        help_text="CVSS:3.1/... or CVSS:4.0/... — leave blank if not scored",
+        help_text="CVSS:4.0/... (default) or CVSS:3.1/... — leave blank if not scored",
     )
     default_severity = forms.ChoiceField(choices=Finding.Severity.choices, label="Default severity")
 
@@ -152,6 +188,17 @@ class VulnerabilityTemplateForm(forms.Form):
             self.fields[_section_field_name(section.slug)] = RichTextField(
                 required=False, allow_own_blob_images=False, label=section.label,
             )
+
+    def clean(self):
+        cleaned = super().clean()
+        # Validate the default score's format only when it's edited, so a legacy
+        # template with a free-text default stays editable (see FindingForm.clean).
+        if "default_cvss_score" in self.changed_data and "default_cvss_score" not in self.errors:
+            try:
+                validate_cvss_score(cleaned.get("default_cvss_score"))
+            except forms.ValidationError as exc:
+                self.add_error("default_cvss_score", exc)
+        return cleaned
 
     def content_bound_fields(self):
         return [(section, self[_section_field_name(section.slug)]) for section in self.sections]

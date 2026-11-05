@@ -38,7 +38,7 @@
             {% for b in p.breakdown %}{% if b.count %}<span class="posture-bar posture-cell-{{ b.key }}" style="flex: {{ b.count }} 1 0"></span>{% endif %}{% endfor %}
         </span>
         <span class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-            <span><span class="font-mono font-semibold text-slate-900">{{ p.finding_checks }}</span> checks raised findings</span>
+            <span><span class="font-mono font-semibold text-slate-900">{{ p.finding_checks }}</span> check{{ p.finding_checks|pluralize }} raised {% if p.finding_checks == 1 %}a finding{% else %}findings{% endif %}</span>
             {% if p.worst %}<span>Worst: <span class="badge-severity" style="{{ p.worst|severity_chip_style }}">{{ p.worst|title }}</span></span>{% endif %}
         </span>
     </a></li>
@@ -46,7 +46,7 @@
 </ul>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.pct }}%</span><p class="text-xs text-slate-500 mt-0.5">Coverage &middot; {{ posture.done }} of {{ posture.total }} checks</p></div></div>
+    <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.pct }}%</span><p class="text-xs text-slate-500 mt-0.5">Coverage &middot; {{ posture.done }} of {{ posture.total }} check{{ posture.total|pluralize }}</p></div></div>
     <div class="stat-tile"><div><span class="stat-tile-value">{{ posture.finding_checks }}</span><p class="text-xs text-slate-500 mt-0.5">Checks that raised a finding</p></div></div>
     <div class="stat-tile"><div>
         {% if posture.worst %}<span class="badge-severity text-sm px-3 py-1" style="{{ posture.worst|severity_chip_style }}">{{ posture.worst|title }}</span>{% else %}<span class="stat-tile-value">—</span>{% endif %}
@@ -296,8 +296,7 @@
     </summary>
     <div class="panel-body">
         <p class="text-sm text-slate-500 mb-3">
-            An engagement can run several checklists at once — e.g. OWASP WSTG against the main web app and
-            OWASP API Top 10 against its REST API. Give this run a label so it's easy to tell apart.
+            An engagement can run several checklists at once. Give this run a label so it's easy to tell apart.
         </p>
         <form method="post" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
             {% csrf_token %}

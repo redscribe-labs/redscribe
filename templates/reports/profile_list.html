@@ -2,16 +2,14 @@
 {% load redscribe_extras %}
 {% block title %}Report profiles — RedScribe{% endblock %}
 {% block content %}
-<div class="max-w-5xl space-y-6">
+<div class="space-y-6">
     <div>
         <p class="page-eyebrow">Reporting</p>
         <h1 class="page-title">Report profiles</h1>
         <p class="text-sm text-slate-500 mt-1 max-w-3xl">
-            A profile is the full document a report is built from, and how that report looks — write it
-            directly, using headings for chapters/subsections and {% templatetag openvariable %} tag_name {% templatetag closevariable %}
-            placeholders wherever computed or custom content should appear. The default profile is used
-            whenever a report doesn't explicitly choose one. Each profile manages its own independent set of
-            text-block tags from its own edit page.
+            A profile defines a report's full document and appearance — write it with headings and
+            {% templatetag openvariable %} tag_name {% templatetag closevariable %} placeholders for computed or
+            custom content. The default profile is used when a report doesn't choose one.
         </p>
     </div>
 
@@ -54,7 +52,7 @@
         </form>
     </section>
 
-    <section class="card max-w-xl">
+    <section class="card">
         <h2 class="font-semibold text-slate-900">Export limits</h2>
         <p class="field-help !mt-0.5 mb-3">The one setting shared by every report, regardless of profile.</p>
         <form method="post" class="space-y-3">

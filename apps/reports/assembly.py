@@ -80,7 +80,7 @@ def sanitize_content(raw) -> dict:
 def seeded_content(engagement, config) -> dict:
     content = sanitize_content(config.content)
     if content["findings"].get("included_ids") is None:
-        publishable = [f for f in engagement.findings.all() if f.workflow_status in PUBLISHABLE_STATUSES]
+        publishable = [f for f in engagement.findings.filter(archived=False) if f.workflow_status in PUBLISHABLE_STATUSES]
         publishable.sort(key=lambda f: (
             _SEVERITY_ORDER.index(f.severity) if f.severity in _SEVERITY_ORDER else 99, f.created_at
         ))
@@ -143,7 +143,7 @@ def _select_findings(engagement, findings_cfg: dict) -> list[Finding]:
         findings_cfg = {}
 
     all_findings = list(
-        engagement.findings.select_related("created_by").prefetch_related("classifications")
+        engagement.findings.filter(archived=False).select_related("created_by").prefetch_related("classifications")
     )
     publishable = [f for f in all_findings if f.workflow_status in PUBLISHABLE_STATUSES]
 

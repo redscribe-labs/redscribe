@@ -5,38 +5,50 @@ All notable changes to RedScribe. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0, each
 release carries an `-alpha` suffix and may include breaking changes.
 
-## [Unreleased]
+## [0.7.0-alpha] - 2026-11-06
+
+### Security
+
+- Login throttling now also blocks by IP address, with an escalating lockout.
 
 ### Added
 
-- User Management has separate **Active** and **Deactivated** tabs.
-- Deactivated people are labelled "(deactivated)" throughout the app.
-  Reports, emails, and exports are unchanged.
-- **Erase account** permanently removes a deactivated person's personal
-  details while keeping their work attributed to "Erased user".
+- Archive findings, with Active and Archived tabs. Archived findings stay out
+  of reports and the client portal.
+- Add a comment by selecting text in a finding; hover or tap to read comments.
+- Retests now close, reopen, or leave a finding based on the outcome.
+- New grantable permissions: access archived engagements, permanently delete an
+  engagement, and erase a client user.
+- Active and Deactivated tabs in User Management, and erasing a deactivated
+  person's details (their work stays as "Erased user").
 
 ### Changed
 
-- Deactivating a client also deactivates its portal users. They have to be
-  reactivated one by one.
-- The **Retest workflow** setting is gone. An engagement's status now
-  decides whether it is retested.
+- "Vulnerability" is now "finding" throughout.
+- Reviewer and QA independence is enforced unless a role allows reviewing or
+  QA'ing its own work.
+- Engagements can't reach Approved or Delivered until all active findings are
+  QA-approved.
+- CVSS score, vector, and severity are checked for consistency.
+- Archiving now confirms in a pop-up instead of a separate page.
+- Page alignment and widths made consistent, and help text shortened.
+- Removing an engagement member clears their assignments there.
+- Deactivating a client also deactivates its portal users.
+- The Retest workflow setting is gone; engagement status decides retesting.
 - Clearing the audit log no longer needs a second Superadmin.
-- Classifications are optional when creating a finding or template.
-- The audit log no longer records background session checks.
-- Signing out now only works from the sign-out button.
+- Classifications are optional on findings and templates.
+- Signing out only works from the sign-out button.
 
 ### Fixed
 
-- Buttons that sometimes missed a click, and a server error when deleting
-  a report text block.
+- Severity labels are now readable on closed findings in dark mode.
+- Clicks that occasionally missed, and an error when deleting a report text block.
 - Classifications typed but not added were lost on save.
 - Portal users of an inactive client couldn't be edited.
-- Saving some forms could clear a deactivated person or inactive client
-  from them.
+- Forms could clear a deactivated person or inactive client.
 - Deactivated people could still be assigned findings to review.
 - The export page now warns when a report has no layout.
-- Several fixes for phones, keyboard use, and screen readers.
+- Various phone, keyboard, and screen-reader fixes.
 
 ## [0.6.0-alpha] - 2026-10-22
 

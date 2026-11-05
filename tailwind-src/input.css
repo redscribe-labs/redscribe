@@ -313,6 +313,13 @@
        the severity_*_style filters). Squarer than status pills so severity
        and workflow state never read as the same kind of badge. */
     .badge-severity { @apply inline-flex items-center rounded px-2 py-0.5 font-mono text-[0.6875rem] font-semibold tracking-wide uppercase; }
+    /* Closed findings use a translucent (faded) severity chip. Its inline text
+       colour is picked for contrast on the white page; over the dark surface it
+       sits on in dark mode the effective chip is darker, so the filter also
+       emits --sev-dark (accessible text for that case) and we switch to it here.
+       Solid (open) chips set --sev-dark to the same value, so they're unchanged.
+       !important beats the inline colour. */
+    .dark .badge-severity { color: var(--sev-dark, #f8fafc) !important; }
 
     .sidebar-link {
         @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium
@@ -490,7 +497,7 @@
     .posture-cell-finding { @apply bg-orange-700 text-white dark:bg-orange-600; }
     .posture-cell-na      { @apply bg-slate-100 border-[1.5px] border-dashed border-slate-400 dark:bg-slate-200 dark:border-slate-500; }
     .posture-cell-blocked { @apply bg-slate-900 text-white dark:text-slate-50; }
-    .posture-cell-open    { @apply bg-white border-[1.5px] border-slate-500 dark:bg-slate-100 dark:border-slate-600; }
+    .posture-cell-open    { @apply bg-white border-[1.5px] border-solid border-slate-500 dark:bg-slate-100 dark:border-slate-600; }
     .posture-bar { @apply h-full rounded-sm; }
 
     /* The Blocked reason box on a checklist item only shows while Blocked is

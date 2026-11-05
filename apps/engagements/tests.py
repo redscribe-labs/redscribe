@@ -1097,6 +1097,10 @@ class EngagementDefaultRolesTests(TestCase):
         self.engagement.default_approver = self.approver
         self.engagement.status = Engagement.Status.QA
         self.engagement.save(update_fields=["default_approver", "status"])
+        # H-2 completeness gate: every active finding must be QA-approved before Approve.
+        from apps.findings.models import Finding
+        self.finding.workflow_status = Finding.WorkflowStatus.QA_APPROVED
+        self.finding.save(update_fields=["workflow_status"])
 
         lifecycle.transition_engagement(self.engagement, Engagement.Status.APPROVED, actor=self.approver)
         self.engagement.refresh_from_db()

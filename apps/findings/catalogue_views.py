@@ -260,7 +260,7 @@ def template_detail(request, pk):
 @login_required
 def template_create(request):
     if not can_create_catalogue_entry(request.user):
-        raise PermissionDenied("You must be signed in to add to the vulnerability catalogue.")
+        raise PermissionDenied("You must be signed in to add to the finding catalogue.")
 
     sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     if request.method == "POST":
@@ -300,12 +300,21 @@ def template_edit(request, pk):
 
     sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
     if request.method == "POST":
-        form = VulnerabilityTemplateForm(request.POST, sections=sections)
+        # Stored default score as initial so changed_data is accurate: a legacy
+        # free-text default is only re-validated if the user actually edits it.
+        form = VulnerabilityTemplateForm(
+            request.POST, initial={"default_cvss_score": template.default_cvss_score}, sections=sections,
+        )
         classification_rows = parse_classification_rows(request.POST)
         classification_errors = validate_classification_rows(classification_rows)
         if form.is_valid() and not classification_errors:
             needs_reset = template.status != VulnerabilityTemplate.Status.DRAFT
             was_approved = template.status == VulnerabilityTemplate.Status.APPROVED
+            if was_approved and not VulnerabilityTemplateApprovedVersion.objects.filter(template=template).exists():
+                # Approved entries with no frozen snapshot (e.g. approved before snapshots existed)
+                # would otherwise become un-importable the moment they're edited: capture the
+                # still-approved content before the edit overwrites it.
+                VulnerabilityTemplateApprovedVersion.snapshot(template, approved_by=None)
             form.save(
                 instance=template, classification_tags=save_classification_rows(classification_rows),
             )

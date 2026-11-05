@@ -85,7 +85,7 @@ def _item_payload(item, project_key):
         "objectives_images_omitted": objectives_images_omitted,
         "test_results_html": test_results_html,
         "test_results_images_omitted": test_results_images_omitted,
-        "findings": [_finding_payload(f) for f in item.findings.all()],
+        "findings": [_finding_payload(f) for f in item.findings.all() if not f.archived],
         "comments": [_comment_payload(c, project_key) for c in item.comments.all()],
     }
 

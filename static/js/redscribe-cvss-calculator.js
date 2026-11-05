@@ -558,7 +558,7 @@
       vectorFieldDiv.appendChild(newHint);
     }
 
-    let version = "3.1";
+    let version = "4.0";
 
     function showVersion(v) {
       version = v;

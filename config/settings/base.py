@@ -255,6 +255,13 @@ BACKUP_RETENTION_DAYS = int(env("BACKUP_RETENTION_DAYS", "30"))
 
 LOCKOUT_THRESHOLD = int(env("LOCKOUT_THRESHOLD", "5"))
 LOCKOUT_DURATION_SECONDS = int(env("LOCKOUT_DURATION_SECONDS", str(24 * 60 * 60)))
+
+# IP-based login throttle (M-2): catches an attacker rotating usernames from one
+# IP that the per-username lockout above would miss. Threshold is deliberately
+# higher to tolerate shared NAT; the window escalates progressively up to the max.
+IP_LOCKOUT_THRESHOLD = int(env("IP_LOCKOUT_THRESHOLD", "20"))
+IP_LOCKOUT_DURATION_SECONDS = int(env("IP_LOCKOUT_DURATION_SECONDS", str(60 * 60)))
+IP_LOCKOUT_MAX_DURATION_SECONDS = int(env("IP_LOCKOUT_MAX_DURATION_SECONDS", str(24 * 60 * 60)))
 SUPERADMIN_RATE_LIMIT_WINDOW_SECONDS = int(
     env("SUPERADMIN_RATE_LIMIT_WINDOW_SECONDS", "60")
 )

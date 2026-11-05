@@ -21,13 +21,23 @@ PERMISSIONS = [
         "Engagements",
     ),
     (
+        "engagements.access_archived",
+        "Access and list archived engagements (otherwise archived engagements are hidden)",
+        "Engagements",
+    ),
+    (
+        "engagements.delete_permanent",
+        "⚠ Permanently delete an engagement and all of its data (irreversible)",
+        "Engagements",
+    ),
+    (
         "catalogue.manage",
-        "Create, edit, and delete vulnerability catalogue templates",
+        "Create, edit, and delete finding catalogue templates",
         "Catalogue",
     ),
     (
         "catalogue.approve",
-        "Approve draft vulnerability catalogue entries",
+        "Approve draft finding catalogue entries",
         "Catalogue",
     ),
     (
@@ -37,7 +47,7 @@ PERMISSIONS = [
     ),
     (
         "catalogue.bulk_manage",
-        "Export/import the whole vulnerability catalogue at once",
+        "Export/import the whole finding catalogue at once",
         "Catalogue",
     ),
     (
@@ -84,6 +94,11 @@ PERMISSIONS = [
     (
         "clients.manage",
         "Manage client-portal companies and accounts",
+        "Client Portal",
+    ),
+    (
+        "clients.erase_user",
+        "⚠ Erase a client user's personal data (irreversible)",
         "Client Portal",
     ),
     (

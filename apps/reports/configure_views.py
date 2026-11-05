@@ -35,7 +35,7 @@ def _preview_html(document, profile) -> str:
 
 def _publishable_findings(engagement):
     return sorted(
-        (f for f in engagement.findings.all() if f.workflow_status in assembly.PUBLISHABLE_STATUSES),
+        (f for f in engagement.findings.filter(archived=False) if f.workflow_status in assembly.PUBLISHABLE_STATUSES),
         key=lambda f: (
             assembly._SEVERITY_ORDER.index(f.severity) if f.severity in assembly._SEVERITY_ORDER else 99,
             f.title.lower(),

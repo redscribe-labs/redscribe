@@ -29,7 +29,7 @@ def search_results(request):
         engagement_total = engagement_qs.count()
         engagements = engagement_qs[:RESULT_LIMIT]
 
-        finding_qs = Finding.objects.filter(engagement__in=visible).filter(
+        finding_qs = Finding.objects.filter(engagement__in=visible, archived=False).filter(
             Q(title__icontains=query) | Q(cve_id__icontains=query)
         ).select_related("engagement")
         finding_total = finding_qs.count()

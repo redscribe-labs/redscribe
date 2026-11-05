@@ -106,7 +106,7 @@ class EngagementAccessClientRoleTests(TestCase):
         self.engagement.save()
         decision = check_engagement_access(self.client_user, self.engagement)
         self.assertFalse(decision.granted)
-        self.assertEqual(decision.reason, "archived_superadmin_only")
+        self.assertEqual(decision.reason, "client_role_never")
 
     def test_visible_engagements_is_staff_only_now(self):
         result = visible_engagements(self.client_user)

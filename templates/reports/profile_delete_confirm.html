@@ -1,10 +1,10 @@
 {% extends "base/base.html" %}
 {% block title %}Delete {{ profile.name }} — RedScribe{% endblock %}
 {% block content %}
-<div class="max-w-md mx-auto card">
+<div class="max-w-md card">
     <h1 class="text-lg font-semibold mb-2">Delete "{{ profile.name }}"?</h1>
     <p class="text-sm text-slate-500 mb-5">
-        This permanently deletes this report profile. Any ReportConfig that had explicitly chosen it falls back
+        This permanently deletes this report profile. Any engagement report that had explicitly chosen it falls back
         to the default profile. This cannot be undone.
     </p>
     <form method="post" class="flex gap-3">

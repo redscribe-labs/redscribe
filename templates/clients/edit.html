@@ -6,8 +6,8 @@
     <div class="card">
         <h1 class="page-title mb-1">Edit {{ company.name }}</h1>
         <p class="text-sm text-slate-500 mb-5">
-            Setting a client inactive hides it from the "New client user" and
-            engagement portal-company pickers — it doesn't remove existing links.
+            Setting a client inactive hides it from the client-user and engagement pickers, but doesn't
+            remove existing links.
         </p>
         <form method="post">
             {% csrf_token %}

@@ -67,9 +67,13 @@ class ChecklistItemForm(forms.Form):
     )
     assignee = forms.ModelChoiceField(queryset=None, required=False, label="Assigned to", empty_label="Unassigned")
 
-    def __init__(self, *args, engagement=None, current_assignee=None, **kwargs):
+    def __init__(self, *args, engagement=None, current_assignee=None, item=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["findings"].queryset = engagement.findings.all() if engagement else None
+        self.fields["findings"].queryset = engagement.findings.filter(archived=False) if engagement else None
+        # Archived findings aren't offered in the form, but an existing link to one
+        # still satisfies the "Finding Raised" outcome (see clean) — otherwise a check
+        # whose only finding was archived couldn't be saved at all.
+        self._has_archived_finding_link = bool(item and item.findings.filter(archived=True).exists())
         # Only people who can open the engagement can own one of its checks. The current
         # assignee stays listed even after losing access, so saving doesn't unassign them.
         self.fields["assignee"].queryset = users_with_access(engagement) if engagement else None
@@ -82,6 +86,12 @@ class ChecklistItemForm(forms.Form):
                 self.add_error("blocked_reason", "Say why this check couldn't be tested.")
         else:
             cleaned["blocked_reason"] = ""
+        if (
+            cleaned.get("status") == ChecklistItem.Status.TESTED_FINDING_RAISED
+            and not cleaned.get("findings")
+            and not self._has_archived_finding_link
+        ):
+            self.add_error("findings", "Link at least one finding, or choose a different outcome.")
         return cleaned
 
 

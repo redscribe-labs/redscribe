@@ -3,14 +3,13 @@
 {% block title %}Import catalogue — RedScribe{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl">
     <div class="card">
         <h1 class="text-xl font-bold text-slate-900 mb-1">Import catalogue</h1>
         <p class="text-sm text-slate-500 mb-5">
-            Upload a .json file previously produced by <a href="{% url 'catalogue:export' %}" class="underline">Export</a>
-            (from this or another RedScribe instance). Every entry is created fresh, as Draft — nothing is matched
-            against or overwrites an existing entry, and approval status is never carried over, so each one needs
-            reviewing and approving again here.
+            Upload a .json file from <a href="{% url 'catalogue:export' %}" class="underline">Export</a>. Every entry
+            is created fresh as Draft — nothing is matched or overwritten, and approval status isn't carried over, so
+            each needs approving again.
         </p>
         <form method="post" enctype="multipart/form-data" data-import-preview>
             {% csrf_token %}

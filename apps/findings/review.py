@@ -27,6 +27,9 @@ def _is_eligible(candidate, finding: Finding, permission: str, own_permission: s
     author = finding.created_by
     if author is None:
         return False
+    # The author may self-serve as reviewer/QA only if they hold the matching
+    # "own" permission — small teams enable this; otherwise the author is excluded
+    # and reviewer independence is enforced.
     if candidate.pk == author.pk and not candidate.has_permission(own_permission):
         return False
     return True
@@ -81,6 +84,9 @@ def _require_assigner(user, finding: Finding):
 def _require_reviewer_assigner(user, finding: Finding):
     if is_engagement_manager(user, finding.engagement):
         return
+    # The author may route their own finding to a reviewer (choosing from the
+    # eligible candidates, which only include the author on a team that grants
+    # findings.review_own).
     if finding.created_by_id and user.pk == finding.created_by_id:
         return
     raise PermissionDenied("Only a Superadmin, Team Lead, or this finding's author can assign a reviewer.")
@@ -91,6 +97,8 @@ def _require_qa_assigner(user, finding: Finding):
         return
     if finding.assigned_reviewer_id and user.pk == finding.assigned_reviewer_id:
         return
+    # The author may route their own finding to QA (choosing from the eligible
+    # candidates, which only include the author on a team that grants findings.qa_own).
     if finding.created_by_id and user.pk == finding.created_by_id:
         return
     raise PermissionDenied("Only a Superadmin, Team Lead, this finding's reviewer, or its author can assign QA.")
@@ -256,6 +264,8 @@ def _do_assign_reviewer(finding: Finding, reviewer, *, assigned_by, send_email=T
 
 def assign_reviewer(finding: Finding, reviewer, *, assigned_by, send_email=True) -> Finding:
     _require_reviewer_assigner(assigned_by, finding)
+    if finding.archived:
+        raise PermissionDenied("A reviewer can't be assigned to an archived finding.")
     if finding.workflow_status not in {Finding.WorkflowStatus.DRAFT, Finding.WorkflowStatus.REVIEW_CHANGES_REQUESTED}:
         raise PermissionDenied("Reviewer can only be (re)assigned while the finding is in Draft.")
     if not is_eligible_reviewer(reviewer, finding):
@@ -269,6 +279,9 @@ def submit_review(finding: Finding, user, outcome: str, *, send_email=True) -> F
         raise ValueError("Invalid review outcome provided.")
     if not (user.has_permission("findings.act_any_assignment") or (finding.assigned_reviewer_id and user.pk == finding.assigned_reviewer_id)):
         raise PermissionDenied("Only the assigned reviewer (or a Superadmin) can submit this review.")
+    # A reviewer must be assigned before the finding can move to Reviewed.
+    if finding.assigned_reviewer_id is None:
+        raise PermissionDenied("A reviewer must be assigned before this finding can be reviewed.")
     if finding.workflow_status not in {Finding.WorkflowStatus.DRAFT, Finding.WorkflowStatus.REVIEW_CHANGES_REQUESTED}:
         raise PermissionDenied("This finding isn't awaiting review.")
 
@@ -290,6 +303,8 @@ def _do_assign_qa(finding: Finding, qa_reviewer, *, assigned_by, send_email=True
 
 def assign_qa(finding: Finding, qa_reviewer, *, assigned_by, send_email=True) -> Finding:
     _require_qa_assigner(assigned_by, finding)
+    if finding.archived:
+        raise PermissionDenied("QA can't be assigned to an archived finding.")
     if finding.workflow_status not in {Finding.WorkflowStatus.REVIEWED, Finding.WorkflowStatus.QA_CHANGES_REQUESTED}:
         raise PermissionDenied("QA can only be assigned once the finding has been Reviewed.")
     if not is_eligible_qa_reviewer(qa_reviewer, finding):
@@ -303,6 +318,9 @@ def submit_qa(finding: Finding, user, outcome: str, *, send_email=True) -> Findi
         raise ValueError("Invalid QA outcome provided.")
     if not (user.has_permission("findings.act_any_assignment") or (finding.assigned_qa_id and user.pk == finding.assigned_qa_id)):
         raise PermissionDenied("Only the assigned QA reviewer (or a Superadmin) can submit this QA decision.")
+    # A QA reviewer must be assigned before the finding can be QA-approved.
+    if finding.assigned_qa_id is None:
+        raise PermissionDenied("A QA reviewer must be assigned before this finding can be QA-approved.")
     if finding.workflow_status not in {Finding.WorkflowStatus.REVIEWED, Finding.WorkflowStatus.QA_CHANGES_REQUESTED}:
         raise PermissionDenied("This finding isn't awaiting QA.")
 

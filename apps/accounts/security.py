@@ -19,6 +19,14 @@ from .models import LoginAttempt, MFAAttempt, User, UserSession
 
 logger = logging.getLogger(__name__)
 
+# Defaults used when the corresponding IP_LOCKOUT_* settings are absent (see note in
+# the remediation report). The IP threshold is intentionally higher than the per-username
+# LOCKOUT_THRESHOLD so legitimate users behind a shared NAT aren't locked out as easily,
+# while still catching an attacker rotating usernames from a single address.
+_DEFAULT_IP_LOCKOUT_THRESHOLD = 20
+_DEFAULT_IP_LOCKOUT_DURATION_SECONDS = 60 * 60  # 1 hour base lockout window
+_DEFAULT_IP_LOCKOUT_MAX_DURATION_SECONDS = 24 * 60 * 60  # 24 hour escalation cap
+
 
 @dataclass
 class LockoutStatus:
@@ -40,7 +48,55 @@ def _recent_failed_count(*, username: str, window_seconds: int) -> int:
     return qs.count()
 
 
-def check_lockout(*, username: str, is_superadmin: bool) -> LockoutStatus:
+def _recent_failed_count_by_ip(*, ip_address: str, window_seconds: int) -> int:
+    since = timezone.now() - timezone.timedelta(seconds=window_seconds)
+    # Deliberately NOT reset on a success here (unlike the per-username counter): an
+    # attacker rotating usernames from one IP can interleave a valid credential, so a
+    # success must not wipe the IP's failure history.
+    return LoginAttempt.objects.filter(
+        ip_address=ip_address, successful=False, created_at__gte=since
+    ).count()
+
+
+def check_ip_lockout(*, ip_address: str | None) -> LockoutStatus:
+    """IP-keyed brute-force lockout with a progressive (escalating) window.
+
+    Each additional ``threshold`` worth of failures doubles the lockout window, capped at
+    IP_LOCKOUT_MAX_DURATION_SECONDS, so repeat offenders from the same address are held
+    longer while one-off bursts clear quickly.
+    """
+    if not ip_address:
+        return LockoutStatus(blocked=False)
+
+    threshold = getattr(settings, "IP_LOCKOUT_THRESHOLD", _DEFAULT_IP_LOCKOUT_THRESHOLD)
+    base_window = getattr(
+        settings, "IP_LOCKOUT_DURATION_SECONDS", _DEFAULT_IP_LOCKOUT_DURATION_SECONDS
+    )
+    max_window = getattr(
+        settings, "IP_LOCKOUT_MAX_DURATION_SECONDS", _DEFAULT_IP_LOCKOUT_MAX_DURATION_SECONDS
+    )
+
+    # Count over the widest window first to decide how far the lockout should escalate.
+    failed = _recent_failed_count_by_ip(ip_address=ip_address, window_seconds=max_window)
+    if failed < threshold:
+        return LockoutStatus(blocked=False)
+
+    tier = failed // threshold
+    window = min(base_window * (2 ** (tier - 1)), max_window)
+
+    # Re-check within the escalated window so the block naturally lifts once failures age
+    # out of it, instead of staying latched for the whole max window.
+    recent = _recent_failed_count_by_ip(ip_address=ip_address, window_seconds=window)
+    if recent < threshold:
+        return LockoutStatus(blocked=False)
+    return LockoutStatus(blocked=True, retry_after_seconds=window, reason="ip_rate_limited")
+
+
+def check_lockout(*, username: str, is_superadmin: bool, ip_address: str | None = None) -> LockoutStatus:
+    ip_status = check_ip_lockout(ip_address=ip_address)
+    if ip_status.blocked:
+        return ip_status
+
     if is_superadmin:
         window = settings.SUPERADMIN_RATE_LIMIT_WINDOW_SECONDS
         threshold = settings.SUPERADMIN_RATE_LIMIT_MAX_ATTEMPTS

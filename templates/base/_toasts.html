@@ -1,4 +1,4 @@
-<div id="toast-container" class="fixed top-4 right-4 z-50 w-full max-w-sm flex flex-col gap-2">
+<div id="toast-container" class="fixed top-[4.5rem] right-4 pointer-events-none [&>*]:pointer-events-auto z-50 w-full max-w-sm flex flex-col gap-2">
     {% for message in messages %}
     <div class="toast toast-{{ message.tags|default:'info' }}" data-toast role="alert">
         <span class="toast-icon" aria-hidden="true">
@@ -49,5 +49,49 @@
 
         document.querySelectorAll("[data-toast]").forEach(wire);
         window.RedscribeToast = { show: show };
+
+        // In-app replacement for window.confirm(): resolves true/false.
+        function confirmDialog(message, opts) {
+            opts = opts || {};
+            return new Promise(function (resolve) {
+                var dlg = document.createElement("dialog");
+                dlg.className = "p-0 border-0 bg-transparent w-full max-w-md backdrop:bg-black/40";
+                dlg.setAttribute("aria-label", opts.title || "Please confirm");
+                dlg.style.position = "fixed";
+                dlg.style.top = "50%";
+                dlg.style.left = "50%";
+                dlg.style.margin = "0";
+                dlg.style.transform = "translate(-50%, -50%)";
+                dlg.innerHTML =
+                    '<div class="card !m-0">' +
+                    '<h2 class="text-lg font-bold text-slate-900 mb-2"></h2>' +
+                    '<p class="text-sm text-slate-600 mb-3"></p>' +
+                    '<div class="flex gap-2 mt-3">' +
+                    '<button type="button" class="btn-primary" data-confirm-ok></button>' +
+                    '<button type="button" class="btn-secondary" data-confirm-cancel>Cancel</button>' +
+                    "</div></div>";
+                dlg.querySelector("h2").textContent = opts.title || "Are you sure?";
+                dlg.querySelector("p").textContent = message;
+                var ok = dlg.querySelector("[data-confirm-ok]");
+                ok.textContent = opts.confirmLabel || "Confirm";
+                if (opts.danger) ok.classList.add("bg-red-600", "hover:bg-red-700");
+                var done = false;
+                function finish(value) {
+                    if (done) return;
+                    done = true;
+                    dlg.close();
+                    dlg.remove();
+                    resolve(value);
+                }
+                ok.addEventListener("click", function () { finish(true); });
+                dlg.querySelector("[data-confirm-cancel]").addEventListener("click", function () { finish(false); });
+                dlg.addEventListener("cancel", function (e) { e.preventDefault(); finish(false); });
+                dlg.addEventListener("click", function (e) { if (e.target === dlg) finish(false); });
+                document.body.appendChild(dlg);
+                dlg.showModal();
+                dlg.querySelector("[data-confirm-cancel]").focus();
+            });
+        }
+        window.RedscribeConfirm = confirmDialog;
     })();
 </script>

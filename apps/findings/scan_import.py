@@ -53,7 +53,13 @@ def import_target_section():
     """The section a scan result's technical details are written into, or None
     when no active section is ticked as the import target (the details are then
     dropped — the import page warns about this up front)."""
-    return ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).narrative().first()
+    return import_target_sections().first()
+
+
+def import_target_sections():
+    """Every active narrative section ticked as an import target; each result's
+    technical details are written into all of them."""
+    return ContentSectionDefinition.objects.filter(is_import_target=True, is_active=True).narrative()
 
 
 @transaction.atomic
@@ -64,7 +70,7 @@ def import_scan(*, engagement, project_key, raw, fmt: str, imported_by, filename
     if only is not None:
         imported = [item for index, item in enumerate(imported) if index in only]
 
-    import_target = import_target_section()
+    import_targets = list(import_target_sections())
 
     count = 0
     for item in imported:
@@ -80,7 +86,7 @@ def import_scan(*, engagement, project_key, raw, fmt: str, imported_by, filename
             created_by=imported_by,
         )
         finding.save()
-        if import_target is not None:
+        for import_target in import_targets:
             FindingSection.objects.create(
                 finding=finding, definition=import_target,
                 content_ciphertext=encrypt_bytes(

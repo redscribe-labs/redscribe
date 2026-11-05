@@ -8,7 +8,7 @@ from apps.engagements.breadcrumbs import engagement_crumbs
 from apps.feature_flags.models import FeatureFlags
 
 from .forms import ScanImportForm, selected_import_rows
-from .scan_import import FORMAT_LABELS, import_scan, import_target_section, parse_scan, preview_rows
+from .scan_import import FORMAT_LABELS, import_scan, import_target_sections, parse_scan, preview_rows
 
 
 def _preview(request, form):
@@ -61,7 +61,8 @@ def finding_import(request, engagement_id):
     return render(
         request, "findings/import.html",
         {
-            "engagement": request.engagement, "form": form, "import_target": import_target_section(),
+            "engagement": request.engagement, "form": form,
+            "import_targets": list(import_target_sections()),
             "breadcrumbs": engagement_crumbs(request.engagement) + [
                 {"label": "Findings", "url": reverse("findings:list", args=[request.engagement.pk])},
                 {"label": "Import scan"},

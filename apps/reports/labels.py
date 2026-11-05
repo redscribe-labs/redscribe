@@ -16,7 +16,7 @@ LABEL_DEFAULTS: dict[str, str] = {
     "testing_methodology_coverage": "Testing Methodology / Coverage",
     "retest_history": "Retest history",
     "finding_severity_rating": "Severity rating",
-    "finding_id_row": "Vulnerability ID",
+    "finding_id_row": "Finding ID",
     "finding_cvss_score": "CVSS score",
     "finding_cvss_vector": "CVSS vector",
     "finding_cve_id": "CVE ID",
@@ -64,14 +64,14 @@ LABEL_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
     ]),
     ("Finding details table", [
         ("finding_severity_rating", "\"Severity rating\" row"),
-        ("finding_id_row", "\"Vulnerability ID\" row"),
+        ("finding_id_row", "\"Finding ID\" row"),
         ("finding_cvss_score", "\"CVSS score\" row"),
         ("finding_cvss_vector", "\"CVSS vector\" row"),
         ("finding_cve_id", "\"CVE ID\" row"),
         ("finding_classification", "\"Classification\" row (no tags configured)"),
         ("finding_status", "\"Status\" row"),
     ]),
-    ("Vulnerabilities table columns", [
+    ("Findings table columns", [
         ("vuln_table_col_id", "ID column"),
         ("vuln_table_col_severity", "Severity column"),
         ("vuln_table_col_title", "Title column"),

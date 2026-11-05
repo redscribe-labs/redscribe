@@ -6,14 +6,14 @@
 <div class="mb-6">
     <h1 class="page-title">Feature flags</h1>
     <p class="text-sm text-slate-500 mt-1 max-w-2xl">
-        Turn optional features on or off instance-wide. Turning a feature off hides its UI and blocks its
-        actions — it never deletes data already on file.
+        Turn optional features on or off instance-wide. Turning one off hides its UI and blocks its actions,
+        but never deletes existing data.
     </p>
 </div>
 {% endblock %}
 
 {% block settings_content %}
-<form method="post" class="max-w-3xl space-y-6">
+<form method="post" class="max-w-2xl space-y-6">
     {% csrf_token %}
     <section class="panel">
         <div class="panel-header"><h2 class="settings-nav-label !p-0 !text-red-700 dark:!text-red-400">Security</h2></div>

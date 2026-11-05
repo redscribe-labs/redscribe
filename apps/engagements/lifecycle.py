@@ -154,6 +154,23 @@ def transition_engagement(engagement: Engagement, to_status: str, *, actor) -> E
             f"Can't move directly from {engagement.get_status_display()} to {dict(Status.choices)[to_status]}."
         )
 
+    if (engagement.status, to_status) in (
+        (Status.QA, Status.APPROVED),
+        (Status.APPROVED, Status.DELIVERED),
+    ):
+        from apps.reports.services import PUBLISHABLE_STATUSES
+
+        blocking = engagement.findings.filter(archived=False).exclude(
+            workflow_status__in=PUBLISHABLE_STATUSES
+        ).count()
+        if blocking:
+            raise PermissionDenied(
+                f"{blocking} finding{'s' if blocking != 1 else ''} "
+                f"{'are' if blocking != 1 else 'is'} not yet QA-approved — "
+                f"every finding must be QA-approved or archived before this engagement can move to "
+                f"{dict(Status.choices)[to_status]}."
+            )
+
     engagement.status = to_status
     engagement.save(update_fields=["status", "updated_at"])
     EngagementStatusHistory.objects.create(engagement=engagement, status=to_status, changed_by=actor)

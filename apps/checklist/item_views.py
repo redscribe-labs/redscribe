@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from django.contrib import messages
@@ -53,6 +54,18 @@ def _recently_logged(item, actor, kind):
     return item.events.filter(actor=actor, kind=kind, created_at__gte=timezone.now() - EDIT_EVENT_WINDOW).exists()
 
 
+def _same_rich_text(old, new):
+    """Compares two editor documents by content, so a harmless re-serialisation
+    (key order, whitespace) is not logged as an edit."""
+    old, new = old or "", new or ""
+    if old == new:
+        return True
+    try:
+        return json.loads(old) == json.loads(new)
+    except ValueError:
+        return False
+
+
 def _record_events(item, actor, before, cleaned):
     Kind = ChecklistItemEvent.Kind
     labels = dict(ChecklistItem.Status.choices)
@@ -68,7 +81,7 @@ def _record_events(item, actor, before, cleaned):
             from_value=str(before["assignee"] or "Unassigned")[:255], to_value=str(cleaned["assignee"] or "Unassigned")[:255],
             from_user=before["assignee"], to_user=cleaned["assignee"],
         ))
-    if before["test_results"] != (cleaned["test_results"] or "") and not _recently_logged(item, actor, Kind.EVIDENCE):
+    if not _same_rich_text(before["test_results"], cleaned["test_results"]) and not _recently_logged(item, actor, Kind.EVIDENCE):
         events.append(ChecklistItemEvent(item=item, actor=actor, kind=Kind.EVIDENCE))
     if before["scope_tested"] != cleaned["scope_tested"].strip() and not _recently_logged(item, actor, Kind.SCOPE):
         events.append(ChecklistItemEvent(item=item, actor=actor, kind=Kind.SCOPE))
@@ -97,7 +110,7 @@ def _apply_form(item, form, request):
     before = {
         "status": item.status,
         "assignee": item.assignee,
-        "findings": set(item.findings.values_list("pk", flat=True)),
+        "findings": set(item.findings.filter(archived=False).values_list("pk", flat=True)),
         "test_results": decrypt_or_blank(
             item.test_results_ciphertext, key, associated_data=record_aad("checklistitem", item.pk, "test_results"),
         ),
@@ -112,7 +125,9 @@ def _apply_form(item, form, request):
     item.assignee = cleaned["assignee"]
     item.scope_tested_ciphertext = encrypt_item_text(item, "scope_tested", cleaned["scope_tested"].strip(), key)
     item.blocked_reason_ciphertext = encrypt_item_text(item, "blocked_reason", cleaned["blocked_reason"].strip(), key)
-    item.findings.set(cleaned["findings"])
+    # Archived findings aren't offered in the form; keep any existing links to them.
+    archived_links = list(item.findings.filter(archived=True))
+    item.findings.set([*cleaned["findings"], *archived_links])
     test_results = cleaned["test_results"]
     item.test_results_ciphertext = (
         encrypt_bytes(test_results.encode("utf-8"), key, associated_data=record_aad("checklistitem", item.pk, "test_results"))
@@ -134,7 +149,7 @@ def item_autosave(request, engagement_id, pk):
             "saved": False, "conflict": True,
             "message": f"{last.actor.display_label if last and last.actor else 'Someone else'} saved this check after you opened it.",
         }, status=409)
-    form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee)
+    form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee, item=item)
     if not form.is_valid():
         return JsonResponse({"saved": False, "errors": form.errors.get_json_data()}, status=400)
     _apply_form(item, form, request)
@@ -148,7 +163,7 @@ def item_detail(request, engagement_id, pk):
 
     conflict = False
     if request.method == "POST" and "save_item" in request.POST:
-        form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee)
+        form = ChecklistItemForm(request.POST, engagement=request.engagement, current_assignee=item.assignee, item=item)
         # Someone else saved after this page loaded: show their change instead of
         # overwriting it, unless the user has chosen "Keep my changes" (save_item=overwrite).
         conflict = _is_stale(item, request.POST.get("version")) and request.POST.get("save_item") != "overwrite"
@@ -168,6 +183,7 @@ def item_detail(request, engagement_id, pk):
         form = ChecklistItemForm(
             engagement=request.engagement,
             current_assignee=item.assignee,
+            item=item,
             initial={
                 "status": item.status,
                 "assignee": item.assignee_id,
@@ -177,7 +193,7 @@ def item_detail(request, engagement_id, pk):
                     item.test_results_ciphertext, request.project_key,
                     associated_data=record_aad("checklistitem", item.pk, "test_results"),
                 ),
-                "findings": list(item.findings.values_list("id", flat=True)),
+                "findings": list(item.findings.filter(archived=False).values_list("id", flat=True)),
             },
         )
 

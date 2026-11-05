@@ -39,7 +39,7 @@ def severity_style(finding):
     from apps.reports.colors import finding_severity_style
 
     style = finding_severity_style(finding)
-    return f"background-color:{style['background']};color:{style['color']};"
+    return f"background-color:{style['background']};color:{style['color']};--sev-dark:{style['dark_color']};"
 
 
 @register.filter(name="severity_rail_style")
@@ -60,11 +60,13 @@ def severity_value_rail_style(severity_value):
 
 @register.filter(name="severity_chip_style")
 def severity_chip_style(severity_value):
-    from apps.reports.colors import accessible_text_rgb, severity_rgba
+    from apps.reports.colors import accessible_text_on_surface, accessible_text_rgb, severity_rgba
+    from apps.reports.colors import _DARK_SURFACE
 
     background = severity_rgba(severity_value, "open")
     r, g, b = accessible_text_rgb(background)
-    return f"background-color:{background};color:rgb({r},{g},{b});"
+    dr, dg, db = accessible_text_on_surface(background, _DARK_SURFACE)
+    return f"background-color:{background};color:rgb({r},{g},{b});--sev-dark:rgb({dr},{dg},{db});"
 
 
 @register.filter(name="has_permission")

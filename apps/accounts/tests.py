@@ -1048,6 +1048,7 @@ class DefaultRolePermissionRegressionTests(TestCase):
         self.assertTrue(team_lead.has_permission("engagements.view_all"))
         self.assertTrue(team_lead.has_permission("catalogue.manage"))
         self.assertTrue(team_lead.has_permission("findings.review"))
+        # Team Lead keeps review_own/qa_own so a small team can self-serve review/QA.
         self.assertTrue(team_lead.has_permission("findings.review_own"))
         self.assertTrue(team_lead.has_permission("findings.qa"))
         self.assertTrue(team_lead.has_permission("findings.qa_own"))

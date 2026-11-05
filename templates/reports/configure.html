@@ -111,7 +111,7 @@
 
         <div class="card scroll-mt-36" id="report-breakdown">
             <h2 class="font-semibold text-slate-900 text-sm mb-3">Breakdown of findings</h2>
-            <p class="field-help mb-3">Controls the severity chart and vulnerabilities table wherever {% templatetag openvariable %} breakdown_of_findings {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
+            <p class="field-help mb-3">Controls the severity chart and findings table wherever {% templatetag openvariable %} breakdown_of_findings {% templatetag closevariable %} sits in the profile. Only affects this report.</p>
             <label class="flex items-center gap-2 text-sm font-medium text-slate-800 mb-3">
                 <input type="checkbox" id="breakdown_enabled" {% if content.breakdown.enabled %}checked{% endif %}>
                 Include this block
@@ -124,7 +124,7 @@
                     </label>
                     <label class="flex items-center gap-2 text-sm">
                         <input type="checkbox" id="breakdown_show_table" {% if content.breakdown.show_table %}checked{% endif %}>
-                        Vulnerabilities table
+                        Findings table
                     </label>
                 </div>
                 <div>

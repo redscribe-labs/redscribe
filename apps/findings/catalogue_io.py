@@ -85,6 +85,11 @@ def _clean_entry(index: int, raw_entry, definitions_by_slug: dict) -> dict:
     for slug, value in raw_sections.items():
         definition = definitions_by_slug.get(slug)
         if definition is None:
+            # Sections this instance doesn't have are matched by internal name,
+            # not label. They can't be stored, but this isn't a hard error: the
+            # confirm step surfaces them via section_notices() so the importer
+            # sees exactly what will be skipped. (A section-less entry is also
+            # valid — title + severity alone is a usable catalogue stub.)
             continue
         text = json.dumps(value) if isinstance(value, dict) else (value or "")
         wrapped = _wrap_plain_text(text)
@@ -115,7 +120,9 @@ def parse_templates(raw_text: str) -> list[dict]:
     try:
         raw_entries = json.loads(raw_text)
     except json.JSONDecodeError as exc:
-        raise CatalogueImportError(f"Invalid JSON: {exc}") from exc
+        raise CatalogueImportError(
+            f"The file isn't valid JSON — problem near line {exc.lineno}, column {exc.colno}."
+        ) from exc
     except RecursionError as exc:
         raise CatalogueImportError("Invalid JSON: too deeply nested.") from exc
     if not isinstance(raw_entries, list):
@@ -124,6 +131,10 @@ def parse_templates(raw_text: str) -> list[dict]:
         raise CatalogueImportError("No entries found in the uploaded file.")
 
     definitions_by_slug = {d.slug: d for d in ContentSectionDefinition.objects.all()}
+    # No in-file duplicate-title rejection: catalogue titles aren't unique (import
+    # always creates, never merges), so two entries with the same/similar title are
+    # valid and a prior export must stay re-importable. preview_rows() still flags
+    # entries whose title matches one already in the catalogue, for the confirm step.
     return [_clean_entry(i + 1, entry, definitions_by_slug) for i, entry in enumerate(raw_entries)]
 
 

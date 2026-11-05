@@ -247,8 +247,14 @@ def user_send_password_reset(request, user_uuid):
     target = _get_staff_target(user_uuid, auth_type=User.AuthType.LOCAL)
 
     if request.method == "POST":
-        security.send_password_reset_email(target, request)
-        messages.success(request, f"Password reset link sent to {target.email}.")
+        if not target.is_active:
+            messages.error(
+                request,
+                "This account is deactivated — reactivate it before sending a password reset.",
+            )
+        else:
+            security.send_password_reset_email(target, request)
+            messages.success(request, f"Password reset link sent to {target.email}.")
 
     return redirect("user_management:detail", user_uuid=target.uuid)
 

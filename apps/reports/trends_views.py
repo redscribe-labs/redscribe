@@ -3,7 +3,6 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 
 from apps.engagements.access import visible_engagements
-from apps.engagements.models import Engagement
 from apps.feature_flags.models import FeatureFlags
 
 from . import trends
@@ -61,11 +60,12 @@ def trends_view(request):
     if not user.has_permission("reports.trends"):
         raise PermissionDenied("You don't have permission to view trend reporting.")
 
-    if user.is_superadmin_role:
-        engagements = Engagement.objects.all()
+    # visible_engagements already returns every engagement for a Superadmin and for
+    # anyone with engagements.view_all, so the scope follows permissions, not role.
+    engagements = visible_engagements(user)
+    if user.has_permission("engagements.view_all"):
         scope_label = "All engagements"
     else:
-        engagements = visible_engagements(user)
         scope_label = "Engagements you have access to"
 
     severity_months = trends.severity_over_time(engagements)

@@ -3662,10 +3662,10 @@ class ReportWordingTests(TestCase):
         self.assertEqual([child.title for child in section.children], [str(lead)])
         self.assertNotIn(lead.role.name, section.children[0].title)
 
-    def test_finding_id_row_reads_vulnerability_id(self):
+    def test_finding_id_row_reads_finding_id(self):
         from .labels import get_label
 
-        self.assertEqual(get_label(ReportProfile.objects.get(is_default=True), "finding_id_row"), "Vulnerability ID")
+        self.assertEqual(get_label(ReportProfile.objects.get(is_default=True), "finding_id_row"), "Finding ID")
 
     def test_cover_keeps_classification_in_the_top_row_without_a_logo(self):
         from .ir_render import render_cover_html

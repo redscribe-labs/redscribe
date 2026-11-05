@@ -118,7 +118,7 @@ class ReportProfile(models.Model):
     block_defaults = models.JSONField(default=dict, blank=True)
     is_default = models.BooleanField(
         default=False,
-        help_text="The profile a report uses when its ReportConfig has none explicitly chosen.",
+        help_text="The profile a report uses when its report configuration has none explicitly chosen.",
     )
 
     cover_title = models.CharField(max_length=255, blank=True, default="Penetration Test Report")

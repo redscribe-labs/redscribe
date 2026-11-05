@@ -35,4 +35,6 @@ def can_release_engagement_to_client(user, engagement: Engagement) -> bool:
 
 
 def can_permanently_delete_engagement(user) -> bool:
-    return user.is_authenticated and user.is_superadmin_role
+    # has_permission() returns True for a Superadmin (is_superadmin bypass), so
+    # Superadmin keeps this; any role granted engagements.delete_permanent gets it too.
+    return user.is_authenticated and user.has_permission("engagements.delete_permanent")

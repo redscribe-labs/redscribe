@@ -6,15 +6,15 @@
 <div class="mb-6">
     <h1 class="page-title">Licensing</h1>
     <p class="text-sm text-slate-500 mt-1 max-w-2xl">
-        RedScribe is free for personal/community use. If you've purchased a commercial license, paste the
-        key you were given below — this only changes what's shown in the footer, nothing is unlocked or
-        restricted either way. See <code class="font-mono text-xs">COMMERCIAL-LICENSE.md</code> in the repository for terms.
+        RedScribe is free for personal/community use. If you've bought a commercial license, paste the key
+        below — it only updates the footer; nothing is unlocked or restricted. See
+        <code class="font-mono text-xs">COMMERCIAL-LICENSE.md</code> for terms.
     </p>
 </div>
 {% endblock %}
 
 {% block settings_content %}
-<div class="max-w-3xl space-y-6">
+<div class="max-w-2xl space-y-6">
     {% if status.state == "active" or status.state == "expiring_soon" or status.state == "expired" %}
     {% if status.state == "active" %}{% firstof "border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-200" as tone %}
     {% elif status.state == "expiring_soon" %}{% firstof "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200" as tone %}

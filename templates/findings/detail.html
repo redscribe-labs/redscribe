@@ -207,7 +207,14 @@
         <a href="{% url 'findings:edit' engagement.pk finding.pk %}" class="btn-secondary">Edit</a>
         {% endif %}
         {% if not finding.archived and can_delete %}
-        <a href="{% url 'findings:archive' engagement.pk finding.pk %}" class="btn-danger">Archive</a>
+        <form method="post" action="{% url 'findings:archive' engagement.pk finding.pk %}"
+              data-confirm="This archives this finding. It's hidden from the findings list by default and can't be edited further until a manager unarchives it. Archiving is recorded in RedScribe's append-only, tamper-evident audit trail."
+              data-confirm-title="Archive finding?"
+              data-confirm-label="Archive"
+              data-confirm-danger="1">
+            {% csrf_token %}
+            <button type="submit" class="btn-danger">Archive</button>
+        </form>
         {% elif finding.archived and can_archive %}
         <form method="post" action="{% url 'findings:unarchive' engagement.pk finding.pk %}">
             {% csrf_token %}
@@ -339,4 +346,26 @@
 {% include "base/_back_link.html" with url=back_url label="Back to findings" %}
 </div>
 {% endblock %}
-{% block extra_body %}{% include "findings/_editor_scripts.html" %}{% endblock %}
+{% block extra_body %}{% include "findings/_editor_scripts.html" %}
+<script nonce="{{ request.csp_nonce }}">
+    // Inline onsubmit handlers are blocked by the CSP, so confirmations are wired up here.
+    // Turns a form[data-confirm] into an in-page modal (RedscribeConfirm) instead of a
+    // separate confirmation page.
+    document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+            if (form.dataset.confirmed) return;
+            event.preventDefault();
+            var submitter = event.submitter || undefined;
+            window.RedscribeConfirm(form.getAttribute("data-confirm"), {
+                title: form.getAttribute("data-confirm-title") || "Please confirm",
+                confirmLabel: form.getAttribute("data-confirm-label") || "Continue",
+                danger: form.getAttribute("data-confirm-danger") === "1",
+            }).then(function (ok) {
+                if (!ok) return;
+                form.dataset.confirmed = "1";
+                form.requestSubmit(submitter);
+            });
+        });
+    });
+</script>
+{% endblock %}

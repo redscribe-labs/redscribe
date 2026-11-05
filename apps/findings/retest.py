@@ -33,5 +33,10 @@ def log_retest_result(finding: Finding, *, status: str, notes_ciphertext, tested
         finding=finding, status=status, notes_ciphertext=notes_ciphertext, tested_by=tested_by,
     )
     finding.retest_status = status
-    finding.save(update_fields=["retest_status"])
+    if status == Finding.RetestStatus.FIXED:
+        finding.status = Finding.Status.CLOSED
+    elif status in (Finding.RetestStatus.NOT_FIXED, Finding.RetestStatus.PARTIALLY_FIXED):
+        finding.status = Finding.Status.OPEN
+    # RISK_ACCEPTED is a decision, not a fix: leave status unchanged.
+    finding.save(update_fields=["retest_status", "status"])
     return record

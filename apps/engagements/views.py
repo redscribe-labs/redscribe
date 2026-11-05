@@ -158,7 +158,7 @@ def engagement_detail(request, engagement_id):
     from apps.findings.models import Finding
     from apps.reports.services import PUBLISHABLE_STATUSES
 
-    findings_qs = engagement.findings.all()
+    findings_qs = engagement.findings.filter(archived=False)
     findings_summary = {
         "total": findings_qs.count(),
         "open": findings_qs.filter(status=Finding.Status.OPEN).count(),
@@ -321,7 +321,7 @@ def engagement_revoke_client_release(request, engagement_id):
 def engagement_permanent_delete(request, engagement_id):
     engagement = get_object_or_404(Engagement, pk=engagement_id)
     if not can_permanently_delete_engagement(request.user):
-        raise PermissionDenied("Only a Superadmin can permanently delete an engagement.")
+        raise PermissionDenied("You don't have permission to permanently delete an engagement.")
 
     if not engagement.archived:
         messages.error(request, "Archive this engagement before it can be permanently deleted.")
@@ -367,6 +367,18 @@ def member_remove(request, engagement_id, membership_id):
     if request.method == "POST":
         removed_user = membership.user
         membership.delete()
+
+        cleared_defaults = []
+        for field in ("default_reviewer", "default_qa", "default_approver"):
+            if getattr(engagement, f"{field}_id") == removed_user.pk:
+                setattr(engagement, field, None)
+                cleared_defaults.append(field)
+        if cleared_defaults:
+            engagement.save(update_fields=cleared_defaults + ["updated_at"])
+
+        engagement.findings.filter(assigned_reviewer=removed_user).update(assigned_reviewer=None)
+        engagement.findings.filter(assigned_qa=removed_user).update(assigned_qa=None)
+
         messages.success(request, f"{removed_user} removed from the engagement.")
     return redirect("engagements:detail", engagement_id=engagement.pk)
 

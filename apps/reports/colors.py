@@ -38,6 +38,14 @@ def _relative_luminance(r: int, g: int, b: int) -> float:
     return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
 
 
+def _best_text_for(effective_rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+    bg = _relative_luminance(*effective_rgb)
+    dark = (15, 23, 42)
+    on_white = 1.05 / (bg + 0.05)
+    on_dark = (bg + 0.05) / (_relative_luminance(*dark) + 0.05)
+    return (255, 255, 255) if on_white >= on_dark else dark
+
+
 def accessible_text_rgb(background_rgba: str, default: tuple[int, int, int] = (15, 23, 42)) -> tuple[int, int, int]:
     """White or near-black, whichever has the higher WCAG contrast ratio on
     the background. Used for the app's severity chips; report rendering keeps
@@ -46,11 +54,26 @@ def accessible_text_rgb(background_rgba: str, default: tuple[int, int, int] = (1
     if not parsed:
         return default
     r, g, b, alpha = parsed
-    bg = _relative_luminance(*composite_on_white(r, g, b, alpha))
-    dark = (15, 23, 42)
-    on_white = 1.05 / (bg + 0.05)
-    on_dark = (bg + 0.05) / (_relative_luminance(*dark) + 0.05)
-    return (255, 255, 255) if on_white >= on_dark else dark
+    return _best_text_for(composite_on_white(r, g, b, alpha))
+
+
+# Surface the chips sit on in the app's dark theme (--color-slate-100 under
+# .dark). A faded/closed chip is translucent, so its effective colour is the
+# palette colour composited over *this* surface rather than over white — and
+# the accessible text colour differs accordingly. Solid (open) chips are
+# unaffected: at alpha 1 the surface drops out and the result equals the
+# light-mode choice.
+_DARK_SURFACE = (24, 26, 27)
+
+
+def accessible_text_on_surface(background_rgba: str, surface: tuple[int, int, int],
+                               default: tuple[int, int, int] = (15, 23, 42)) -> tuple[int, int, int]:
+    parsed = parse_rgba(background_rgba)
+    if not parsed:
+        return default
+    r, g, b, alpha = parsed
+    effective = tuple(round(c * alpha + s * (1 - alpha)) for c, s in zip((r, g, b), surface))
+    return _best_text_for(effective)
 
 
 def mix_with_white(rgba: str, amount: float, default: str = "rgba(241,245,249,1)") -> str:
@@ -88,4 +111,9 @@ def finding_severity_style(finding, profile=None) -> dict:
     variant = "open" if finding.status == finding.Status.OPEN else "closed"
     background = severity_rgba(finding.severity, variant, profile)
     r, g, b = accessible_text_rgb(background)
-    return {"background": background, "color": f"rgb({r},{g},{b})"}
+    dr, dg, db = accessible_text_on_surface(background, _DARK_SURFACE)
+    return {
+        "background": background,
+        "color": f"rgb({r},{g},{b})",
+        "dark_color": f"rgb({dr},{dg},{db})",
+    }

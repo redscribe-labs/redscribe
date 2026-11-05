@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl">
     <div class="card mb-6">
         <div class="flex items-center gap-2 mb-3">
             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300">
@@ -145,9 +145,13 @@
         var form = document.getElementById("export-form");
         if (!form) return;
         form.addEventListener("submit", function (event) {
-            if (!window.confirm("This report won't contain any findings. Export anyway?")) {
-                event.preventDefault();
-            }
+            if (form.dataset.confirmed) return;
+            event.preventDefault();
+            window.RedscribeConfirm("This report won't contain any findings. Export anyway?", { title: "Empty report", confirmLabel: "Export anyway" }).then(function (ok) {
+                if (!ok) return;
+                form.dataset.confirmed = "1";
+                form.requestSubmit(event.submitter || undefined);
+            });
         });
     })();
 </script>

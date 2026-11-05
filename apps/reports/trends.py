@@ -9,7 +9,7 @@ MONTHS_WINDOW = 12
 
 def severity_over_time(engagements, months: int = MONTHS_WINDOW):
     findings = (
-        Finding.objects.filter(engagement__in=engagements)
+        Finding.objects.filter(engagement__in=engagements, archived=False)
         .annotate(month=TruncMonth("created_at"))
         .values("month", "severity")
     )
@@ -38,7 +38,7 @@ def severity_over_time(engagements, months: int = MONTHS_WINDOW):
 def mean_time_to_remediate(engagements):
     fixed_records = (
         RetestRecord.objects.filter(
-            finding__engagement__in=engagements, status=Finding.RetestStatus.FIXED
+            finding__engagement__in=engagements, finding__archived=False, status=Finding.RetestStatus.FIXED
         )
         .select_related("finding")
         .order_by("finding_id", "created_at")
@@ -81,7 +81,7 @@ def mean_time_to_remediate(engagements):
 
 def repeat_findings_by_client(engagements, min_engagements: int = 2):
     rows = (
-        Finding.objects.filter(engagement__in=engagements, classifications__isnull=False)
+        Finding.objects.filter(engagement__in=engagements, archived=False, classifications__isnull=False)
         .values("engagement__client_name", "engagement_id", "classifications")
         .distinct()
     )
@@ -93,7 +93,7 @@ def repeat_findings_by_client(engagements, min_engagements: int = 2):
         engagement_sets[key].add(row["engagement_id"])
 
     finding_rows = (
-        Finding.objects.filter(engagement__in=engagements, classifications__isnull=False)
+        Finding.objects.filter(engagement__in=engagements, archived=False, classifications__isnull=False)
         .values("engagement__client_name", "classifications")
     )
     for row in finding_rows:

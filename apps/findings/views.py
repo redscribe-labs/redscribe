@@ -92,7 +92,10 @@ def finding_list(request, engagement_id):
         "created_by", "assigned_reviewer", "assigned_qa"
     ).prefetch_related("classifications")
     archived_count = all_findings.filter(archived=True).count()
-    findings = all_findings if show_archived else all_findings.filter(archived=False)
+    active_count = all_findings.filter(archived=False).count()
+    # Active and Archived are partitioned tabs, not a show/hide toggle: the
+    # Archived tab shows only archived findings, never active ones.
+    findings = all_findings.filter(archived=show_archived)
     if query:
         findings = findings.filter(Q(title__icontains=query) | Q(cve_id__icontains=query))
     if severity in Finding.Severity.values:
@@ -146,6 +149,8 @@ def finding_list(request, engagement_id):
             "query": query,
             "show_archived": show_archived,
             "archived_count": archived_count,
+            "active_count": active_count,
+            "active_tab": "archived" if show_archived else "active",
             "severity": severity,
             "workflow": workflow,
             "mine": mine,
@@ -385,7 +390,11 @@ def finding_edit(request, engagement_id, pk):
     sections = list(ContentSectionDefinition.objects.filter(is_active=True))
 
     if request.method == "POST":
-        form = FindingForm(request.POST, sections=sections)
+        # Pass the stored values as initial so the form's changed_data is accurate:
+        # the stricter CVSS checks then apply only to fields the user actually edited,
+        # leaving legacy findings editable (see FindingForm.clean).
+        post_initial = {field: getattr(finding, field) for field in PLAIN_FIELDS}
+        form = FindingForm(request.POST, initial=post_initial, sections=sections)
         posted_version = request.POST.get("_version", "")
         classification_rows = parse_classification_rows(request.POST)
         classification_errors = validate_classification_rows(classification_rows)

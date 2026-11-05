@@ -9,7 +9,7 @@
 Self-hosted engagement, finding, checklist, and report management<br>
 for penetration testing teams.
 
-[![Version](https://img.shields.io/badge/version-0.6.0--alpha-669966?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.0--alpha-669966?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-source--available-68609f?style=flat-square)](#license)
 [![Docs](https://img.shields.io/badge/docs-docs.redscribe.app-6c9390?style=flat-square)](https://docs.redscribe.app)
 [![Python](https://img.shields.io/badge/python-3.13-7a8185?style=flat-square)](requirements.txt)
@@ -31,7 +31,7 @@ for penetration testing teams.
 </picture>
 
 > [!WARNING]
-> **This is alpha software** (`0.6.0-alpha`), not yet production-ready.
+> **This is alpha software** (`0.7.0-alpha`), not yet production-ready.
 > Expect rough edges and breaking changes between releases; see
 > [Alpha status](#alpha-status) before relying on it for a real engagement.
 
@@ -224,7 +224,7 @@ normal during alpha, not a mistake.
 
 ## Alpha status
 
-RedScribe is early alpha (`0.6.0-alpha`). Expect rough edges and
+RedScribe is early alpha (`0.7.0-alpha`). Expect rough edges and
 breaking changes between releases. Worth knowing before relying on it for a
 real engagement (full list in the
 [docs](https://docs.redscribe.app/start/alpha-status/)):

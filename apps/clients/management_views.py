@@ -147,14 +147,14 @@ def client_user_create(request, client_uuid):
     company = get_object_or_404(Client, pk=client_uuid)
 
     if request.method == "POST":
-        form = ClientUserCreateForm(request.POST)
+        form = ClientUserCreateForm(request.POST, client=company)
         if form.is_valid():
             user = form.save()
             security.send_account_created_email(user, request)
             messages.success(request, f"Client account '{user.username}' created.")
             return redirect("clients:user_detail", user_uuid=user.uuid)
     else:
-        form = ClientUserCreateForm(initial={"client": company.pk})
+        form = ClientUserCreateForm(client=company)
 
     return render(
         request, "clients/user_create.html",
@@ -194,8 +194,8 @@ def client_user_detail(request, user_uuid):
 def client_user_erase(request, user_uuid):
     _require_client_manager(request.user)
     # clients.manage is a Team Lead default; erasing is irreversible, so it stays with Superadmins.
-    if not request.user.is_superadmin_role:
-        raise PermissionDenied("Only a Superadmin can erase a client user.")
+    if not request.user.has_permission("clients.erase_user"):
+        raise PermissionDenied("You don't have permission to erase a client user.")
     target = _get_client_target(user_uuid, allow_erased=True)
     detail_url = reverse("clients:user_detail", args=[target.uuid])
 
@@ -279,8 +279,14 @@ def client_user_send_password_reset(request, user_uuid):
     target = _get_client_target(user_uuid, auth_type=User.AuthType.LOCAL)
 
     if request.method == "POST":
-        security.send_password_reset_email(target, request)
-        messages.success(request, f"Password reset link sent to {target.email}.")
+        if not target.is_active:
+            messages.error(
+                request,
+                "This account is deactivated — reactivate it before sending a password reset.",
+            )
+        else:
+            security.send_password_reset_email(target, request)
+            messages.success(request, f"Password reset link sent to {target.email}.")
 
     return redirect("clients:user_detail", user_uuid=target.uuid)
 

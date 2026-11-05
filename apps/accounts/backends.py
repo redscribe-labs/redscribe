@@ -28,7 +28,9 @@ class LockoutAwareModelBackend(ModelBackend):
             if not lock.acquired:
                 return None
 
-            status = security.check_lockout(username=username, is_superadmin=is_superadmin)
+            status = security.check_lockout(
+                username=username, is_superadmin=is_superadmin, ip_address=ip
+            )
             if status.blocked:
                 return None
 

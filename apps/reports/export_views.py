@@ -36,8 +36,8 @@ def export_options(request, engagement_id):
     config = assembly.get_draft_config(engagement)
     content = assembly.seeded_content(engagement, config)
     included_count = len(assembly._select_findings(engagement, content.get("findings", {})))
-    excluded_count = engagement.findings.exclude(workflow_status__in=PUBLISHABLE_STATUSES).count()
-    publishable_count = engagement.findings.filter(workflow_status__in=PUBLISHABLE_STATUSES).count()
+    excluded_count = engagement.findings.filter(archived=False).exclude(workflow_status__in=PUBLISHABLE_STATUSES).count()
+    publishable_count = engagement.findings.filter(archived=False, workflow_status__in=PUBLISHABLE_STATUSES).count()
     # Findings that are signed off (QA Approved) but left out of this report by
     # the saved builder selection — e.g. approved after the config was last
     # saved, so they were never added to it. Easy to miss, so call it out.
