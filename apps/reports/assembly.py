@@ -12,7 +12,7 @@ from apps.findings.scan_import import FORMAT_LABELS
 
 from .block_registry import BLOCK_REGISTRY, BlockContext
 from .labels import get_label, get_severity_label, get_status_label
-from .models import ReportProfile, ReportSettings, ReportTextBlockDefinition
+from .models import ReportConfig, ReportProfile, ReportSettings, ReportTextBlockDefinition
 from .placeholders import _TOKEN_RE, build_placeholder_context, render_placeholders
 from .report_ir import (
     BarGraphBlock,
@@ -22,6 +22,7 @@ from .report_ir import (
     RichTextBlock,
     Section,
     SeverityBar,
+    SeverityBarSegment,
     StyledText,
     TableBlock,
     assign_numbers,
@@ -143,7 +144,9 @@ def _select_findings(engagement, findings_cfg: dict) -> list[Finding]:
         findings_cfg = {}
 
     all_findings = list(
-        engagement.findings.filter(archived=False).select_related("created_by").prefetch_related("classifications")
+        engagement.findings.filter(archived=False)
+        .select_related("created_by", "category")
+        .prefetch_related("classifications")
     )
     publishable = [f for f in all_findings if f.workflow_status in PUBLISHABLE_STATUSES]
 
@@ -223,6 +226,50 @@ def _breakdown_counts(findings: list[Finding], profile: ReportProfile, options: 
     return filtered, severities, statuses, rows
 
 
+def _vuln_summary_table(findings: list[Finding], profile: ReportProfile) -> TableBlock:
+    """The ID / Severity / Title / Status summary table. Shared by the combined
+    breakdown block and the per-category grouped sections so every table renders
+    with identical columns, ordering, and severity/status cell coloring."""
+    return TableBlock(
+        columns=[
+            get_label(profile, "vuln_table_col_id"),
+            get_label(profile, "vuln_table_col_severity"),
+            get_label(profile, "vuln_table_col_title"),
+            get_label(profile, "vuln_table_col_status"),
+        ],
+        rows=[
+            [
+                f.display_id,
+                StyledText(get_severity_label(profile, f.severity), background_rgba=_severity_status_color(f, profile)),
+                f.title,
+                StyledText(get_status_label(profile, f.status), background_rgba=_severity_status_color(f, profile)),
+            ]
+            for f in findings
+        ],
+    )
+
+
+def _group_findings_by_category(findings: list[Finding]) -> list[tuple[object, list[Finding]]]:
+    """Partition the already-ordered flat findings list into
+    (AssetCategory | None, [findings]) buckets. Order within each bucket is
+    preserved (selection/severity order); buckets are ordered by the category's
+    `order` then name, with the untagged (None) bucket last."""
+    buckets: dict[object, tuple[object, list[Finding]]] = {}
+    for f in findings:
+        key = f.category_id
+        if key not in buckets:
+            buckets[key] = (f.category, [])
+        buckets[key][1].append(f)
+
+    def sort_key(item):
+        category, _ = item
+        if category is None:
+            return (1, 0, "")
+        return (0, category.order, category.name)
+
+    return sorted(buckets.values(), key=sort_key)
+
+
 def _breakdown_section(
     findings: list[Finding], profile: ReportProfile, options: dict | None = None,
     notes_html: str = "", intro_html: str = "",
@@ -232,6 +279,11 @@ def _breakdown_section(
         return None
     show_chart = options.get("show_chart", True)
     show_table = options.get("show_table", True)
+    # In a grouped report the per-category sections each carry their own
+    # findings table, so the combined breakdown is chart-only — otherwise the
+    # same findings would be listed twice (once here, once per group).
+    if show_table and "grouped_findings" in _template_tag_order(getattr(profile, "template", None) or {}):
+        show_table = False
     if not show_chart and not show_table:
         return None
     filtered, severities, statuses, count_rows = _breakdown_counts(findings, profile, options)
@@ -241,10 +293,15 @@ def _breakdown_section(
     open_label = get_status_label(profile, "OPEN")
     closed_label = get_status_label(profile, "CLOSED")
     for row in count_rows:
+        # One bar per severity. Open and closed are stacked segments of that
+        # single bar — open at the base in full colour, closed above it in the
+        # lighter shade of the same colour — rather than two side-by-side bars.
+        segments = []
         if Finding.Status.OPEN in statuses:
-            series.append(SeverityBar(f"{row['label']} ({open_label})", row["open_count"], row["open_color"]))
-        if Finding.Status.CLOSED in statuses and row["closed_count"]:
-            series.append(SeverityBar(f"{row['label']} ({closed_label})", row["closed_count"], row["closed_color"]))
+            segments.append(SeverityBarSegment(open_label, row["open_count"], row["open_color"]))
+        if Finding.Status.CLOSED in statuses:
+            segments.append(SeverityBarSegment(closed_label, row["closed_count"], row["closed_color"]))
+        series.append(SeverityBar(row["label"], segments))
         fallback_rows.append([row["label"], str(row["open_count"]), str(row["closed_count"])])
 
     blocks = []
@@ -268,23 +325,7 @@ def _breakdown_section(
 
     children = []
     if show_table:
-        vuln_table = TableBlock(
-            columns=[
-                get_label(profile, "vuln_table_col_id"),
-                get_label(profile, "vuln_table_col_severity"),
-                get_label(profile, "vuln_table_col_title"),
-                get_label(profile, "vuln_table_col_status"),
-            ],
-            rows=[
-                [
-                    f.display_id,
-                    StyledText(get_severity_label(profile, f.severity), background_rgba=_severity_status_color(f, profile)),
-                    f.title,
-                    StyledText(get_status_label(profile, f.status), background_rgba=_severity_status_color(f, profile)),
-                ]
-                for f in filtered
-            ],
-        )
+        vuln_table = _vuln_summary_table(filtered, profile)
         # No heading — this table sits immediately under the chart/notes
         # above (both already establish the "breakdown of findings"
         # context), so a "Vulnerabilities table" heading here just read as
@@ -554,6 +595,59 @@ def _scan_imports_section(engagement, profile: ReportProfile) -> Section:
     )
 
 
+def _scope_table_section(engagement, profile: ReportProfile) -> Section | None:
+    """Structured scope rendered as one Type/Value/Notes table per asset
+    category (replaces the old free-text {{ scope }} token). Emits nothing when
+    the engagement has no scope assets."""
+    children = []
+    for category in engagement.asset_categories.prefetch_related("assets").all():
+        assets = list(category.assets.all())
+        if not assets:
+            continue
+        children.append(Section(
+            key=f"scope:{category.id}", title=category.name, numbered=False,
+            blocks=[TableBlock(
+                columns=[
+                    get_label(profile, "scope_col_type"),
+                    get_label(profile, "scope_col_value"),
+                    get_label(profile, "scope_col_description"),
+                ],
+                rows=[[a.get_asset_type_display(), a.value, a.description or "—"] for a in assets],
+            )],
+        ))
+    if not children:
+        return None
+    return Section(key="scope_table", title="", numbered=False, children=children)
+
+
+def _grouped_findings_sections(context) -> list[Section]:
+    """Per asset category (in order), a numbered section whose block is that
+    category's vulnerabilities summary table and whose children are that
+    category's finding detail sections. Untagged findings fall into a trailing
+    'Uncategorized' section only if any exist."""
+    profile = context.profile
+    page_break = context.toggles.get("page_break_per_finding", False)
+    sections = []
+    for category, group_findings in _group_findings_by_category(context.findings):
+        if not group_findings:
+            continue
+        title = category.name if category is not None else get_label(profile, "uncategorized_findings")
+        detail_children = [
+            context.finding_section_builder(
+                f, context.rendered_findings[f.id], page_break_before=page_break
+            )
+            for f in group_findings
+        ]
+        sections.append(Section(
+            key=f"grouped_findings:{category.id if category is not None else 'none'}",
+            title=title,
+            toc_entry=True,
+            blocks=[_vuln_summary_table(group_findings, profile)],
+            children=detail_children,
+        ))
+    return sections
+
+
 def _dict_rows(value) -> list[dict]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
@@ -612,6 +706,8 @@ def build_report_document(*, config, engagement, project_key, user) -> ReportDoc
         is_remediation_report=config.is_remediation_report,
         finding_section_builder=_make_finding_section_builder(config.is_remediation_report, profile, active_sections),
         breakdown_builder=_breakdown_section,
+        grouped_findings_builder=_grouped_findings_sections,
+        scope_builder=_scope_table_section,
         document_control_builder=_document_control_table,
         assessment_team_builder=_assessment_team_section,
         dict_rows=_dict_rows,
@@ -646,6 +742,29 @@ def get_effective_profile(config) -> "ReportProfile | None":
     if profile_id:
         return ReportProfile.objects.filter(pk=profile_id).first()
     return ReportProfile.objects.filter(is_default=True).first()
+
+
+def engagement_effective_profile(engagement):
+    """The profile this engagement's report would use right now, without
+    creating a draft config: its saved report config's profile, else the
+    instance default."""
+    config = (
+        ReportConfig.objects.filter(engagement=engagement, is_template=False)
+        .select_related("profile")
+        .first()
+    )
+    if config is not None:
+        return get_effective_profile(config)
+    return ReportProfile.objects.filter(is_default=True).first()
+
+
+def engagement_uses_asset_groups(engagement) -> bool:
+    """True when this engagement's effective report profile is a network-style
+    profile that splits findings by asset group. This single switch turns on the
+    required asset-group field on findings, the clustered builder view, and the
+    split report; every other profile keeps the standard single-list behaviour."""
+    profile = engagement_effective_profile(engagement)
+    return bool(profile and getattr(profile, "split_findings_by_asset_group", False))
 
 
 def _heading_text(node: dict) -> str:

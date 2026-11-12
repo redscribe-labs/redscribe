@@ -9,10 +9,10 @@
 Self-hosted engagement, finding, checklist, and report management<br>
 for penetration testing teams.
 
-[![Version](https://img.shields.io/badge/version-0.7.0--alpha-669966?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0--alpha-669966?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-source--available-68609f?style=flat-square)](#license)
 [![Docs](https://img.shields.io/badge/docs-docs.redscribe.app-6c9390?style=flat-square)](https://docs.redscribe.app)
-[![Python](https://img.shields.io/badge/python-3.13-7a8185?style=flat-square)](requirements.txt)
+[![Python](https://img.shields.io/badge/python-3.14-7a8185?style=flat-square)](requirements.txt)
 [![Django](https://img.shields.io/badge/django-5.2-7a8185?style=flat-square)](requirements.txt)
 
 [**Website**](https://redscribe.app) ·
@@ -31,7 +31,7 @@ for penetration testing teams.
 </picture>
 
 > [!WARNING]
-> **This is alpha software** (`0.7.0-alpha`), not yet production-ready.
+> **This is alpha software** (`0.8.0-alpha`), not yet production-ready.
 > Expect rough edges and breaking changes between releases; see
 > [Alpha status](#alpha-status) before relying on it for a real engagement.
 
@@ -148,7 +148,12 @@ cp .env.example .env
 touch secrets/root_key.txt  # filled in below, after the app is up
 python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(50)))" > secrets/django_secret_key.txt
 openssl rand -base64 32 > secrets/postgres_password.txt
-docker compose up -d --build
+# Build and start just the app and database. web serves its own static files
+# (WhiteNoise) on http://localhost:8000, so for this no-TLS local run the
+# nginx reverse proxy and Tailscale cert services aren't needed — naming the
+# services skips them (a bare `up` would start nginx too, needlessly binding
+# host ports 80/443). They're only for a real TLS deployment (see the tip below).
+docker compose up -d --build db web
 docker compose exec web python manage.py generate_root_key
 # copy the printed value into secrets/root_key.txt, then:
 docker compose up -d web

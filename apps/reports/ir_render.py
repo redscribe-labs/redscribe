@@ -9,6 +9,7 @@ from .report_ir import (
     ReportDocument,
     RichTextBlock,
     Section,
+    SeverityBar,
     StyledText,
     TableBlock,
     TableOfContentsBlock,
@@ -126,7 +127,7 @@ _PREVIEW_CSS_BASE = """
    HTML/PDF (the table fallback is still used, unchanged, for the
    Markdown export, which has no chart capability of its own — see
    report_ir.BarGraphBlock). */
-.report-bargraph-vertical {{ display: flex; align-items: flex-end; gap: .9rem; margin: .75rem 0 1.25rem; width: 100%; }}
+.report-bargraph-vertical {{ display: flex; align-items: flex-end; gap: .9rem; margin: .75rem 0 .55rem; width: 100%; }}
 /* NOT display:flex — see .report-vbar-track's comment below for the
    general shape of the bug this avoids. Here it showed up on WIDTH: a
    column that's a flex item of the row above AND its own flex container
@@ -164,8 +165,20 @@ _PREVIEW_CSS_BASE = """
       track's own containing block. <div>s (block-level from the start,
       see _render_bargraph) don't hit this. */
 .report-vbar-track {{ position: relative; width: 100%; height: 17rem; background: #f1f5f9; border-radius: .2rem; overflow: hidden; }}
-.report-vbar-fill {{ position: absolute; bottom: 0; left: 0; width: 100%; }}
+/* Stacked segments of ONE bar — open (full colour) at the base, closed (the
+   lighter shade) on top. Each is absolutely positioned with its own bottom
+   offset and a height that's a percentage of the track, the same
+   percentage-against-the-track's-own-height approach the single fill used and
+   which WeasyPrint resolves correctly for block-level divs (see the track
+   notes above). */
+.report-vbar-seg {{ position: absolute; left: 0; width: 100%; }}
 .report-vbar-label {{ font-size: .65rem; color: #64748b; text-align: center; line-height: 1.2; margin-top: .3rem; }}
+/* Key for the open (full colour) / closed (lighter) split every bar encodes.
+   Neutral swatches so the key isn't tied to one severity's hue. */
+.report-bargraph-legend {{ display: flex; flex-wrap: wrap; gap: 1.1rem; justify-content: center; margin: 0 0 1.25rem; font-size: .68rem; color: #475569; }}
+.report-legend-item {{ display: flex; align-items: center; gap: .4rem; }}
+.report-legend-swatch {{ width: .72rem; height: .72rem; border-radius: .15rem; background: #475569; display: inline-block; flex-shrink: 0; }}
+.report-legend-swatch-muted {{ background: #cbd5e1; }}
 /* Light tint of the same table-theme color as everything else themed
    below (not an independent palette choice) — darker border/text for
    contrast against it. Long unbroken lines wrap instead of running off
@@ -292,16 +305,57 @@ def _render_bargraph(block: BarGraphBlock) -> str:
     max_value = max((bar.value for bar in block.series), default=0) or 1
     cols = []
     for bar in block.series:
-        pct = round(bar.value / max_value * 100, 1)
+        # Stack each bar's segments from the base up: open (full colour) first,
+        # then closed (lighter) on top. Heights are percentages of the track,
+        # and each segment is offset by the running total beneath it.
+        segs = ""
+        bottom = 0.0
+        for segment in bar.segments:
+            if segment.value <= 0:
+                continue
+            height = round(segment.value / max_value * 100, 2)
+            segs += (
+                f'<div class="report-vbar-seg" '
+                f'style="bottom:{bottom}%;height:{height}%;background:{_escape(segment.color_rgba)}" '
+                f'title="{_escape(segment.label)}: {segment.value}"></div>'
+            )
+            bottom += height
         cols.append(
             f'<div class="report-vbar-col">'
             f'<div class="report-vbar-value">{bar.value}</div>'
-            f'<div class="report-vbar-track"><div class="report-vbar-fill" '
-            f'style="height:{pct}%;background:{_escape(bar.color_rgba)}"></div></div>'
+            f'<div class="report-vbar-track">{segs}</div>'
             f'<div class="report-vbar-label">{_escape(bar.label)}</div>'
             f"</div>"
         )
-    return f'<div class="report-bargraph-vertical" role="img" aria-label="Findings by severity">{"".join(cols)}</div>'
+    legend = _render_bargraph_legend(block.series)
+    return (
+        f'<div class="report-bargraph-vertical" role="img" aria-label="Findings by severity">'
+        f'{"".join(cols)}</div>{legend}'
+    )
+
+
+def _render_bargraph_legend(series: list[SeverityBar]) -> str:
+    # Distinct status segments that actually render (value > 0), bottom-to-top.
+    # Only worth a key when more than one appears — a chart with only open
+    # findings is all full-colour, so the full-vs-lighter key would point at
+    # nothing and is omitted.
+    labels: list[str] = []
+    for bar in series:
+        for segment in bar.segments:
+            if segment.value > 0 and segment.label not in labels:
+                labels.append(segment.label)
+    if len(labels) < 2:
+        return ""
+    # Neutral swatches — solid for the base segment (open), a lighter tint for
+    # the next (closed) — so the key mirrors the full/lighter convention
+    # without being tied to any one severity's colour.
+    classes = ["report-legend-swatch", "report-legend-swatch report-legend-swatch-muted"]
+    items = "".join(
+        f'<span class="report-legend-item">'
+        f'<span class="{classes[min(index, 1)]}"></span>{_escape(label)}</span>'
+        for index, label in enumerate(labels)
+    )
+    return f'<div class="report-bargraph-legend">{items}</div>'
 
 
 def _render_code(block: CodeBlock) -> str:

@@ -20,8 +20,22 @@ from apps.notifications.services import notify_scope_change_approved, notify_sco
 from . import lifecycle
 from .access import check_engagement_access, visible_engagements
 from .breadcrumbs import engagement_crumbs
-from .forms import AddMemberForm, EngagementCreateForm, EngagementEditForm, ScopeChangeRequestForm
-from .models import Engagement, EngagementMembership, EngagementStatusHistory, ScopeChangeRequest
+from .forms import (
+    AddMemberForm,
+    AssetCategoryForm,
+    EngagementCreateForm,
+    EngagementEditForm,
+    ScopeAssetForm,
+    ScopeChangeRequestForm,
+)
+from .models import (
+    AssetCategory,
+    Engagement,
+    EngagementMembership,
+    EngagementStatusHistory,
+    ScopeAsset,
+    ScopeChangeRequest,
+)
 from .permissions import (
     can_archive_engagement,
     can_create_engagement,
@@ -383,6 +397,101 @@ def member_remove(request, engagement_id, membership_id):
     return redirect("engagements:detail", engagement_id=engagement.pk)
 
 
+def _require_scope_manager(request, engagement):
+    if not is_engagement_manager(request.user, engagement):
+        raise PermissionDenied("Only a Superadmin or Team Lead can manage scope.")
+
+
+@login_required
+def scope_manage(request, engagement_id):
+    engagement = get_object_or_404(Engagement, pk=engagement_id)
+    _require_scope_manager(request, engagement)
+    categories = list(engagement.asset_categories.all())
+    assets = list(engagement.scope_assets.select_related("category").all())
+
+    editing = None
+    edit_id = request.GET.get("edit")
+    if edit_id:
+        editing = ScopeAsset.objects.filter(pk=edit_id, engagement=engagement).first()
+    asset_form = (
+        ScopeAssetForm(instance=editing, engagement=engagement) if categories else None
+    )
+    return render(
+        request,
+        "engagements/scope_manage.html",
+        {
+            "engagement": engagement,
+            "categories": categories,
+            "assets": assets,
+            "category_form": AssetCategoryForm(engagement=engagement),
+            "asset_form": asset_form,
+            "editing_asset": editing,
+            "breadcrumbs": engagement_crumbs(engagement) + [{"label": "Scope"}],
+        },
+    )
+
+
+@require_POST
+@login_required
+def scope_category_add(request, engagement_id):
+    engagement = get_object_or_404(Engagement, pk=engagement_id)
+    _require_scope_manager(request, engagement)
+    form = AssetCategoryForm(request.POST, engagement=engagement)
+    if form.is_valid():
+        category = form.save(commit=False)
+        category.engagement = engagement
+        category.save()
+        messages.success(request, f"Added asset category '{category.name}'.")
+    else:
+        messages.error(request, "; ".join(e for errs in form.errors.values() for e in errs))
+    return redirect("engagements:scope_manage", engagement_id=engagement.pk)
+
+
+@require_POST
+@login_required
+def scope_category_delete(request, engagement_id, pk):
+    engagement = get_object_or_404(Engagement, pk=engagement_id)
+    _require_scope_manager(request, engagement)
+    category = get_object_or_404(AssetCategory, pk=pk, engagement=engagement)
+    if category.assets.exists():
+        messages.error(request, f"'{category.name}' still has scope assets — remove them first.")
+    elif category.findings.exists():
+        messages.error(request, f"'{category.name}' is assigned to findings — retag them first.")
+    else:
+        category.delete()
+        messages.success(request, f"Removed category '{category.name}'.")
+    return redirect("engagements:scope_manage", engagement_id=engagement.pk)
+
+
+@require_POST
+@login_required
+def scope_asset_save(request, engagement_id):
+    engagement = get_object_or_404(Engagement, pk=engagement_id)
+    _require_scope_manager(request, engagement)
+    asset_id = request.POST.get("asset_id") or None
+    instance = get_object_or_404(ScopeAsset, pk=asset_id, engagement=engagement) if asset_id else None
+    form = ScopeAssetForm(request.POST, instance=instance, engagement=engagement)
+    if form.is_valid():
+        asset = form.save(commit=False)
+        asset.engagement = engagement
+        asset.save()
+        messages.success(request, f"{'Updated' if instance else 'Added'} scope asset '{asset.value}'.")
+    else:
+        messages.error(request, "; ".join(e for errs in form.errors.values() for e in errs))
+    return redirect("engagements:scope_manage", engagement_id=engagement.pk)
+
+
+@require_POST
+@login_required
+def scope_asset_delete(request, engagement_id, pk):
+    engagement = get_object_or_404(Engagement, pk=engagement_id)
+    _require_scope_manager(request, engagement)
+    asset = get_object_or_404(ScopeAsset, pk=pk, engagement=engagement)
+    asset.delete()
+    messages.success(request, f"Removed scope asset '{asset.value}'.")
+    return redirect("engagements:scope_manage", engagement_id=engagement.pk)
+
+
 @login_required
 def scope_change_create(request, engagement_id):
     engagement = get_object_or_404(Engagement, pk=engagement_id)
@@ -412,16 +521,16 @@ def scope_change_approve(request, engagement_id, pk):
         ScopeChangeRequest, pk=pk, engagement=engagement, status=ScopeChangeRequest.Status.PENDING
     )
     if request.method == "POST":
-        engagement.scope = scope_request.proposed_scope
-        engagement.save(update_fields=["scope", "updated_at"])
-
+        # Scope is structured now (AssetCategory/ScopeAsset), so approval records
+        # the decision and notifies — a manager then applies the requested change
+        # on the Manage Scope page. (No free-text write-back.)
         scope_request.status = ScopeChangeRequest.Status.APPROVED
         scope_request.reviewed_by = request.user
         scope_request.reviewed_at = timezone.now()
         scope_request.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         notify_scope_change_approved(scope_request, actor=request.user)
 
-        messages.success(request, "Scope change approved and applied.")
+        messages.success(request, "Scope change approved — apply it on the Manage Scope page.")
     return redirect("engagements:detail", engagement_id=engagement.pk)
 
 

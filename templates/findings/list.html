@@ -115,6 +115,7 @@
                     <a href="{% url 'findings:detail' engagement.pk finding.pk %}" class="block truncate text-sm font-semibold text-slate-900 hover:text-brand-700 dark:hover:text-brand-300">{{ finding.title }}</a>
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
                         <span class="{{ finding.workflow_status|badge_class }}">{{ finding.get_workflow_status_display }}</span>
+                        {% if finding.category %}<span class="badge-blue" title="Asset group">{{ finding.category.name }}</span>{% endif %}
                         {% if finding.status == "CLOSED" %}<span class="badge-slate">Closed</span>{% endif %}
                         {% if finding.archived %}<span class="badge-red">Archived</span>{% endif %}
                         {% if finding.cvss_score %}<span class="font-mono">CVSS {{ finding.cvss_score }}</span>{% endif %}
@@ -142,6 +143,7 @@
         <div class="flex flex-wrap items-center gap-2">
             {% if selected.display_id %}<span class="font-mono text-xs text-slate-500">{{ selected.display_id }}</span>{% endif %}
             <span class="badge-severity" style="{{ selected|severity_style }}">{{ selected.get_severity_display }}</span>
+            {% if selected.category %}<span class="badge-blue" title="Asset group">{{ selected.category.name }}</span>{% endif %}
             {% if selected.cvss_score %}<span class="font-mono text-xs text-slate-700">CVSS {{ selected.cvss_score }}</span>{% endif %}
             <a href="{% url 'findings:detail' engagement.pk selected.pk %}" class="ml-auto text-xs font-medium text-brand-700 dark:text-brand-300 hover:underline">Open finding</a>
         </div>

@@ -23,6 +23,16 @@
 
 <section class="card !p-5 space-y-4" aria-labelledby="finding-meta-details">
     <h2 id="finding-meta-details" class="font-semibold text-slate-900 text-sm">Details</h2>
+    {% if form.category.field.queryset.exists %}
+    <div>
+        <label for="{{ form.category.id_for_label }}" class="field-label">
+            {{ form.category.label }}{% if form.category.field.required %} <span class="text-rose-500">*</span>{% endif %}
+        </label>
+        {{ form.category|add_class:"field-input" }}
+        {% if form.category.help_text %}<p class="field-help">{{ form.category.help_text }}</p>{% endif %}
+        {% for error in form.category.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
             <label for="{{ form.status.id_for_label }}" class="field-label">{{ form.status.label }}</label>

@@ -3,6 +3,11 @@
     <section class="card">
     {% if section.slug == "affects" %}
     {% include "findings/_form_field_plain_textarea.html" with field=field label=section.label %}
+    {% if form.affects_suggestions %}
+    <p class="field-help mt-2">In scope:
+        {% for value in form.affects_suggestions %}<code class="inline-block rounded bg-slate-100 dark:bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">{{ value }}</code>{% if not forloop.last %} {% endif %}{% endfor %}
+    </p>
+    {% endif %}
     {% else %}
     {% include "findings/_form_field_rte.html" with field=field field_name=section.slug label=section.label encrypted=True supports_image_upload=section.supports_image_upload %}
     {% endif %}

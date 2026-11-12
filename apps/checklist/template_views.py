@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -18,11 +19,27 @@ def _require_permission(user):
         raise PermissionDenied("You don't have permission to manage checklist templates.")
 
 
+def _crumbs(*tail):
+    """Breadcrumb trail rooted at the template library, plus any deeper crumbs."""
+    return [{"label": "Checklist templates", "url": reverse("checklist_templates:list")}, *tail]
+
+
+def _detail_crumb(template):
+    return {"label": template.name, "url": reverse("checklist_templates:detail", args=[template.pk])}
+
+
 @login_required
 def template_list(request):
     _require_permission(request.user)
-    templates = ChecklistTemplate.objects.prefetch_related("items")
-    return render(request, "checklist/template_list.html", {"templates": templates})
+    show_archived = request.GET.get("view") == "archived"
+    all_templates = ChecklistTemplate.objects.prefetch_related("items")
+    return render(request, "checklist/template_list.html", {
+        "templates": all_templates.filter(archived=show_archived),
+        "show_archived": show_archived,
+        "active_count": all_templates.filter(archived=False).count(),
+        "archived_count": all_templates.filter(archived=True).count(),
+        "breadcrumbs": [{"label": "Checklist templates"}],
+    })
 
 
 @login_required
@@ -36,7 +53,8 @@ def template_detail(request, pk):
     grouped = [{"category": category, "items": group_items} for category, group_items in by_category.items()]
     return render(
         request, "checklist/template_detail.html",
-        {"template": template, "items": items, "grouped": grouped},
+        {"template": template, "items": items, "grouped": grouped,
+         "breadcrumbs": _crumbs({"label": template.name})},
     )
 
 
@@ -77,7 +95,10 @@ def template_create(request):
     else:
         form = ChecklistTemplateForm()
 
-    return render(request, "checklist/template_form.html", {"form": form, "heading": "New checklist template"})
+    return render(request, "checklist/template_form.html", {
+        "form": form, "heading": "New checklist template",
+        "breadcrumbs": _crumbs({"label": "New template"}),
+    })
 
 
 @login_required
@@ -110,7 +131,8 @@ def template_edit(request, pk):
 
     return render(
         request, "checklist/template_form.html",
-        {"form": form, "heading": f"Edit {template.name}", "template": template},
+        {"form": form, "heading": f"Edit {template.name}", "template": template,
+         "breadcrumbs": _crumbs(_detail_crumb(template), {"label": "Edit"})},
     )
 
 
@@ -142,7 +164,8 @@ def template_item_create(request, pk):
 
     return render(
         request, "checklist/template_item_form.html",
-        {"form": form, "template": template, "categories": categories, "heading": "Add checklist item"},
+        {"form": form, "template": template, "categories": categories, "heading": "Add checklist item",
+         "breadcrumbs": _crumbs(_detail_crumb(template), {"label": "Add item"})},
     )
 
 
@@ -173,7 +196,8 @@ def template_item_edit(request, item_pk):
 
     return render(
         request, "checklist/template_item_form.html",
-        {"form": form, "template": template, "categories": categories, "heading": "Edit checklist item", "item": item},
+        {"form": form, "template": template, "categories": categories, "heading": "Edit checklist item", "item": item,
+         "breadcrumbs": _crumbs(_detail_crumb(template), {"label": "Edit item"})},
     )
 
 
@@ -189,7 +213,10 @@ def template_item_delete(request, item_pk):
         messages.success(request, f"Item '{title}' deleted.")
         return redirect("checklist_templates:detail", pk=template.pk)
 
-    return render(request, "checklist/template_item_delete_confirm.html", {"item": item, "template": template})
+    return render(request, "checklist/template_item_delete_confirm.html", {
+        "item": item, "template": template,
+        "breadcrumbs": _crumbs(_detail_crumb(template), {"label": "Delete item"}),
+    })
 
 
 @login_required
@@ -239,7 +266,10 @@ def template_upload(request):
     else:
         form = ChecklistImportForm()
 
-    return render(request, "checklist/template_upload.html", {"form": form})
+    return render(request, "checklist/template_upload.html", {
+        "form": form,
+        "breadcrumbs": _crumbs({"label": "Upload / replace"}),
+    })
 
 
 @login_required
@@ -247,8 +277,39 @@ def template_set_default(request, pk):
     _require_permission(request.user)
     if request.method == "POST":
         target = get_object_or_404(ChecklistTemplate, pk=pk)
+        if target.archived:
+            messages.error(request, "An archived template can't be the default. Restore it first.")
+            return redirect("checklist_templates:list")
         with transaction.atomic():
             ChecklistTemplate.objects.update(is_default=False)
             ChecklistTemplate.objects.filter(pk=target.pk).update(is_default=True)
         messages.success(request, "Default checklist template updated.")
+    return redirect("checklist_templates:list")
+
+
+@login_required
+def template_archive(request, pk):
+    _require_permission(request.user)
+    template = get_object_or_404(ChecklistTemplate, pk=pk)
+    if request.method == "POST":
+        # Retire from the new-run picker. Runs already started are snapshots and
+        # keep working. An archived template can't be the default, so clear it.
+        template.archived = True
+        template.is_default = False
+        template.save(update_fields=["archived", "is_default"])
+        messages.success(
+            request,
+            f"'{template.name}' archived. Existing runs keep working; it can no longer start new ones.",
+        )
+    return redirect("checklist_templates:list")
+
+
+@login_required
+def template_unarchive(request, pk):
+    _require_permission(request.user)
+    template = get_object_or_404(ChecklistTemplate, pk=pk)
+    if request.method == "POST":
+        template.archived = False
+        template.save(update_fields=["archived"])
+        messages.success(request, f"'{template.name}' restored. It can start new runs again.")
     return redirect("checklist_templates:list")

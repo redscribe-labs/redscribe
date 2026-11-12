@@ -136,7 +136,7 @@ def checklist_list(request, engagement_id):
             "engagement": request.engagement, "runs": run_contexts,
             "postures": postures, "posture": selected, "selected_context": selected_context,
             "unlinked_findings": unlinked_findings,
-            "checklist_templates": ChecklistTemplate.objects.all(),
+            "checklist_templates": ChecklistTemplate.objects.filter(archived=False),
             "bulk_outcomes": [(s, ChecklistItem.Status(s).label) for s in BULK_OUTCOMES],
             "breadcrumbs": engagement_crumbs(request.engagement) + [{"label": "Checklist"}],
         },

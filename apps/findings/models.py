@@ -176,6 +176,15 @@ class Finding(models.Model):
 
     affects = models.TextField(blank=True, default="")
 
+    # The asset class (Internal / External / …) this finding belongs to, used
+    # to split grouped reports into per-category sections. Nullable at the DB
+    # level for legacy/ungrouped engagements; required via the form and export
+    # validation whenever the engagement has asset categories defined.
+    category = models.ForeignKey(
+        "engagements.AssetCategory", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="findings",
+    )
+
     workflow_status = models.CharField(
         max_length=32, choices=WorkflowStatus.choices, default=WorkflowStatus.DRAFT
     )

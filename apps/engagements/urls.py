@@ -30,6 +30,17 @@ urlpatterns = [
         views.member_remove,
         name="member_remove",
     ),
+    path("<uuid:engagement_id>/scope/", views.scope_manage, name="scope_manage"),
+    path("<uuid:engagement_id>/scope/categories/add/", views.scope_category_add, name="scope_category_add"),
+    path(
+        "<uuid:engagement_id>/scope/categories/<uuid:pk>/delete/",
+        views.scope_category_delete, name="scope_category_delete",
+    ),
+    path("<uuid:engagement_id>/scope/assets/save/", views.scope_asset_save, name="scope_asset_save"),
+    path(
+        "<uuid:engagement_id>/scope/assets/<uuid:pk>/delete/",
+        views.scope_asset_delete, name="scope_asset_delete",
+    ),
     path("<uuid:engagement_id>/scope-changes/new/", views.scope_change_create, name="scope_change_create"),
     path(
         "<uuid:engagement_id>/scope-changes/<uuid:pk>/approve/",

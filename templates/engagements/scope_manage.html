@@ -1,0 +1,129 @@
+{% extends "base/base.html" %}
+{% load redscribe_extras %}
+{% block title %}Scope — {{ engagement.client_name }}{% endblock %}
+
+{% block engagement_subnav %}
+{% include "engagements/_subnav.html" with engagement=engagement active="overview" %}
+{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <p class="page-eyebrow !mb-0.5">{{ engagement.client_name }}</p>
+    <h1 class="page-title">Manage scope</h1>
+    <p class="text-sm text-slate-500 mt-1">
+        Define the asset groups (e.g. Internal, External) and the in-scope assets under each. Findings
+        are tagged with a group, and a network-pentest report shows one section per group.
+    </p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col xl:flex-row gap-8">
+    <div class="min-w-0 flex-1 space-y-6">
+        <section class="card">
+            <h2 class="font-semibold text-slate-900 mb-3">Scope assets</h2>
+            {% if assets %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-500 border-b border-slate-100 dark:border-slate-200">
+                            <th class="py-2 pr-3 font-medium">Group</th>
+                            <th class="py-2 pr-3 font-medium">Type</th>
+                            <th class="py-2 pr-3 font-medium">Asset</th>
+                            <th class="py-2 pr-3 font-medium">Notes</th>
+                            <th class="py-2 font-medium"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-200">
+                        {% for asset in assets %}
+                        <tr>
+                            <td class="py-2 pr-3">{{ asset.category.name }}</td>
+                            <td class="py-2 pr-3">{{ asset.get_asset_type_display }}</td>
+                            <td class="py-2 pr-3 font-mono break-all">{{ asset.value }}</td>
+                            <td class="py-2 pr-3 text-slate-500">{{ asset.description|default:"—" }}</td>
+                            <td class="py-2 whitespace-nowrap text-right">
+                                <a href="?edit={{ asset.pk }}" class="text-brand-700 dark:text-brand-300 hover:underline">Edit</a>
+                                <form method="post" action="{% url 'engagements:scope_asset_delete' engagement.pk asset.pk %}" class="inline ml-2">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-rose-600 hover:underline">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-sm text-slate-400">No scope assets yet.</p>
+            {% endif %}
+
+            {% if asset_form %}
+            <h3 class="font-medium text-slate-800 mt-6 mb-2 text-sm">
+                {% if editing_asset %}Edit asset{% else %}Add an asset{% endif %}
+            </h3>
+            <form method="post" action="{% url 'engagements:scope_asset_save' engagement.pk %}" class="space-y-3">
+                {% csrf_token %}
+                {% if editing_asset %}<input type="hidden" name="asset_id" value="{{ editing_asset.pk }}">{% endif %}
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label for="{{ asset_form.category.id_for_label }}" class="field-label">Group</label>
+                        {{ asset_form.category|add_class:"field-input" }}
+                    </div>
+                    <div>
+                        <label for="{{ asset_form.asset_type.id_for_label }}" class="field-label">Type</label>
+                        {{ asset_form.asset_type|add_class:"field-input" }}
+                    </div>
+                    <div>
+                        <label for="{{ asset_form.value.id_for_label }}" class="field-label">Asset</label>
+                        {{ asset_form.value|add_class:"field-input font-mono" }}
+                    </div>
+                </div>
+                <div>
+                    <label for="{{ asset_form.description.id_for_label }}" class="field-label">Notes</label>
+                    {{ asset_form.description|add_class:"field-input" }}
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="btn-primary">{% if editing_asset %}Save asset{% else %}Add asset{% endif %}</button>
+                    {% if editing_asset %}<a href="{% url 'engagements:scope_manage' engagement.pk %}" class="btn-secondary">Cancel</a>{% endif %}
+                </div>
+            </form>
+            {% else %}
+            <p class="text-sm text-slate-500 mt-4">Add an asset group first before adding assets.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <div class="xl:w-80 shrink-0 space-y-6">
+        <section class="card">
+            <h2 class="font-semibold text-slate-900 mb-3">Asset groups</h2>
+            {% if categories %}
+            <ul class="space-y-2 mb-4">
+                {% for category in categories %}
+                <li class="flex items-center justify-between text-sm">
+                    <span>{{ category.name }}</span>
+                    <form method="post" action="{% url 'engagements:scope_category_delete' engagement.pk category.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="text-rose-600 hover:underline text-xs">Remove</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-slate-400 mb-4">No groups yet — add Internal, External, and so on.</p>
+            {% endif %}
+            <form method="post" action="{% url 'engagements:scope_category_add' engagement.pk %}" class="space-y-2">
+                {% csrf_token %}
+                <div>
+                    <label for="{{ category_form.name.id_for_label }}" class="field-label">New group</label>
+                    {{ category_form.name|add_class:"field-input" }}
+                </div>
+                <button type="submit" class="btn-secondary w-full">Add group</button>
+            </form>
+        </section>
+    </div>
+</div>
+
+<div class="mt-6">
+    <a href="{% url 'engagements:detail' engagement.pk %}" class="text-sm text-slate-500 hover:underline">← Back to engagement</a>
+</div>
+{% endblock %}

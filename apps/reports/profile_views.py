@@ -221,6 +221,7 @@ def report_profile_edit(request, pk):
             profile.empty_cell_background_color = (
                 form.cleaned_data["empty_cell_background_color"] or "rgba(237,238,238,1)"
             )
+            profile.split_findings_by_asset_group = form.cleaned_data["split_findings_by_asset_group"]
             profile.finding_table_layout = (
                 form.cleaned_data["finding_table_layout"] or ReportProfile.FindingTableLayout.TABLE
             )
@@ -253,6 +254,7 @@ def report_profile_edit(request, pk):
             "table_header_color": profile.table_header_color,
             "empty_cell_background_color": profile.empty_cell_background_color,
             "finding_table_layout": profile.finding_table_layout,
+            "split_findings_by_asset_group": profile.split_findings_by_asset_group,
         }
         form = ReportProfileTemplateForm(initial=initial, profile=profile)
 

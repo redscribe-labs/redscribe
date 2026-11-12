@@ -121,6 +121,13 @@ class ReportProfile(models.Model):
         help_text="The profile a report uses when its report configuration has none explicitly chosen.",
     )
 
+    split_findings_by_asset_group = models.BooleanField(
+        default=False,
+        help_text="Network-style report: findings must be tagged with an asset group (e.g. Internal, "
+                  "External) and the report is split into one section per group. Leave off for a standard "
+                  "single-list report, which behaves exactly as before.",
+    )
+
     cover_title = models.CharField(max_length=255, blank=True, default="Penetration Test Report")
 
     classification_label = models.CharField(max_length=64, blank=True, default="Strictly Confidential")

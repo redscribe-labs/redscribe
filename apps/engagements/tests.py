@@ -617,7 +617,7 @@ class MemberManagementTests(TestCase):
 
 class ScopeChangeWorkflowTests(TestCase):
     def setUp(self):
-        self.engagement = Engagement.objects.create(client_name="Acme", scope="original scope")
+        self.engagement = Engagement.objects.create(client_name="Acme")
         generate_project_key(self.engagement)
         self.team_lead = make_user(User.Role.TEAM_LEAD)
         self.consultant = make_user(User.Role.CONSULTANT)
@@ -634,8 +634,6 @@ class ScopeChangeWorkflowTests(TestCase):
         req = ScopeChangeRequest.objects.get(engagement=self.engagement)
         self.assertEqual(req.status, ScopeChangeRequest.Status.PENDING)
         self.assertEqual(req.requested_by, self.consultant)
-        self.engagement.refresh_from_db()
-        self.assertEqual(self.engagement.scope, "original scope")
 
     def test_non_member_cannot_propose_scope_change(self):
         outsider = make_user(User.Role.CONSULTANT)
@@ -647,7 +645,9 @@ class ScopeChangeWorkflowTests(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
-    def test_team_lead_approval_applies_scope_and_records_review(self):
+    def test_team_lead_approval_records_review(self):
+        # Scope is structured now, so approval records the decision + notifies;
+        # a manager then applies the change on the Manage Scope page.
         req = ScopeChangeRequest.objects.create(
             engagement=self.engagement, proposed_scope="app.acme.com/*", requested_by=self.consultant
         )
@@ -658,9 +658,7 @@ class ScopeChangeWorkflowTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
 
-        self.engagement.refresh_from_db()
         req.refresh_from_db()
-        self.assertEqual(self.engagement.scope, "app.acme.com/*")
         self.assertEqual(req.status, ScopeChangeRequest.Status.APPROVED)
         self.assertEqual(req.reviewed_by, self.team_lead)
         self.assertIsNotNone(req.reviewed_at)
@@ -678,10 +676,10 @@ class ScopeChangeWorkflowTests(TestCase):
             reverse("engagements:scope_change_approve", args=[self.engagement.pk, req.pk])
         )
         self.assertEqual(resp.status_code, 403)
-        self.engagement.refresh_from_db()
-        self.assertEqual(self.engagement.scope, "original scope")
+        req.refresh_from_db()
+        self.assertEqual(req.status, ScopeChangeRequest.Status.PENDING)
 
-    def test_rejection_does_not_apply_scope(self):
+    def test_rejection_records_rejected_status(self):
         req = ScopeChangeRequest.objects.create(
             engagement=self.engagement, proposed_scope="app.acme.com/*", requested_by=self.consultant
         )
@@ -692,9 +690,7 @@ class ScopeChangeWorkflowTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
 
-        self.engagement.refresh_from_db()
         req.refresh_from_db()
-        self.assertEqual(self.engagement.scope, "original scope")
         self.assertEqual(req.status, ScopeChangeRequest.Status.REJECTED)
 
     def test_approval_notifies_requester(self):

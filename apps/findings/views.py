@@ -43,7 +43,7 @@ from .review import (
 
 PAGE_SIZE = 10
 
-PLAIN_FIELDS = ["title", "cvss_score", "cvss_vector", "severity", "cve_id", "status", "affects"]
+PLAIN_FIELDS = ["title", "cvss_score", "cvss_vector", "severity", "cve_id", "status", "affects", "category"]
 
 
 def _save_finding(form, engagement, project_key, *, classification_tags, instance=None, created_by=None, sections=None):
@@ -89,7 +89,7 @@ def finding_list(request, engagement_id):
     Status = Finding.WorkflowStatus
     user = request.user
     all_findings = request.engagement.findings.select_related(
-        "created_by", "assigned_reviewer", "assigned_qa"
+        "created_by", "assigned_reviewer", "assigned_qa", "category"
     ).prefetch_related("classifications")
     archived_count = all_findings.filter(archived=True).count()
     active_count = all_findings.filter(archived=False).count()
@@ -230,7 +230,7 @@ def _initial_from_template(source) -> dict:
 def finding_create(request, engagement_id):
     sections = list(ContentSectionDefinition.objects.filter(is_active=True))
     if request.method == "POST":
-        form = FindingForm(request.POST, sections=sections)
+        form = FindingForm(request.POST, sections=sections, engagement=request.engagement)
         classification_rows = parse_classification_rows(request.POST)
         classification_errors = validate_classification_rows(classification_rows)
         if form.is_valid() and not classification_errors:
@@ -274,7 +274,7 @@ def finding_create(request, engagement_id):
 
             initial.setdefault("title", check.title)
             initial["affects"] = decrypt_item_text(check, "scope_tested", request.project_key)
-        form = FindingForm(initial=initial or None, sections=sections)
+        form = FindingForm(initial=initial or None, sections=sections, engagement=request.engagement)
         classification_rows = classification_rows_for(template_source) if template_source else []
         classification_errors = []
 
@@ -394,7 +394,7 @@ def finding_edit(request, engagement_id, pk):
         # the stricter CVSS checks then apply only to fields the user actually edited,
         # leaving legacy findings editable (see FindingForm.clean).
         post_initial = {field: getattr(finding, field) for field in PLAIN_FIELDS}
-        form = FindingForm(request.POST, initial=post_initial, sections=sections)
+        form = FindingForm(request.POST, initial=post_initial, sections=sections, engagement=request.engagement)
         posted_version = request.POST.get("_version", "")
         classification_rows = parse_classification_rows(request.POST)
         classification_errors = validate_classification_rows(classification_rows)
@@ -434,7 +434,7 @@ def finding_edit(request, engagement_id, pk):
                 finding_section.content_ciphertext if finding_section else None, request.project_key,
                 associated_data=record_aad("finding", finding.pk, definition.slug),
             )
-        form = FindingForm(initial=initial, sections=sections)
+        form = FindingForm(initial=initial, sections=sections, engagement=request.engagement)
         classification_rows = classification_rows_for(finding)
         classification_errors = []
 

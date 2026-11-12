@@ -291,6 +291,54 @@ def _finding_details_table_subdoc(tpl, finding, profile, styles):
     return subdoc
 
 
+def _group_summary_table_subdoc(tpl, findings, profile, styles):
+    """The per-category ID/Severity/Title/Status summary table for a grouped
+    report ({%p for group in finding_groups %} ... {{p group.summary_table }}).
+    Mirrors the IR assembly._vuln_summary_table columns + severity/status cell
+    shading so DOCX matches the PDF/HTML output."""
+    columns = [
+        get_label(profile, "vuln_table_col_id"),
+        get_label(profile, "vuln_table_col_severity"),
+        get_label(profile, "vuln_table_col_title"),
+        get_label(profile, "vuln_table_col_status"),
+    ]
+    rows = []
+    shaded = {}
+    for i, f in enumerate(findings):
+        color = assembly._severity_status_color(f, profile)
+        rows.append([
+            f.display_id, get_severity_label(profile, f.severity), f.title,
+            get_status_label(profile, f.status),
+        ])
+        shaded[(i, 1)] = color
+        shaded[(i, 3)] = color
+    subdoc = tpl.new_subdoc()
+    _build_table(subdoc, columns, rows, styles=styles, shaded_cells=shaded)
+    return subdoc
+
+
+def _scope_table_subdoc(tpl, engagement, profile, styles):
+    """Structured scope as one Type/Asset/Notes table per asset category, for
+    {{p scope_table }} — the DOCX equivalent of the IR scope_table block."""
+    subdoc = tpl.new_subdoc()
+    columns = [
+        get_label(profile, "scope_col_type"), get_label(profile, "scope_col_value"),
+        get_label(profile, "scope_col_description"),
+    ]
+    any_assets = False
+    for category in engagement.asset_categories.prefetch_related("assets").all():
+        assets = list(category.assets.all())
+        if not assets:
+            continue
+        any_assets = True
+        _set_style_attr(subdoc.add_paragraph(category.name), styles.get("heading_3"))
+        rows = [[a.get_asset_type_display(), a.value, a.description or "—"] for a in assets]
+        _build_table(subdoc, columns, rows, styles=styles)
+    if not any_assets:
+        _set_style_attr(subdoc.add_paragraph("No scope assets recorded."), styles.get("body_paragraph"))
+    return subdoc
+
+
 def _assessment_team_subdoc(tpl, engagement, profile, styles):
     subdoc = tpl.new_subdoc()
     data = assembly._assessment_team_data(engagement)
@@ -481,6 +529,7 @@ def _base_context(tpl, *, profile, settings_obj, engagement, findings, content, 
         "assessment_team": _assessment_team_subdoc(tpl, engagement, profile, styles),
         "checklist_coverage": _checklist_coverage_subdoc(tpl, engagement, findings, profile, styles, project_key),
         "scan_imports": _scan_imports_subdoc(tpl, engagement, profile, styles),
+        "scope_table": _scope_table_subdoc(tpl, engagement, profile, styles),
         "breakdown_table": _breakdown_table_subdoc(
             tpl, findings, profile, content.get("breakdown") if isinstance(content, dict) else None, styles,
         ),
@@ -521,13 +570,24 @@ def build_docx(*, config, engagement, project_key, user) -> bytes:
     # merge field (set explicitly in _finding_context below) — excluded here so this
     # generic per-section loop doesn't clobber that with an empty subdoc.
     active_sections = list(ContentSectionDefinition.objects.filter(is_active=True).narrative())
-    context["findings"] = [
-        _finding_context(
+    finding_ctx_by_id = {
+        f.id: _finding_context(
             tpl, f, project_key=project_key, image_resolver=image_resolver, styles=styles,
             active_sections=active_sections, is_remediation_report=config.is_remediation_report,
             monospace_font=profile.monospace_font, text_transform=substitute, profile=profile,
         )
         for f in findings
+    }
+    context["findings"] = [finding_ctx_by_id[f.id] for f in findings]
+    # Grouped (per asset class) view for {%p for group in finding_groups %}.
+    # The combined chart (breakdown_table) and flat findings list stay as-is.
+    context["finding_groups"] = [
+        {
+            "name": category.name if category is not None else get_label(profile, "uncategorized_findings"),
+            "summary_table": _group_summary_table_subdoc(tpl, group, profile, styles),
+            "findings": [finding_ctx_by_id[f.id] for f in group],
+        }
+        for category, group in assembly._group_findings_by_category(findings)
     ]
 
     try:
@@ -559,6 +619,7 @@ def build_dummy_context(profile):
         "cover_title": profile.cover_title, "classification_label": profile.classification_label,
         "firm_name": "Example Firm", "document_control": tpl.new_subdoc(), "assessment_team": tpl.new_subdoc(),
         "checklist_coverage": tpl.new_subdoc(), "scan_imports": tpl.new_subdoc(),
+        "scope_table": tpl.new_subdoc(),
         "breakdown_table": tpl.new_subdoc(), "firm_logo": tpl.new_subdoc(),
         "observations": [{"title": "Example observation", "content": tpl.new_subdoc()}],
         "testing_phases": [{"title": "Example phase", "content": tpl.new_subdoc()}],
@@ -573,4 +634,8 @@ def build_dummy_context(profile):
     for definition in active_sections:
         dummy_finding[definition.slug] = tpl.new_subdoc()
     context["findings"] = [dummy_finding]
+    # One dummy group so a {%p for group in finding_groups %} loop body is exercised.
+    context["finding_groups"] = [
+        {"name": "Internal", "summary_table": tpl.new_subdoc(), "findings": [dummy_finding]},
+    ]
     return tpl, context

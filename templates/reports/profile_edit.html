@@ -141,6 +141,17 @@
                 </div>
 
                 <div class="mb-6">
+                    <label class="flex items-start gap-2.5 text-sm text-slate-700">
+                        {{ form.split_findings_by_asset_group }}
+                        <span>
+                            <span class="field-label !mb-0">{{ form.split_findings_by_asset_group.label }}</span>
+                            <span class="field-help block mt-0.5">{{ form.split_findings_by_asset_group.help_text }}</span>
+                        </span>
+                    </label>
+                    {% for error in form.split_findings_by_asset_group.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+                </div>
+
+                <div class="mb-6">
                     <p class="field-label mb-1">{{ form.finding_table_layout.label }}</p>
                     <div class="flex gap-4">
                         {% for radio in form.finding_table_layout %}

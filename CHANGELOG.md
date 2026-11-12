@@ -5,6 +5,71 @@ All notable changes to RedScribe. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until 1.0, each
 release carries an `-alpha` suffix and may include breaking changes.
 
+## [Unreleased]
+
+## [0.8.0-alpha] - 2026-11-13
+
+### Added
+
+- Per-engagement structured scope: typed assets (URL, IP, subnet, FQDN) under
+  named asset groups (e.g. Internal, External), each with a notes field.
+  Managed from the new "Manage scope" page.
+- Checklist templates can be archived. An archived template is retired from the
+  new-run picker, so new engagements can't start a run from it, while runs
+  already started keep working (each run snapshots its template's items when it
+  starts). Archive or restore from the template library, which now has **Active**
+  and **Archived** tabs; an archived template can't be the default.
+- Network-penetration-test reports: a report profile can split findings by
+  asset group into one section per group, each with its own findings table,
+  while the overall severity chart stays combined over all findings. Turned on
+  per profile with "Split findings by asset group". New profile/DOCX tags:
+  `grouped_findings` and `scope_table`.
+- Findings carry an asset group. The field is shown and required only on
+  engagements whose report profile splits by asset group, and grouped-report
+  export is blocked until every included finding is tagged. The findings list
+  shows each finding's asset group as a badge.
+
+### Changed
+
+- The breakdown-of-findings chart now stacks open and closed counts in one bar
+  per severity — open in full colour, closed in a lighter shade — with a key,
+  instead of two separate bars.
+- Scope change requests are now review notes: approval records the decision and
+  notifies, and a manager applies the change on the Manage scope page.
+- Dependencies: Django 5.2.19, django-allauth 65.22.0, psycopg 3.3.9. The
+  container image now runs on Python 3.14, and the browser password-strength
+  meter was rebuilt on zxcvbn-ts 4.
+- The bundled PostgreSQL client (`pg_dump`/`pg_restore`, used by backups) is now
+  version 18, installed from the PGDG apt repo since Debian ships only 17. It
+  backs up both 17 and 18 servers.
+- **Breaking (operators): the `db` service moves to PostgreSQL 18.** The 18
+  image stores its data in a major-version subdirectory and mounts the volume at
+  `/var/lib/postgresql` (not `.../data`), and it will **refuse to start on an
+  existing 17 data directory** — the upgrade is a backup-and-restore, not an
+  in-place pull. On a fresh install there is nothing to do. To upgrade an
+  existing 17 deployment, while it is still running on 17:
+  1. Back up: `docker compose exec web python manage.py create_backup` — note
+     the resulting `./backups/*.rsbk` file and your `BACKUP_ENCRYPTION_PASSPHRASE`.
+  2. `docker compose down`, then pull/build this release.
+  3. Remove the old 17 volume so 18 initialises fresh:
+     `docker volume rm redscribe_pgdata` (confirm the name with `docker volume ls`).
+  4. `docker compose up -d --build` — the 18 server starts empty and `web`
+     applies migrations.
+  5. Restore: `docker compose exec web python manage.py restore_backup
+     /app/backups/<file>.rsbk` (it writes a pre-restore safety snapshot first).
+
+### Removed
+
+- **Breaking:** the free-text engagement scope field. Existing scope text is
+  migrated into a single "In Scope" asset group. The `{{ scope }}` report
+  placeholder now renders the structured scope; DOCX templates that used the
+  old free-text `scope` should switch to `{{p scope_table }}`.
+
+### Fixed
+
+- Breadcrumbs now appear on the checklist-template pages (the template library,
+  a template, and the item editors), which previously had none.
+
 ## [0.7.0-alpha] - 2026-11-06
 
 ### Security

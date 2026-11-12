@@ -23,6 +23,11 @@ class BlockContext:
     checklist_builder: callable
     scan_imports_builder: callable
     substitute: callable
+    # Added for grouped (per-category) findings and structured scope; default
+    # None so existing BlockContext constructions keep working — the grouped /
+    # scope tags are only reachable via build_report_document, which sets them.
+    grouped_findings_builder: callable = None
+    scope_builder: callable = None
 
 
 @dataclass
@@ -72,6 +77,20 @@ def _finding_details(context: BlockContext) -> Fragment:
         for f in context.findings
     ]
     return Fragment(children=children)
+
+
+def _grouped_findings(context: BlockContext) -> Fragment:
+    # One section per asset category (Internal/External/…): its own summary
+    # table + its own finding detail entries. The combined severity chart stays
+    # separate ({{ breakdown_of_findings }} with show_table=false).
+    return Fragment(children=context.grouped_findings_builder(context))
+
+
+def _scope_table(context: BlockContext) -> Fragment | None:
+    section = context.scope_builder(context.engagement, context.profile)
+    if section is None:
+        return None
+    return Fragment(blocks=section.blocks, children=section.children)
 
 
 def _observations(context: BlockContext) -> Fragment:
@@ -131,6 +150,8 @@ BLOCK_REGISTRY = {
     "table_of_contents": _table_of_contents,
     "breakdown_of_findings": _breakdown_of_findings,
     "finding_details": _finding_details,
+    "grouped_findings": _grouped_findings,
+    "scope_table": _scope_table,
     "observations": _observations,
     "testing_phases": _testing_phases,
     "assessment_team": _assessment_team,

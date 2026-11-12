@@ -28,6 +28,7 @@ _DOCX_TOP_LEVEL_RICH_TAGS = [
     ("checklist_coverage", "Checklist coverage, grouped by run/category"),
     ("scan_imports", "Scanner imports appendix (tool, file, date, imported by, findings produced)"),
     ("breakdown_table", "Breakdown-of-findings severity/status counts table"),
+    ("scope_table", "Structured scope: one Type/Asset/Notes table per asset class"),
 ]
 
 # Loop variables available anywhere outside the finding loop — lists of
@@ -37,6 +38,11 @@ _DOCX_TOP_LEVEL_RICH_TAGS = [
 _DOCX_TOP_LEVEL_LOOP_TAGS = [
     ("observations", "Free-form per-engagement observations"),
     ("testing_phases", "Free-form per-engagement testing phases"),
+    (
+        "finding_groups",
+        "Findings grouped by asset class; each group has .name (plain), "
+        ".summary_table (rich), and .findings (same fields as the findings loop)",
+    ),
 ]
 
 # Plain-value tags available on each `finding` inside a

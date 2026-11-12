@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-redscribe}
@@ -14,7 +14,13 @@ services:
     secrets:
       - postgres_password
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # The 18+ official images store the cluster in a major-version
+      # subdirectory (PGDATA=/var/lib/postgresql/18/docker) and expect the
+      # volume one level up, at /var/lib/postgresql — not the old
+      # .../data path the 17 image used. Upgrading from a 17 volume is NOT
+      # automatic: the 18 image refuses to start on a 17 data directory. See
+      # the PostgreSQL 17 -> 18 steps in CHANGELOG.md before pulling this.
+      - pgdata:/var/lib/postgresql
     ports:
       # Bound to loopback only — for local dev/admin access (e.g. psql,
       # running migrations from the host). Not reachable off-box.

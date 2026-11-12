@@ -70,6 +70,14 @@ class ReportProfileTemplateForm(forms.Form):
                    "table, or a plain list. Severity/status color highlighting only applies to the table layout.",
         widget=forms.RadioSelect,
     )
+    split_findings_by_asset_group = forms.BooleanField(
+        required=False, label="Split findings by asset group (network penetration test)",
+        help_text="Turn on for network tests. Every finding must be tagged with an asset group "
+                   "(e.g. Internal, External), and the report shows one findings section per group with its "
+                   "own summary table, over a single combined severity chart. Off = a standard single-list "
+                   "report, unchanged. Use the {{ scope_table }} and {{ grouped_findings }} tags in the "
+                   "document above to place the split scope and findings.",
+    )
 
     def __init__(self, *args, profile=None, **kwargs):
         super().__init__(*args, **kwargs)

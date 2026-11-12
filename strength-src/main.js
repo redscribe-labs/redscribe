@@ -1,8 +1,12 @@
-import { zxcvbn, zxcvbnOptions } from "@zxcvbn-ts/core";
+import { ZxcvbnFactory } from "@zxcvbn-ts/core";
 import * as zxcvbnCommonPackage from "@zxcvbn-ts/language-common";
 import * as zxcvbnEnPackage from "@zxcvbn-ts/language-en";
 
-zxcvbnOptions.setOptions({
+// zxcvbn-ts 4 removed the top-level zxcvbn()/zxcvbnOptions singleton in
+// favour of a factory: build it once with the same options object (the
+// language packages still export dictionary/adjacencyGraphs/translations
+// under those names), then call .check() per password below.
+const zxcvbn = new ZxcvbnFactory({
   dictionary: {
     ...zxcvbnCommonPackage.dictionary,
     ...zxcvbnEnPackage.dictionary,
@@ -45,7 +49,7 @@ function attach(input) {
       return;
     }
 
-    const result = zxcvbn(value);
+    const result = zxcvbn.check(value);
     const level = LEVELS[result.score];
     fill.style.width = `${((result.score + 1) / LEVELS.length) * 100}%`;
     fill.className = `password-strength-fill ${level.className}`;

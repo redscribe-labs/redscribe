@@ -7,6 +7,11 @@
 <a href="{% url 'checklist_templates:edit' template.pk %}" class="btn-secondary">Edit name &amp; description</a>
 <a href="{% url 'checklist_templates:export' template.pk %}" class="btn-secondary">Export JSON</a>
 <a href="{% url 'checklist_templates:upload' %}" class="btn-secondary">Upload / replace</a>
+{% if template.archived %}
+<form method="post" action="{% url 'checklist_templates:unarchive' template.pk %}" class="inline-flex">{% csrf_token %}<button type="submit" class="btn-secondary">Restore from archive</button></form>
+{% else %}
+<form method="post" action="{% url 'checklist_templates:archive' template.pk %}" class="inline-flex">{% csrf_token %}<button type="submit" class="btn-secondary">Archive</button></form>
+{% endif %}
 <a href="{% url 'checklist_templates:item_add' template.pk %}" class="btn-primary">+ Add item</a>
 {% endblock %}
 
@@ -15,8 +20,9 @@
     <p class="page-eyebrow">Checklist template</p>
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="page-title">{{ template.name }}</h1>
-        {% if template.is_default %}<span class="badge-brand">Default</span>{% endif %}
+        {% if template.archived %}<span class="badge-mist">Archived</span>{% elif template.is_default %}<span class="badge-brand">Default</span>{% endif %}
     </div>
+    {% if template.archived %}<p class="text-sm text-slate-500 mt-1">Archived — existing runs keep working, but new engagements can't start a run from this template. Restore it to use it again.</p>{% endif %}
     <p class="text-sm text-slate-500 mt-1">{{ items|length }} check{{ items|length|pluralize }} in {{ grouped|length }} categor{{ grouped|length|pluralize:"y,ies" }} &middot; updated {{ template.updated_at|date:"d/m/Y H:i" }}</p>
     {% if template.description %}<p class="text-sm text-slate-600 mt-2 max-w-3xl">{{ template.description }}</p>{% endif %}
 </div>

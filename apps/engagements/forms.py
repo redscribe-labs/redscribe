@@ -7,7 +7,7 @@ from apps.accounts.fields import keep_current_user_selectable
 from apps.checklist.models import ChecklistTemplate
 from apps.clients.models import Client
 
-from .models import Engagement, EngagementMembership, ScopeChangeRequest
+from .models import AssetCategory, Engagement, EngagementMembership, ScopeAsset, ScopeChangeRequest
 
 User = get_user_model()
 
@@ -69,11 +69,10 @@ class EngagementCreateForm(_DateRangeCleanMixin, forms.ModelForm):
     class Meta:
         model = Engagement
         fields = [
-            "client", "reference_number", "test_type", "scope", "start_date", "end_date",
+            "client", "reference_number", "test_type", "start_date", "end_date",
             "default_reviewer", "default_qa", "default_approver",
         ]
         widgets = {
-            "scope": forms.Textarea(attrs={"rows": 5}),
             "start_date": forms.DateInput(
                 format="%Y-%m-%d",
                 attrs={"type": "text", "data-redscribe-datepicker": "true", "autocomplete": "off"},
@@ -133,6 +132,45 @@ class ScopeChangeRequestForm(forms.ModelForm):
         model = ScopeChangeRequest
         fields = ["proposed_scope"]
         widgets = {"proposed_scope": forms.Textarea(attrs={"rows": 5})}
+
+
+class AssetCategoryForm(forms.ModelForm):
+    class Meta:
+        model = AssetCategory
+        # `order` is intentionally excluded — it's not rendered and defaults to
+        # 0 on the model; including it would make it a required form field.
+        fields = ["name"]
+
+    def __init__(self, *args, engagement=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.engagement = engagement
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if self.engagement is not None and name:
+            clash = AssetCategory.objects.filter(engagement=self.engagement, name__iexact=name)
+            if self.instance.pk:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise forms.ValidationError("This engagement already has a category with that name.")
+        return name
+
+
+class ScopeAssetForm(forms.ModelForm):
+    class Meta:
+        model = ScopeAsset
+        # `order` excluded for the same reason as AssetCategoryForm.
+        fields = ["category", "asset_type", "value", "description"]
+        widgets = {
+            "value": forms.TextInput(attrs={"placeholder": "e.g. 10.0.0.0/24 or https://app.example.com"}),
+            "description": forms.Textarea(attrs={"rows": 2, "placeholder": "Inclusion notes (optional)"}),
+        }
+
+    def __init__(self, *args, engagement=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if engagement is not None:
+            self.fields["category"].queryset = engagement.asset_categories.all()
+        self.fields["category"].empty_label = None
 
 
 class AddMemberForm(forms.Form):

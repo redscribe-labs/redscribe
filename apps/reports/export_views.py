@@ -43,6 +43,7 @@ def export_options(request, engagement_id):
     # saved, so they were never added to it. Easy to miss, so call it out.
     omitted_count = max(publishable_count - included_count, 0)
     profile = assembly.get_effective_profile(config)
+    untagged_count = len(_grouped_untagged_findings(engagement, config))
     return render(
         request, "reports/export_options.html",
         {
@@ -50,12 +51,27 @@ def export_options(request, engagement_id):
             "included_count": included_count,
             "excluded_count": excluded_count,
             "omitted_count": omitted_count,
+            "untagged_count": untagged_count,
             "export_logs": engagement.report_export_logs.select_related("exported_by")[:20],
             "docx_available": bool(profile and profile.docx_template),
             "no_layout": not (profile and (profile.docx_template or (profile.template or {}).get("content"))),
             "breadcrumbs": engagement_crumbs(engagement) + [{"label": "Export report"}],
         },
     )
+
+
+def _grouped_untagged_findings(engagement, config):
+    """When the active profile's template splits findings by asset class
+    ({{ grouped_findings }}), every included finding must be tagged with a
+    category. Returns the untagged included findings (empty when the template
+    isn't grouped)."""
+    profile = assembly.get_effective_profile(config)
+    template = getattr(profile, "template", None)
+    if not template or "grouped_findings" not in assembly._template_tag_order(template):
+        return []
+    content = assembly.seeded_content(engagement, config)
+    findings = assembly._select_findings(engagement, content.get("findings", {}))
+    return [f for f in findings if f.category_id is None]
 
 
 def _build_document(request, engagement):
@@ -93,6 +109,18 @@ def export_download(request, engagement_id, fmt):
         return HttpResponseBadRequest("Unknown export format.")
 
     engagement = request.engagement
+
+    untagged = _grouped_untagged_findings(engagement, assembly.get_draft_config(engagement))
+    if untagged:
+        names = ", ".join(f.title for f in untagged[:5])
+        if len(untagged) > 5:
+            names += f", and {len(untagged) - 5} more"
+        messages.error(
+            request,
+            f"This report splits findings by asset class, but {len(untagged)} included "
+            f"finding(s) have no class assigned ({names}). Tag them before exporting.",
+        )
+        return redirect("reports:options", engagement_id=engagement.pk)
 
     if fmt == "docx":
         config = assembly.get_draft_config(engagement)

@@ -226,6 +226,24 @@
             </label>
             {% if not publishable_findings %}
             <p class="text-sm text-slate-500">No QA Approved findings on this engagement yet.</p>
+            {% elif findings_by_category %}
+            <div class="space-y-3" id="findings-list">
+                {% for category, group in findings_by_category %}
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{{ category.name|default:"Uncategorized" }}</p>
+                    <div class="space-y-1.5">
+                        {% for f in group %}
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" class="finding-checkbox" value="{{ f.id }}" {% if f.id|stringformat:"s" in content.findings.included_ids %}checked{% endif %}>
+                            <span class="badge-severity" style="{{ f|severity_style }}">{{ f.get_severity_display }}</span>
+                            {{ f.title }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <p class="field-help mt-2">Grouped by asset group — each becomes its own report section. Uncheck to exclude; order within a group follows severity.</p>
             {% else %}
             <div class="space-y-1.5" id="findings-list">
                 {% for f in publishable_findings %}

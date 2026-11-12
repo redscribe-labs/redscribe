@@ -27,7 +27,6 @@ class Engagement(models.Model):
         "clients.Client", null=True, blank=True, on_delete=models.PROTECT, related_name="engagements",
     )
     reference_number = models.CharField(max_length=64, blank=True, default="")
-    scope = models.TextField(blank=True, default="")
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
 
@@ -69,6 +68,66 @@ class Engagement(models.Model):
 
     def __str__(self):
         return self.client_name
+
+
+class AssetCategory(models.Model):
+    """An ordered, per-engagement grouping of scope assets (e.g. Internal /
+    External). Findings are tagged with one of these; reports that use the
+    grouped blocks emit one section per category, in `order`."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    engagement = models.ForeignKey(
+        Engagement, on_delete=models.CASCADE, related_name="asset_categories"
+    )
+    name = models.CharField(max_length=120)
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["engagement", "name"], name="unique_asset_category_name_per_engagement"
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class ScopeAsset(models.Model):
+    """A single structured, typed scope entry, replacing the old free-text
+    Engagement.scope. Belongs to an AssetCategory; `description` is the
+    free-text comment for inclusion nuance."""
+
+    class AssetType(models.TextChoices):
+        URL = "URL", "URL (website / API endpoint)"
+        IP = "IP", "IP address"
+        SUBNET = "SUBNET", "Subnet (CIDR)"
+        FQDN = "FQDN", "Fully-qualified domain name"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    engagement = models.ForeignKey(
+        Engagement, on_delete=models.CASCADE, related_name="scope_assets"
+    )
+    category = models.ForeignKey(
+        AssetCategory, on_delete=models.PROTECT, related_name="assets"
+    )
+    asset_type = models.CharField(max_length=16, choices=AssetType.choices, default=AssetType.URL)
+    value = models.CharField(max_length=512)
+    description = models.TextField(blank=True, default="")
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category__order", "order", "value"]
+
+    def __str__(self):
+        return f"{self.get_asset_type_display()}: {self.value}"
 
 
 class EngagementMembership(models.Model):

@@ -42,6 +42,15 @@
             to add them before exporting.
         </p>
         {% endif %}
+        {% if untagged_count %}
+        <p class="text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-md px-3 py-2 mt-3">
+            <strong>{{ untagged_count }} included finding{{ untagged_count|pluralize }}
+            {{ untagged_count|pluralize:"has,have" }} no asset group assigned.</strong>
+            This profile splits findings into one section per asset group, so export is blocked until
+            every finding is tagged. Tag them from the
+            <a href="{% url 'findings:list' engagement.pk %}" class="underline font-medium">Findings</a> list.
+        </p>
+        {% endif %}
         {% if excluded_count %}
         <p class="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-md px-3 py-2 mt-3">
             {{ excluded_count }} other finding{{ excluded_count|pluralize }} — still Draft or awaiting

@@ -1,9 +1,9 @@
 # Web framework
-Django==5.2.18
+Django==5.2.19
 
 # Auth: single-provider, single-domain OAuth (Google/Microsoft) alongside
 # local username/password
-django-allauth==65.20.1
+django-allauth==65.22.0
 # Required by allauth's Google provider to verify the id_token JWT it gets
 # back from the token endpoint.
 PyJWT==2.15.1
@@ -28,7 +28,7 @@ argon2-cffi==25.1.0
 cryptography==50.0.2
 
 # Postgres driver
-psycopg[binary]==3.3.6
+psycopg[binary]==3.3.9
 
 # Local dev/prod env
 gunicorn==26.2.0

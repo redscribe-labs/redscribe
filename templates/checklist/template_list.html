@@ -15,6 +15,14 @@
 {% endblock %}
 
 {% block content %}
+<nav aria-label="Template status" class="flex gap-1 border-b border-slate-200 mb-5 overflow-x-auto">
+    <a href="?" class="{% if not show_archived %}tab-link-active{% else %}tab-link{% endif %}"{% if not show_archived %} aria-current="page"{% endif %}>
+        Active <span class="font-mono text-[0.6875rem] text-slate-500">{{ active_count }}</span>
+    </a>
+    <a href="?view=archived" class="{% if show_archived %}tab-link-active{% else %}tab-link{% endif %}"{% if show_archived %} aria-current="page"{% endif %}>
+        Archived <span class="font-mono text-[0.6875rem] text-slate-500">{{ archived_count }}</span>
+    </a>
+</nav>
 {% if templates %}
 <ul class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
     {% for template in templates %}
@@ -27,16 +35,27 @@
                 <h2 class="font-semibold text-slate-900"><a href="{% url 'checklist_templates:detail' template.pk %}" class="hover:text-brand-700 dark:hover:text-brand-300">{{ template.name }}</a></h2>
                 {% if template.description %}<p class="text-sm text-slate-500 mt-0.5">{{ template.description|truncatechars:120 }}</p>{% endif %}
             </div>
-            {% if template.is_default %}<span class="badge-brand shrink-0">Default</span>{% endif %}
+            {% if template.archived %}<span class="badge-mist shrink-0">Archived</span>{% elif template.is_default %}<span class="badge-brand shrink-0">Default</span>{% endif %}
         </div>
         <p class="text-sm text-slate-600"><span class="font-mono font-semibold text-slate-900">{{ template.items.count }}</span> check{{ template.items.count|pluralize }}</p>
         <div class="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 dark:border-slate-200 pt-3 text-sm">
             <a href="{% url 'checklist_templates:detail' template.pk %}" class="font-medium text-brand-700 dark:text-brand-300 hover:underline">Edit items</a>
             <a href="{% url 'checklist_templates:export' template.pk %}" class="font-medium text-brand-700 dark:text-brand-300 hover:underline">Export JSON</a>
+            {% if template.archived %}
+            <form method="post" action="{% url 'checklist_templates:unarchive' template.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="font-medium text-brand-700 dark:text-brand-300 hover:underline">Restore</button>
+            </form>
+            {% else %}
             {% if not template.is_default %}
             <form method="post" action="{% url 'checklist_templates:set_default' template.pk %}">
                 {% csrf_token %}
                 <button type="submit" class="font-medium text-brand-700 dark:text-brand-300 hover:underline">Make default</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'checklist_templates:archive' template.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="font-medium text-slate-500 hover:text-slate-700 hover:underline">Archive</button>
             </form>
             {% endif %}
             <span class="ml-auto text-xs text-slate-500">Updated {{ template.updated_at|date:"d/m/Y" }}</span>
@@ -44,6 +63,8 @@
     </li>
     {% endfor %}
 </ul>
+{% elif show_archived %}
+<p class="text-sm text-slate-500">No archived templates. Archiving a template retires it from new engagements while leaving existing runs untouched.</p>
 {% else %}
 {% url 'checklist_templates:create' as create_url %}
 {% include "base/_empty_state.html" with icon="check" title="No checklist templates yet" message="Create one, or upload a JSON or CSV file to start from." action_url=create_url action_label="New template" %}

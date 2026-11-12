@@ -1,5 +1,7 @@
 from django import forms
 
+from apps.engagements.models import AssetCategory
+
 from .models import ContentSectionDefinition, Finding, TemplateSection, VulnerabilityTemplate
 from .validators import (
     sanitize_tiptap_image_srcs,
@@ -54,13 +56,42 @@ class FindingForm(forms.Form):
         }),
     )
     status = forms.ChoiceField(choices=Finding.Status.choices, initial=Finding.Status.OPEN)
+    # The asset class (Internal / External / …) this finding is reported under.
+    # Queryset + requiredness are set per-engagement in __init__: required once
+    # the engagement has any asset categories, optional otherwise.
+    category = forms.ModelChoiceField(
+        queryset=AssetCategory.objects.none(), required=False,
+        empty_label="— Select group —", label="Asset group",
+        help_text="Places this finding in its section of the report (e.g. Internal, External).",
+    )
     affects = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}), required=False,
         help_text="One affected asset/URL per line",
     )
 
-    def __init__(self, *args, sections=None, **kwargs):
+    def __init__(self, *args, sections=None, engagement=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if engagement is not None:
+            # The asset-group field only applies when the engagement's report
+            # profile is a network-style one that splits findings by group. On a
+            # standard profile the field stays hidden (empty queryset) and
+            # optional, so those engagements behave exactly as before.
+            from apps.reports.assembly import engagement_uses_asset_groups
+
+            if engagement_uses_asset_groups(engagement):
+                categories = engagement.asset_categories.all()
+                self.fields["category"].queryset = categories
+                # Required once there are groups to tag against. If the profile
+                # wants groups but none are defined yet, the field stays hidden
+                # and the export guard flags any untagged findings instead.
+                self.fields["category"].required = categories.exists()
+            # The scope-asset values are offered as free-input autocomplete
+            # suggestions on the affects textarea (template reads this list).
+            self.affects_suggestions = sorted(
+                {a.value for a in engagement.scope_assets.all() if a.value}
+            )
+        else:
+            self.affects_suggestions = []
         self.sections = (
             list(sections) if sections is not None
             else list(ContentSectionDefinition.objects.filter(is_active=True))

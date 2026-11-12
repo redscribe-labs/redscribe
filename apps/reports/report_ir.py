@@ -40,10 +40,24 @@ class CodeBlock:
 
 
 @dataclass
-class SeverityBar:
+class SeverityBarSegment:
+    """One stacked slice of a severity bar — e.g. the open findings (full
+    colour) or the closed ones (a lighter shade of the same colour)."""
+
     label: str
     value: int
     color_rgba: str
+
+
+@dataclass
+class SeverityBar:
+    label: str
+    segments: list[SeverityBarSegment]
+
+    @property
+    def value(self) -> int:
+        """Total height of the (stacked) bar — all segments combined."""
+        return sum(segment.value for segment in self.segments)
 
 
 @dataclass

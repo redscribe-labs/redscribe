@@ -994,11 +994,55 @@ class BargraphAndTocRenderTests(TestCase):
         exec_summary = next(s for s in document.sections if s.title == "Executive Summary")
         bargraph = next(b for b in exec_summary.blocks if isinstance(b, BarGraphBlock))
         labels = [bar.label for bar in bargraph.series]
+        # One bar per severity (never two), labelled by the severity alone —
+        # open/closed are now stacked segments within that single bar.
         for severity in _SEVERITY_ORDER:
             display = dict(Finding.Severity.choices)[severity]
-            self.assertIn(f"{display} (Open)", labels)
-        zero_bars = [bar for bar in bargraph.series if bar.label != "Critical (Open)"]
+            self.assertEqual(labels.count(display), 1)
+        zero_bars = [bar for bar in bargraph.series if bar.label != "Critical"]
         self.assertTrue(all(bar.value == 0 for bar in zero_bars))
+
+    def test_open_and_closed_share_one_stacked_bar(self):
+        from .report_ir import BarGraphBlock
+
+        # A closed Critical alongside the open one from setUp.
+        make_finding(
+            self.engagement, self.author, title="Closed crit",
+            severity=Finding.Severity.CRITICAL, status=Finding.Status.CLOSED,
+            workflow_status=Finding.WorkflowStatus.QA_APPROVED,
+        )
+        document = self._build_document()
+        exec_summary = next(s for s in document.sections if s.title == "Executive Summary")
+        bargraph = next(b for b in exec_summary.blocks if isinstance(b, BarGraphBlock))
+
+        criticals = [bar for bar in bargraph.series if bar.label == "Critical"]
+        self.assertEqual(len(criticals), 1)  # one bar, not two
+        crit = criticals[0]
+        # Open at the base, closed stacked on top; total height is the sum.
+        self.assertEqual([(s.label, s.value) for s in crit.segments], [("Open", 1), ("Closed", 1)])
+        self.assertEqual(crit.value, 2)
+        # Closed uses a lighter shade of the same colour, not the open colour.
+        self.assertNotEqual(crit.segments[0].color_rgba, crit.segments[1].color_rgba)
+
+    def test_bargraph_html_stacks_segments_and_shows_legend(self):
+        from .ir_render import render_body_html
+
+        make_finding(
+            self.engagement, self.author, title="Closed crit",
+            severity=Finding.Severity.CRITICAL, status=Finding.Status.CLOSED,
+            workflow_status=Finding.WorkflowStatus.QA_APPROVED,
+        )
+        html = render_body_html(self._build_document())
+        # Stacked segments, not a separate fill element per bar.
+        self.assertIn("report-vbar-seg", html)
+        self.assertNotIn("report-vbar-fill", html)
+        # The closed segment sits above the open one (non-zero bottom offset).
+        self.assertIn("bottom:0.0%", html)
+        self.assertIn("bottom:50.0%", html)  # open fills half the Critical bar
+        # A key explains the full-colour / lighter split.
+        self.assertIn("report-bargraph-legend", html)
+        self.assertIn(">Open<", html)
+        self.assertIn(">Closed<", html)
 
     def test_toc_does_not_include_individual_finding_titles(self):
         from .ir_render import render_toc
@@ -1098,7 +1142,7 @@ class BargraphAndTocRenderTests(TestCase):
         # commentary before the (child-section) table in document order.
         self.assertIsNotNone(vuln_table_position)
 
-    def test_breakdown_status_filter_excludes_open_bars(self):
+    def test_breakdown_status_filter_excludes_open_segments(self):
         from .report_ir import BarGraphBlock
 
         document = self._build_document_with_breakdown({
@@ -1106,7 +1150,10 @@ class BargraphAndTocRenderTests(TestCase):
         })
         exec_summary = next(s for s in document.sections if s.title == "Executive Summary")
         bargraph = next(b for b in exec_summary.blocks if isinstance(b, BarGraphBlock))
-        self.assertFalse(any("(Open)" in bar.label for bar in bargraph.series))
+        # Filtering to CLOSED leaves each bar with only its closed segment — no
+        # open segment is stacked in.
+        segment_labels = {seg.label for bar in bargraph.series for seg in bar.segments}
+        self.assertEqual(segment_labels, {"Closed"})
 
     def test_toc_nests_level_two_entries(self):
         from .ir_render import render_toc

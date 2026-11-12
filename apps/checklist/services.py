@@ -9,7 +9,7 @@ def instantiate_checklist(
     engagement, template: ChecklistTemplate | None = None, label: str = "", created_by=None,
 ) -> ChecklistRun:
     if template is None:
-        template = ChecklistTemplate.objects.filter(is_default=True).first()
+        template = ChecklistTemplate.objects.filter(is_default=True, archived=False).first()
     if template is None:
         raise ValueError("No checklist template is set as default.")
 

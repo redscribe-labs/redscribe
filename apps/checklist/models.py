@@ -13,6 +13,9 @@ class ChecklistTemplate(models.Model):
     description = models.TextField(blank=True, default="")
 
     is_default = models.BooleanField(default=False)
+    # Retired from the new-run picker. Runs already started are snapshots and
+    # keep working; archiving only stops new runs being started from it.
+    archived = models.BooleanField(default=False)
 
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -22,7 +25,7 @@ class ChecklistTemplate(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["archived", "name"]
 
     def __str__(self):
         return self.name

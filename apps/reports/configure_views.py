@@ -35,7 +35,10 @@ def _preview_html(document, profile) -> str:
 
 def _publishable_findings(engagement):
     return sorted(
-        (f for f in engagement.findings.filter(archived=False) if f.workflow_status in assembly.PUBLISHABLE_STATUSES),
+        (
+            f for f in engagement.findings.filter(archived=False).select_related("category")
+            if f.workflow_status in assembly.PUBLISHABLE_STATUSES
+        ),
         key=lambda f: (
             assembly._SEVERITY_ORDER.index(f.severity) if f.severity in assembly._SEVERITY_ORDER else 99,
             f.title.lower(),
@@ -72,6 +75,14 @@ def report_configure(request, engagement_id):
     )
     preview_html = _preview_html(document, effective_profile)
 
+    # When the engagement defines asset classes, cluster the selection list by
+    # class so the author sees how findings will split — the report order within
+    # each class stays the severity order the flat list already uses.
+    publishable_findings = _publishable_findings(engagement)
+    findings_by_category = None
+    if assembly.engagement_uses_asset_groups(engagement):
+        findings_by_category = assembly._group_findings_by_category(publishable_findings)
+
     return render(
         request, "reports/configure.html",
         {
@@ -84,7 +95,8 @@ def report_configure(request, engagement_id):
             "selected_profile_cover_title": effective_profile.cover_title if effective_profile else "",
             "selected_profile_classification_label": effective_profile.classification_label if effective_profile else "",
             "selected_profile_has_docx_template": bool(effective_profile and effective_profile.docx_template),
-            "publishable_findings": _publishable_findings(engagement),
+            "publishable_findings": publishable_findings,
+            "findings_by_category": findings_by_category,
             "severity_choices": Finding.Severity.choices,
             "status_choices": Finding.Status.choices,
             "dynamic_section_fields": [

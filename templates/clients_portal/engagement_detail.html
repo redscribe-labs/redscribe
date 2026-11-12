@@ -27,13 +27,36 @@
 </div>
 {% endif %}
 
-{% if engagement.scope %}
+{% if engagement.scope_assets.exists %}
 <details class="card mb-6 group">
     <summary class="cursor-pointer font-semibold text-slate-900 select-none list-none flex items-center justify-between">
         Scope of this engagement
         <svg class="h-4 w-4 text-slate-500 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5l5 5-5 5"/></svg>
     </summary>
-    <p class="whitespace-pre-wrap bg-slate-50 dark:bg-slate-50 border border-slate-100 dark:border-slate-200 rounded-md p-3 text-sm text-slate-700 mt-3">{{ engagement.scope }}</p>
+    <div class="mt-3 space-y-4">
+        {% for category in engagement.asset_categories.all %}
+        {% with assets=category.assets.all %}
+        {% if assets %}
+        <div>
+            <div class="flex items-baseline justify-between gap-2 mb-1.5">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ category.name }}</h3>
+                <span class="text-xs font-mono text-slate-400">{{ assets|length }} asset{{ assets|length|pluralize }}</span>
+            </div>
+            <ul class="space-y-1 rounded-lg bg-slate-50 px-3 py-2.5">
+                {% for asset in assets %}
+                <li class="flex items-baseline gap-3">
+                    <span class="w-16 shrink-0 text-right font-mono text-xs font-semibold uppercase tracking-wide text-slate-500" title="{{ asset.get_asset_type_display }}">{{ asset.asset_type }}</span>
+                    <span class="min-w-0 flex-1 text-sm">
+                        <span class="font-mono text-slate-700 break-all">{{ asset.value }}</span>{% if asset.description %}<span class="text-slate-400"> — {{ asset.description }}</span>{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endfor %}
+    </div>
 </details>
 {% endif %}
 
